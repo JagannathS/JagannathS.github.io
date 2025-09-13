@@ -1,0 +1,839 @@
+<!DOCTYPE HTML>
+<html> <head> <title>DevOps Automation in Telecommunications: Building Self-Healing Infrastructure at Scale - Future Imperfect</title> <meta charset="utf-8" /> <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no" /> <link rel="stylesheet" href="../assets/css/main.css" /> <link rel="stylesheet" href="../assets/css/codehilite.css" /> </head> <body class="single is-preload"> <div id="wrapper"> <header id="header"> <h1><a href="../index.html">Future Imperfect</a></h1> <nav class="links"></nav> </header> <div id="main"> <article class="post"> <header> <div class="title"><h2>DevOps Automation in Telecommunications: Building Self-Healing Infrastructure at Scale</h2><p>In the fast-paced world of telecommunications, where network downtime can cost millions and affect millions of subscribers, traditional manual deployment and operations processes simply cannot keep pace with business demands. Over the past two years, I&#x27;ve been architecting and implementing comprehensive DevOps automation solutions that have transformed how we deploy, monitor, and maintain critical telecommunications infrastructure.</p></div> <div class="meta"><span class="published">DevOps</span></div> </header> <div class="content markdown"><h1>DevOps Automation in Telecommunications: Building Self-Healing Infrastructure at Scale</h1>
+<h2>Introduction</h2>
+<p>In the fast-paced world of telecommunications, where network downtime can cost millions and affect millions of subscribers, traditional manual deployment and operations processes simply cannot keep pace with business demands. Over the past two years, I've been architecting and implementing comprehensive DevOps automation solutions that have transformed how we deploy, monitor, and maintain critical telecommunications infrastructure.</p>
+<p>This blog post chronicles the journey from manual, error-prone processes to a fully automated, self-healing infrastructure that handles 20+ automated deployments and manages continuous integration/continuous delivery (CI/CD) pipelines across multiple services and regions.</p>
+<h2>The Challenge: Manual Operations at Telecommunications Scale</h2>
+<h3>The Problem Landscape</h3>
+<p>Telecommunications infrastructure presents unique automation challenges that differ significantly from typical web applications:</p>
+<p><strong>Scale and Complexity:</strong>
+- Multiple services deployed across 3+ geographic regions
+- 24/7 operations with zero-tolerance for extended downtime<br />
+- Complex interdependencies between network functions
+- Regulatory compliance requiring audit trails for all changes</p>
+<p><strong>Legacy Integration:</strong>
+- Mix of legacy systems and modern cloud-native services
+- Multiple deployment patterns (Kubernetes, traditional VMs, hardware appliances)
+- Complex network configurations spanning multiple data centers
+- Integration with existing BSS/OSS systems</p>
+<p><strong>Operational Requirements:</strong>
+- Sub-second failover requirements for critical services
+- Capacity for rapid scaling during peak events (emergencies, major holidays)
+- Compliance with telecommunications regulations across multiple jurisdictions
+- Security requirements demanding encrypted communications and access controls</p>
+<h3>The Cost of Manual Operations</h3>
+<p>Before automation, our operational metrics painted a concerning picture:</p>
+<ul>
+<li><strong>Deployment time</strong>: 4-8 hours for a single service across all environments</li>
+<li><strong>Error rate</strong>: 30% of deployments required manual intervention</li>
+<li><strong>Recovery time</strong>: 45 minutes average for service restoration</li>
+<li><strong>Change frequency</strong>: Limited to once per week due to risk management</li>
+<li><strong>Operational overhead</strong>: 60% of engineering time spent on toil</li>
+</ul>
+<h2>Architecture Overview: End-to-End Automation</h2>
+<p>Our automation strategy encompasses the entire software delivery lifecycle, from code commit to production deployment and ongoing operations.</p>
+<h3>Core Components</h3>
+<div class="codehilite"><pre><span></span><code><span class="n">graph</span><span class="w"> </span><span class="n">TB</span>
+<span class="w"> </span><span class="n">A</span><span class="p">[</span><span class="n">Developer</span><span class="w"> </span><span class="n">Commit</span><span class="p">]</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">B</span><span class="p">[</span><span class="n">GitHub</span><span class="w"> </span><span class="n">Actions</span><span class="p">]</span>
+<span class="w"> </span><span class="n">B</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">C</span><span class="p">[</span><span class="n">Automated</span><span class="w"> </span><span class="n">Testing</span><span class="p">]</span>
+<span class="w"> </span><span class="n">C</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">D</span><span class="p">[</span><span class="n">Container</span><span class="w"> </span><span class="n">Build</span><span class="p">]</span>
+<span class="w"> </span><span class="n">D</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">E</span><span class="p">[</span><span class="n">Security</span><span class="w"> </span><span class="n">Scanning</span><span class="p">]</span>
+<span class="w"> </span><span class="n">E</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">F</span><span class="p">[</span><span class="n">Artifact</span><span class="w"> </span><span class="n">Registry</span><span class="p">]</span>
+<span class="w"> </span><span class="n">F</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">G</span><span class="p">[</span><span class="n">ArgoCD</span><span class="w"> </span><span class="n">Sync</span><span class="p">]</span>
+<span class="w"> </span><span class="n">G</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">H</span><span class="p">[</span><span class="n">Kubernetes</span><span class="w"> </span><span class="n">Deployment</span><span class="p">]</span>
+<span class="w"> </span><span class="n">H</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">I</span><span class="p">[</span><span class="n">Health</span><span class="w"> </span><span class="n">Validation</span><span class="p">]</span>
+<span class="w"> </span><span class="n">I</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">J</span><span class="p">[</span><span class="n">Monitoring</span><span class="w"> </span><span class="n">Integration</span><span class="p">]</span>
+<span class="w"> </span><span class="n">J</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">K</span><span class="p">[</span><span class="n">Automated</span><span class="w"> </span><span class="n">Scaling</span><span class="p">]</span>
+<span class="w"> </span><span class="n">K</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">L</span><span class="p">[</span><span class="n">Self</span><span class="o">-</span><span class="n">Healing</span><span class="w"> </span><span class="n">Actions</span><span class="p">]</span>
+</code></pre></div> <h3>GitHub Actions: The Orchestration Engine</h3>
+<p>Our CI/CD pipeline is built on GitHub Actions, providing robust automation for every aspect of the deployment lifecycle.</p>
+<h4>Multi-Service Pipeline Configuration</h4>
+<div class="codehilite"><pre><span></span><code><span class="c1"># .github/workflows/deploy-wireless-services.yml</span>
+<span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Deploy Wireless Services</span> <span class="nt">on</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">push</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">branches</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">main</span><span class="p p-Indicator">]</span>
+<span class="w"> </span><span class="nt">paths</span><span class="p">:</span><span class="w"> </span>
+<span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="s">&#39;wireless-*/**&#39;</span>
+<span class="w"> </span><span class="nt">pull_request</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">branches</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">main</span><span class="p p-Indicator">]</span> <span class="nt">env</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">REGISTRY</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">ghcr.io</span>
+<span class="w"> </span><span class="nt">VAULT_ADDR</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">${{ secrets.VAULT_ADDR }}</span>
+<span class="w"> </span><span class="nt">KUBECONFIG_DATA</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">${{ secrets.KUBECONFIG_DATA }}</span> <span class="nt">jobs</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">detect-changes</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">runs-on</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">ubuntu-latest</span>
+<span class="w"> </span><span class="nt">outputs</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">services</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">${{ steps.changes.outputs.services }}</span>
+<span class="w"> </span><span class="nt">steps</span><span class="p">:</span>
+<span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Checkout repository</span>
+<span class="w"> </span><span class="nt">uses</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">actions/checkout@v4</span>
+<span class="w"> </span><span class="nt">with</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">fetch-depth</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0</span> <span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Detect changed services</span>
+<span class="w"> </span><span class="nt">id</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">changes</span>
+<span class="w"> </span><span class="nt">run</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">|</span>
+<span class="w"> </span><span class="no">CHANGED_SERVICES=$(git diff --name-only HEAD~1 HEAD | grep &#39;^wireless-&#39; | cut -d&#39;/&#39; -f1 | sort -u | jq -R -s -c &#39;split(&quot;\n&quot;)[:-1]&#39;)</span>
+<span class="w"> </span><span class="no">echo &quot;services=$CHANGED_SERVICES&quot; &gt;&gt; $GITHUB_OUTPUT</span>
+<span class="w"> </span><span class="no">echo &quot;Changed services: $CHANGED_SERVICES&quot;</span> <span class="w"> </span><span class="nt">test-and-build</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">needs</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">detect-changes</span>
+<span class="w"> </span><span class="nt">if</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">needs.detect-changes.outputs.services != &#39;[]&#39;</span>
+<span class="w"> </span><span class="nt">runs-on</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">ubuntu-latest</span>
+<span class="w"> </span><span class="nt">strategy</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">matrix</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">service</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">${{ fromJson(needs.detect-changes.outputs.services) }}</span>
+<span class="w"> </span><span class="nt">steps</span><span class="p">:</span>
+<span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Checkout repository</span>
+<span class="w"> </span><span class="nt">uses</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">actions/checkout@v4</span> <span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Set up Docker Buildx</span>
+<span class="w"> </span><span class="nt">uses</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">docker/setup-buildx-action@v3</span> <span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Login to Container Registry</span>
+<span class="w"> </span><span class="nt">uses</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">docker/login-action@v3</span>
+<span class="w"> </span><span class="nt">with</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">registry</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">${{ env.REGISTRY }}</span>
+<span class="w"> </span><span class="nt">username</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">${{ github.actor }}</span>
+<span class="w"> </span><span class="nt">password</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">&lt;REDACTED&gt; secrets.GITHUB_TOKEN }}</span> <span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Run service tests</span>
+<span class="w"> </span><span class="nt">run</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">|</span>
+<span class="w"> </span><span class="no">cd ${{ matrix.service }}</span>
+<span class="w"> </span><span class="no">if [ -f &quot;Makefile&quot; ]; then</span>
+<span class="w"> </span><span class="no">make test</span>
+<span class="w"> </span><span class="no">else</span>
+<span class="w"> </span><span class="no">echo &quot;No tests found for ${{ matrix.service }}&quot;</span>
+<span class="w"> </span><span class="no">fi</span> <span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Build and push Docker image</span>
+<span class="w"> </span><span class="nt">uses</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">docker/build-push-action@v5</span>
+<span class="w"> </span><span class="nt">with</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">context</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">./${{ matrix.service }}</span>
+<span class="w"> </span><span class="nt">push</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
+<span class="w"> </span><span class="nt">tags</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">|</span>
+<span class="w"> </span><span class="no">${{ env.REGISTRY }}/${{ github.repository }}/${{ matrix.service }}:${{ github.sha }}</span>
+<span class="w"> </span><span class="no">${{ env.REGISTRY }}/${{ github.repository }}/${{ matrix.service }}:latest</span>
+<span class="w"> </span><span class="nt">cache-from</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">type=gha</span>
+<span class="w"> </span><span class="nt">cache-to</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">type=gha,mode=max</span> <span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Security scan</span>
+<span class="w"> </span><span class="nt">uses</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">aquasecurity/trivy-action@master</span>
+<span class="w"> </span><span class="nt">with</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">image-ref</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">${{ env.REGISTRY }}/${{ github.repository }}/${{ matrix.service }}:${{ github.sha }}</span>
+<span class="w"> </span><span class="nt">format</span><span class="p">:</span><span class="w"> </span><span class="s">&#39;sarif&#39;</span>
+<span class="w"> </span><span class="nt">output</span><span class="p">:</span><span class="w"> </span><span class="s">&#39;trivy-results.sarif&#39;</span> <span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Upload security scan results</span>
+<span class="w"> </span><span class="nt">uses</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">github/codeql-action/upload-sarif@v2</span>
+<span class="w"> </span><span class="nt">with</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">sarif_file</span><span class="p">:</span><span class="w"> </span><span class="s">&#39;trivy-results.sarif&#39;</span> <span class="w"> </span><span class="nt">deploy-dev</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">needs</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">detect-changes</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">test-and-build</span><span class="p p-Indicator">]</span>
+<span class="w"> </span><span class="nt">runs-on</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">ubuntu-latest</span>
+<span class="w"> </span><span class="nt">environment</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">development</span>
+<span class="w"> </span><span class="nt">strategy</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">matrix</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">service</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">${{ fromJson(needs.detect-changes.outputs.services) }}</span>
+<span class="w"> </span><span class="nt">steps</span><span class="p">:</span>
+<span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Checkout repository</span>
+<span class="w"> </span><span class="nt">uses</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">actions/checkout@v4</span> <span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Setup kubectl</span>
+<span class="w"> </span><span class="nt">uses</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">azure/setup-kubectl@v3</span>
+<span class="w"> </span><span class="nt">with</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">version</span><span class="p">:</span><span class="w"> </span><span class="s">&#39;v1.28.0&#39;</span> <span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Configure kubeconfig</span>
+<span class="w"> </span><span class="nt">run</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">|</span>
+<span class="w"> </span><span class="no">echo &quot;${{ env.KUBECONFIG_DATA }}&quot; | base64 -d &gt; $HOME/.kube/config</span>
+<span class="w"> </span><span class="no">chmod 600 $HOME/.kube/config</span> <span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Update deployment metadata</span>
+<span class="w"> </span><span class="nt">run</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">|</span>
+<span class="w"> </span><span class="no">cd ${{ matrix.service }}</span> <span class="w"> </span><span class="no"># Update image reference in meta-dev.yml</span>
+<span class="w"> </span><span class="no">sed -i &quot;s|image_ref:.*|image_ref: ${{ env.REGISTRY }}/${{ github.repository }}/${{ matrix.service }}:${{ github.sha }}|&quot; meta-dev.yml</span> <span class="w"> </span><span class="no"># Update version timestamp</span>
+<span class="w"> </span><span class="no">sed -i &quot;s|version:.*|version: $(date -u +%Y%m%d%H%M%S)|&quot; meta-dev.yml</span> <span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Deploy to development</span>
+<span class="w"> </span><span class="nt">run</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">|</span>
+<span class="w"> </span><span class="no">cd ${{ matrix.service }}</span>
+<span class="w"> </span><span class="no">kubectl apply -f meta-dev.yml</span> <span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Wait for deployment rollout</span>
+<span class="w"> </span><span class="nt">run</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">|</span>
+<span class="w"> </span><span class="no">kubectl rollout status deployment/${{ matrix.service }} -n development --timeout=300s</span> <span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Run smoke tests</span>
+<span class="w"> </span><span class="nt">run</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">|</span>
+<span class="w"> </span><span class="no">cd ${{ matrix.service }}</span>
+<span class="w"> </span><span class="no">if [ -f &quot;smoke-tests.sh&quot; ]; then</span>
+<span class="w"> </span><span class="no">./smoke-tests.sh development</span>
+<span class="w"> </span><span class="no">fi</span> <span class="w"> </span><span class="nt">create-deployment-pr</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">needs</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">detect-changes</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">deploy-dev</span><span class="p p-Indicator">]</span>
+<span class="w"> </span><span class="nt">runs-on</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">ubuntu-latest</span>
+<span class="w"> </span><span class="nt">if</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">github.ref == &#39;refs/heads/main&#39;</span>
+<span class="w"> </span><span class="nt">strategy</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">matrix</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">service</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">${{ fromJson(needs.detect-changes.outputs.services) }}</span>
+<span class="w"> </span><span class="nt">steps</span><span class="p">:</span>
+<span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Checkout repository</span>
+<span class="w"> </span><span class="nt">uses</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">actions/checkout@v4</span>
+<span class="w"> </span><span class="nt">with</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">token</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">&lt;REDACTED&gt; secrets.AUTOMATION_TOKEN }}</span> <span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Update production metadata</span>
+<span class="w"> </span><span class="nt">run</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">|</span>
+<span class="w"> </span><span class="no">cd ${{ matrix.service }}</span> <span class="w"> </span><span class="no"># Update image reference in meta-prod.yml</span>
+<span class="w"> </span><span class="no">sed -i &quot;s|image_ref:.*|image_ref: ${{ env.REGISTRY }}/${{ github.repository }}/${{ matrix.service }}:${{ github.sha }}|&quot; meta-prod.yml</span> <span class="w"> </span><span class="no"># Update version</span>
+<span class="w"> </span><span class="no">sed -i &quot;s|version:.*|version: $(date -u +%Y%m%d%H%M%S)|&quot; meta-prod.yml</span> <span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Create Pull Request</span>
+<span class="w"> </span><span class="nt">uses</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">peter-evans/create-pull-request@v5</span>
+<span class="w"> </span><span class="nt">with</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">token</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">&lt;REDACTED&gt; secrets.AUTOMATION_TOKEN }}</span>
+<span class="w"> </span><span class="nt">commit-message</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;Automatic</span><span class="nv"> </span><span class="s">PR:</span><span class="nv"> </span><span class="s">Development</span><span class="nv"> </span><span class="s">changes</span><span class="nv"> </span><span class="s">detected</span><span class="nv"> </span><span class="s">in</span><span class="nv"> </span><span class="s">${{</span><span class="nv"> </span><span class="s">matrix.service</span><span class="nv"> </span><span class="s">}}&quot;</span>
+<span class="w"> </span><span class="nt">title</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;Deploy</span><span class="nv"> </span><span class="s">${{</span><span class="nv"> </span><span class="s">matrix.service</span><span class="nv"> </span><span class="s">}}</span><span class="nv"> </span><span class="s">to</span><span class="nv"> </span><span class="s">Production&quot;</span>
+<span class="w"> </span><span class="nt">body</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">|</span>
+<span class="w"> </span><span class="no">## Automated Production Deployment Request</span> <span class="w"> </span><span class="no">**Service:** ${{ matrix.service }}</span>
+<span class="w"> </span><span class="no">**Image:** ${{ env.REGISTRY }}/${{ github.repository }}/${{ matrix.service }}:${{ github.sha }}</span>
+<span class="w"> </span><span class="no">**Triggered by:** ${{ github.actor }}</span>
+<span class="w"> </span><span class="no">**Commit:** ${{ github.sha }}</span> <span class="w"> </span><span class="no">### Changes Included</span>
+<span class="w"> </span><span class="no">${{ github.event.head_commit.message }}</span> <span class="w"> </span><span class="no">### Validation Completed</span>
+<span class="w"> </span><span class="no">- ✅ Automated tests passed</span>
+<span class="w"> </span><span class="no">- ✅ Security scanning completed</span>
+<span class="w"> </span><span class="no">- ✅ Development deployment successful</span>
+<span class="w"> </span><span class="no">- ✅ Smoke tests passed</span> <span class="w"> </span><span class="no">### Deployment Checklist</span>
+<span class="w"> </span><span class="no">- [ ] Review changes and approve</span>
+<span class="w"> </span><span class="no">- [ ] Verify production readiness</span>
+<span class="w"> </span><span class="no">- [ ] Merge to trigger production deployment</span> <span class="w"> </span><span class="no">---</span>
+<span class="w"> </span><span class="no">🤖 This PR was automatically created by the deployment pipeline.</span>
+<span class="w"> </span><span class="nt">branch</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">deployments/${{ matrix.service }}-prod-patch</span>
+<span class="w"> </span><span class="nt">delete-branch</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
+</code></pre></div> <h3>project Automation: Infrastructure as Code</h3>
+<p>Complementing our Kubernetes deployments, project provides infrastructure automation for configuration management, system setup, and operational tasks.</p>
+<h4>Dynamic Inventory Management</h4>
+<div class="codehilite"><pre><span></span><code><span class="c1"># project/inventories/dynamic/aws_ec2.yml</span>
+<span class="nt">plugin</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">amazon.aws.aws_ec2</span>
+<span class="nt">regions</span><span class="p">:</span>
+<span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">us-east-1</span>
+<span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">eu-west-1</span><span class="w"> </span>
+<span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">ap-southeast-2</span> <span class="nt">filters</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">tag:Environment</span><span class="p">:</span>
+<span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">development</span>
+<span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">production</span>
+<span class="w"> </span><span class="nt">tag:Service</span><span class="p">:</span>
+<span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">wireless-admin</span>
+<span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">wireless-billing</span>
+<span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">wireless-manager</span>
+<span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">pcap-extractor</span> <span class="nt">hostnames</span><span class="p">:</span>
+<span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">tag:Name</span>
+<span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">dns-name</span>
+<span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">private-ip-address</span> <span class="nt">compose</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">project_host</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">private_ip_address</span>
+<span class="w"> </span><span class="nt">service_name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">tags.Service | default(&#39;unknown&#39;)</span>
+<span class="w"> </span><span class="nt">environment</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">tags.Environment | default(&#39;unknown&#39;)</span>
+<span class="w"> </span><span class="nt">region</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">placement.region</span> <span class="nt">groups</span><span class="p">:</span>
+<span class="w"> </span><span class="c1"># Group by service</span>
+<span class="w"> </span><span class="nt">wireless_admin</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">service_name == &#39;wireless-admin&#39;</span>
+<span class="w"> </span><span class="nt">wireless_billing</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">service_name == &#39;wireless-billing&#39;</span><span class="w"> </span>
+<span class="w"> </span><span class="nt">wireless_manager</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">service_name == &#39;wireless-manager&#39;</span>
+<span class="w"> </span><span class="nt">pcap_extractor</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">service_name == &#39;pcap-extractor&#39;</span> <span class="w"> </span><span class="c1"># Group by environment</span>
+<span class="w"> </span><span class="nt">development</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">environment == &#39;development&#39;</span>
+<span class="w"> </span><span class="nt">production</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">environment == &#39;production&#39;</span> <span class="w"> </span><span class="c1"># Group by region</span>
+<span class="w"> </span><span class="nt">us_east_1</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">region == &#39;us-east-1&#39;</span>
+<span class="w"> </span><span class="nt">eu_west_1</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">region == &#39;eu-west-1&#39;</span>
+<span class="w"> </span><span class="nt">ap_southeast_2</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">region == &#39;ap-southeast-2&#39;</span>
+</code></pre></div> <h4>Service Deployment Playbook</h4>
+<div class="codehilite"><pre><span></span><code><span class="c1"># project/playbooks/deploy-wireless-service.yml</span>
+<span class="nn">---</span>
+<span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Deploy Wireless Service</span>
+<span class="w"> </span><span class="nt">hosts</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;{{</span><span class="nv"> </span><span class="s">target_service</span><span class="nv"> </span><span class="s">|</span><span class="nv"> </span><span class="s">default(&#39;all&#39;)</span><span class="nv"> </span><span class="s">}}&quot;</span>
+<span class="w"> </span><span class="nt">become</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">yes</span>
+<span class="w"> </span><span class="nt">serial</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;{{</span><span class="nv"> </span><span class="s">deployment_batch_size</span><span class="nv"> </span><span class="s">|</span><span class="nv"> </span><span class="s">default(&#39;30%&#39;)</span><span class="nv"> </span><span class="s">}}&quot;</span>
+<span class="w"> </span><span class="nt">max_fail_percentage</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">5</span> <span class="w"> </span><span class="nt">vars</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">service_config_path</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;/opt/wireless/{{</span><span class="nv"> </span><span class="s">service_name</span><span class="nv"> </span><span class="s">}}&quot;</span>
+<span class="w"> </span><span class="nt">backup_retention_days</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">30</span>
+<span class="w"> </span><span class="nt">health_check_retries</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">10</span>
+<span class="w"> </span><span class="nt">health_check_delay</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">30</span> <span class="w"> </span><span class="nt">pre_tasks</span><span class="p">:</span>
+<span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Validate deployment parameters</span>
+<span class="w"> </span><span class="nt">assert</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">that</span><span class="p">:</span>
+<span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">service_name is defined</span>
+<span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">service_version is defined</span>
+<span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">environment is defined</span>
+<span class="w"> </span><span class="nt">fail_msg</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;Required</span><span class="nv"> </span><span class="s">deployment</span><span class="nv"> </span><span class="s">parameters</span><span class="nv"> </span><span class="s">missing&quot;</span> <span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Create deployment backup</span>
+<span class="w"> </span><span class="nt">copy</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">src</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;{{</span><span class="nv"> </span><span class="s">service_config_path</span><span class="nv"> </span><span class="s">}}/current&quot;</span>
+<span class="w"> </span><span class="nt">dest</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;{{</span><span class="nv"> </span><span class="s">service_config_path</span><span class="nv"> </span><span class="s">}}/backups/{{</span><span class="nv"> </span><span class="s">project_date_time.epoch</span><span class="nv"> </span><span class="s">}}&quot;</span>
+<span class="w"> </span><span class="nt">remote_src</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">yes</span>
+<span class="w"> </span><span class="nt">ignore_errors</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">yes</span> <span class="w"> </span><span class="nt">tasks</span><span class="p">:</span>
+<span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Stop existing service</span>
+<span class="w"> </span><span class="nt">systemd</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;{{</span><span class="nv"> </span><span class="s">service_name</span><span class="nv"> </span><span class="s">}}&quot;</span>
+<span class="w"> </span><span class="nt">state</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">stopped</span>
+<span class="w"> </span><span class="nt">register</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">service_stop</span>
+<span class="w"> </span><span class="nt">failed_when</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">false</span> <span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Download service artifact</span>
+<span class="w"> </span><span class="nt">get_url</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">url</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;https://{{</span><span class="nv"> </span><span class="s">artifact_registry</span><span class="nv"> </span><span class="s">}}/{{</span><span class="nv"> </span><span class="s">service_name</span><span class="nv"> </span><span class="s">}}/{{</span><span class="nv"> </span><span class="s">service_version</span><span class="nv"> </span><span class="s">}}/{{</span><span class="nv"> </span><span class="s">service_name</span><span class="nv"> </span><span class="s">}}.tar.gz&quot;</span>
+<span class="w"> </span><span class="nt">dest</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;/tmp/{{</span><span class="nv"> </span><span class="s">service_name</span><span class="nv"> </span><span class="s">}}-{{</span><span class="nv"> </span><span class="s">service_version</span><span class="nv"> </span><span class="s">}}.tar.gz&quot;</span>
+<span class="w"> </span><span class="nt">headers</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">Authorization</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;Bearer</span><span class="nv"> </span><span class="s">{{</span><span class="nv"> </span><span class="s">artifact_token</span><span class="nv"> </span><span class="s">}}&quot;</span>
+<span class="w"> </span><span class="nt">validate_certs</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">yes</span> <span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Extract service artifact</span>
+<span class="w"> </span><span class="nt">unarchive</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">src</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;/tmp/{{</span><span class="nv"> </span><span class="s">service_name</span><span class="nv"> </span><span class="s">}}-{{</span><span class="nv"> </span><span class="s">service_version</span><span class="nv"> </span><span class="s">}}.tar.gz&quot;</span>
+<span class="w"> </span><span class="nt">dest</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;{{</span><span class="nv"> </span><span class="s">service_config_path</span><span class="nv"> </span><span class="s">}}/{{</span><span class="nv"> </span><span class="s">service_version</span><span class="nv"> </span><span class="s">}}&quot;</span>
+<span class="w"> </span><span class="nt">remote_src</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">yes</span>
+<span class="w"> </span><span class="nt">creates</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;{{</span><span class="nv"> </span><span class="s">service_config_path</span><span class="nv"> </span><span class="s">}}/{{</span><span class="nv"> </span><span class="s">service_version</span><span class="nv"> </span><span class="s">}}/bin/{{</span><span class="nv"> </span><span class="s">service_name</span><span class="nv"> </span><span class="s">}}&quot;</span> <span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Update service configuration</span>
+<span class="w"> </span><span class="nt">template</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">src</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;{{</span><span class="nv"> </span><span class="s">service_name</span><span class="nv"> </span><span class="s">}}.conf.j2&quot;</span>
+<span class="w"> </span><span class="nt">dest</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;{{</span><span class="nv"> </span><span class="s">service_config_path</span><span class="nv"> </span><span class="s">}}/{{</span><span class="nv"> </span><span class="s">service_version</span><span class="nv"> </span><span class="s">}}/config/{{</span><span class="nv"> </span><span class="s">service_name</span><span class="nv"> </span><span class="s">}}.conf&quot;</span>
+<span class="w"> </span><span class="nt">backup</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">yes</span>
+<span class="w"> </span><span class="nt">notify</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">restart service</span> <span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Update service symlink</span>
+<span class="w"> </span><span class="nt">file</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">src</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;{{</span><span class="nv"> </span><span class="s">service_config_path</span><span class="nv"> </span><span class="s">}}/{{</span><span class="nv"> </span><span class="s">service_version</span><span class="nv"> </span><span class="s">}}&quot;</span>
+<span class="w"> </span><span class="nt">dest</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;{{</span><span class="nv"> </span><span class="s">service_config_path</span><span class="nv"> </span><span class="s">}}/current&quot;</span>
+<span class="w"> </span><span class="nt">state</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">link</span>
+<span class="w"> </span><span class="nt">force</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">yes</span>
+<span class="w"> </span><span class="nt">notify</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">restart service</span> <span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Start service</span>
+<span class="w"> </span><span class="nt">systemd</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;{{</span><span class="nv"> </span><span class="s">service_name</span><span class="nv"> </span><span class="s">}}&quot;</span>
+<span class="w"> </span><span class="nt">state</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">started</span>
+<span class="w"> </span><span class="nt">enabled</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">yes</span>
+<span class="w"> </span><span class="nt">daemon_reload</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">yes</span>
+<span class="w"> </span><span class="nt">register</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">service_start</span> <span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Wait for service health check</span>
+<span class="w"> </span><span class="nt">uri</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">url</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;http://{{</span><span class="nv"> </span><span class="s">project_default_ipv4.address</span><span class="nv"> </span><span class="s">}}:{{</span><span class="nv"> </span><span class="s">service_port</span><span class="nv"> </span><span class="s">|</span><span class="nv"> </span><span class="s">default(8080)</span><span class="nv"> </span><span class="s">}}/health&quot;</span>
+<span class="w"> </span><span class="nt">method</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">GET</span>
+<span class="w"> </span><span class="nt">status_code</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">200</span>
+<span class="w"> </span><span class="nt">register</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">health_check</span>
+<span class="w"> </span><span class="nt">retries</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;{{</span><span class="nv"> </span><span class="s">health_check_retries</span><span class="nv"> </span><span class="s">}}&quot;</span>
+<span class="w"> </span><span class="nt">delay</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;{{</span><span class="nv"> </span><span class="s">health_check_delay</span><span class="nv"> </span><span class="s">}}&quot;</span>
+<span class="w"> </span><span class="nt">until</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">health_check.status == 200</span> <span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Validate service metrics</span>
+<span class="w"> </span><span class="nt">uri</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">url</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;http://{{</span><span class="nv"> </span><span class="s">project_default_ipv4.address</span><span class="nv"> </span><span class="s">}}:{{</span><span class="nv"> </span><span class="s">service_port</span><span class="nv"> </span><span class="s">|</span><span class="nv"> </span><span class="s">default(8080)</span><span class="nv"> </span><span class="s">}}/metrics&quot;</span>
+<span class="w"> </span><span class="nt">method</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">GET</span>
+<span class="w"> </span><span class="nt">status_code</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">200</span>
+<span class="w"> </span><span class="nt">register</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">metrics_check</span>
+<span class="w"> </span><span class="nt">retries</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">3</span>
+<span class="w"> </span><span class="nt">delay</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">10</span> <span class="w"> </span><span class="nt">post_tasks</span><span class="p">:</span>
+<span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Clean up old artifacts</span>
+<span class="w"> </span><span class="nt">file</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">path</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;/tmp/{{</span><span class="nv"> </span><span class="s">service_name</span><span class="nv"> </span><span class="s">}}-{{</span><span class="nv"> </span><span class="s">service_version</span><span class="nv"> </span><span class="s">}}.tar.gz&quot;</span>
+<span class="w"> </span><span class="nt">state</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">absent</span> <span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Clean up old backups</span>
+<span class="w"> </span><span class="nt">find</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">paths</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;{{</span><span class="nv"> </span><span class="s">service_config_path</span><span class="nv"> </span><span class="s">}}/backups&quot;</span>
+<span class="w"> </span><span class="nt">age</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;{{</span><span class="nv"> </span><span class="s">backup_retention_days</span><span class="nv"> </span><span class="s">}}d&quot;</span>
+<span class="w"> </span><span class="nt">register</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">old_backups</span> <span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Remove old backups</span>
+<span class="w"> </span><span class="nt">file</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">path</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;{{</span><span class="nv"> </span><span class="s">item.path</span><span class="nv"> </span><span class="s">}}&quot;</span>
+<span class="w"> </span><span class="nt">state</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">absent</span>
+<span class="w"> </span><span class="nt">loop</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;{{</span><span class="nv"> </span><span class="s">old_backups.files</span><span class="nv"> </span><span class="s">}}&quot;</span> <span class="w"> </span><span class="nt">handlers</span><span class="p">:</span>
+<span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">restart service</span>
+<span class="w"> </span><span class="nt">systemd</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;{{</span><span class="nv"> </span><span class="s">service_name</span><span class="nv"> </span><span class="s">}}&quot;</span>
+<span class="w"> </span><span class="nt">state</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">restarted</span>
+<span class="w"> </span><span class="nt">daemon_reload</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">yes</span>
+<span class="w"> </span><span class="nt">listen</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">restart service</span>
+</code></pre></div> <h3>ArgoCD: GitOps Implementation</h3>
+<p>ArgoCD provides the GitOps foundation, ensuring that the deployed state matches the desired state defined in Git repositories.</p>
+<h4>Application Configuration</h4>
+<div class="codehilite"><pre><span></span><code><span class="c1"># argocd/applications/wireless-services.yaml</span>
+<span class="nt">apiVersion</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">argoproj.io/v1alpha1</span>
+<span class="nt">kind</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Application</span>
+<span class="nt">metadata</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">wireless-billing-prod</span>
+<span class="w"> </span><span class="nt">namespace</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">argocd</span>
+<span class="w"> </span><span class="nt">finalizers</span><span class="p">:</span>
+<span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">resources-finalizer.argocd.argoproj.io</span>
+<span class="nt">spec</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">project</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">telecommunications</span>
+<span class="w"> </span><span class="nt">source</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">repoURL</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">https://github.com/telecom/deploy-core-wireless</span>
+<span class="w"> </span><span class="nt">targetRevision</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">main</span>
+<span class="w"> </span><span class="nt">path</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">wireless-billing/deployments/k8s/prod/overlays/backend-ch1-prod</span>
+<span class="w"> </span><span class="nt">destination</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">server</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">https://kubernetes.default.svc</span>
+<span class="w"> </span><span class="nt">namespace</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">wireless-billing-prod</span>
+<span class="w"> </span><span class="nt">syncPolicy</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">automated</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">prune</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
+<span class="w"> </span><span class="nt">selfHeal</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
+<span class="w"> </span><span class="nt">allowEmpty</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">false</span>
+<span class="w"> </span><span class="nt">syncOptions</span><span class="p">:</span>
+<span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">CreateNamespace=true</span>
+<span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">PrunePropagationPolicy=foreground</span>
+<span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">PruneLast=true</span>
+<span class="w"> </span><span class="nt">retry</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">limit</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">5</span>
+<span class="w"> </span><span class="nt">backoff</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">duration</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">5s</span>
+<span class="w"> </span><span class="nt">factor</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">2</span>
+<span class="w"> </span><span class="nt">maxDuration</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">3m</span>
+<span class="w"> </span><span class="nt">revisionHistoryLimit</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">10</span> <span class="nn">---</span>
+<span class="nt">apiVersion</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">argoproj.io/v1alpha1</span>
+<span class="nt">kind</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">AppProject</span>
+<span class="nt">metadata</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">telecommunications</span>
+<span class="w"> </span><span class="nt">namespace</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">argocd</span>
+<span class="nt">spec</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">description</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Telecommunications infrastructure services</span> <span class="w"> </span><span class="nt">sourceRepos</span><span class="p">:</span>
+<span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">https://github.com/telecom/deploy-core-wireless</span>
+<span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">https://charts.helm.sh/stable</span> <span class="w"> </span><span class="nt">destinations</span><span class="p">:</span>
+<span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">namespace</span><span class="p">:</span><span class="w"> </span><span class="s">&#39;*&#39;</span>
+<span class="w"> </span><span class="nt">server</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">https://kubernetes.default.svc</span> <span class="w"> </span><span class="nt">clusterResourceWhitelist</span><span class="p">:</span>
+<span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">group</span><span class="p">:</span><span class="w"> </span><span class="s">&#39;&#39;</span>
+<span class="w"> </span><span class="nt">kind</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Namespace</span>
+<span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">group</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">rbac.authorization.k8s.io</span>
+<span class="w"> </span><span class="nt">kind</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">ClusterRole</span>
+<span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">group</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">rbac.authorization.k8s.io</span>
+<span class="w"> </span><span class="nt">kind</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">ClusterRoleBinding</span> <span class="w"> </span><span class="nt">namespaceResourceWhitelist</span><span class="p">:</span>
+<span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">group</span><span class="p">:</span><span class="w"> </span><span class="s">&#39;&#39;</span>
+<span class="w"> </span><span class="nt">kind</span><span class="p">:</span><span class="w"> </span><span class="s">&#39;*&#39;</span>
+<span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">group</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">apps</span>
+<span class="w"> </span><span class="nt">kind</span><span class="p">:</span><span class="w"> </span><span class="s">&#39;*&#39;</span>
+<span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">group</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">networking.k8s.io</span>
+<span class="w"> </span><span class="nt">kind</span><span class="p">:</span><span class="w"> </span><span class="s">&#39;*&#39;</span>
+<span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">group</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">monitoring.coreos.com</span>
+<span class="w"> </span><span class="nt">kind</span><span class="p">:</span><span class="w"> </span><span class="s">&#39;*&#39;</span> <span class="w"> </span><span class="nt">roles</span><span class="p">:</span>
+<span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">developer</span>
+<span class="w"> </span><span class="nt">policies</span><span class="p">:</span>
+<span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">p, proj:telecommunications:developer, applications, get, telecommunications/*, allow</span>
+<span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">p, proj:telecommunications:developer, applications, sync, telecommunications/*, allow</span>
+<span class="w"> </span><span class="nt">groups</span><span class="p">:</span>
+<span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">telecom:developers</span> <span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">operator</span>
+<span class="w"> </span><span class="nt">policies</span><span class="p">:</span>
+<span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">p, proj:telecommunications:operator, applications, *, telecommunications/*, allow</span>
+<span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">p, proj:telecommunications:operator, repositories, *, *, allow</span>
+<span class="w"> </span><span class="nt">groups</span><span class="p">:</span>
+<span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">telecom:operators</span>
+</code></pre></div> <h4>Automated Rollback Configuration</h4>
+<div class="codehilite"><pre><span></span><code><span class="c1"># argocd/rollouts/wireless-billing-rollout.yaml</span>
+<span class="nt">apiVersion</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">argoproj.io/v1alpha1</span>
+<span class="nt">kind</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Rollout</span>
+<span class="nt">metadata</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">wireless-billing</span>
+<span class="nt">spec</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">replicas</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">5</span>
+<span class="w"> </span><span class="nt">strategy</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">canary</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">analysis</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">templates</span><span class="p">:</span>
+<span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">templateName</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">wireless-billing-success-rate</span>
+<span class="w"> </span><span class="nt">startingStep</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">2</span>
+<span class="w"> </span><span class="nt">args</span><span class="p">:</span>
+<span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">service-name</span>
+<span class="w"> </span><span class="nt">value</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">wireless-billing</span>
+<span class="w"> </span><span class="nt">canaryMetadata</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">labels</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">deployment</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">canary</span>
+<span class="w"> </span><span class="nt">steps</span><span class="p">:</span>
+<span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">setWeight</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">20</span>
+<span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">pause</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">duration</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">10m</span>
+<span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">setWeight</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">40</span>
+<span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">pause</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">duration</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">10m</span>
+<span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">analysis</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">templates</span><span class="p">:</span>
+<span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">templateName</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">wireless-billing-success-rate</span>
+<span class="w"> </span><span class="nt">args</span><span class="p">:</span>
+<span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">service-name</span>
+<span class="w"> </span><span class="nt">value</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">wireless-billing</span>
+<span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">setWeight</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">60</span>
+<span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">pause</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">duration</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">10m</span>
+<span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">setWeight</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">80</span>
+<span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">pause</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">duration</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">10m</span>
+<span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">setWeight</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">100</span>
+<span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">pause</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">duration</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">10m</span>
+<span class="w"> </span><span class="nt">abortScaleDownDelaySeconds</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">30</span>
+<span class="w"> </span><span class="nt">scaleDownDelaySeconds</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">30</span> <span class="nn">---</span>
+<span class="nt">apiVersion</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">argoproj.io/v1alpha1</span>
+<span class="nt">kind</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">AnalysisTemplate</span>
+<span class="nt">metadata</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">wireless-billing-success-rate</span>
+<span class="nt">spec</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">args</span><span class="p">:</span>
+<span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">service-name</span>
+<span class="w"> </span><span class="nt">metrics</span><span class="p">:</span>
+<span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">success-rate</span>
+<span class="w"> </span><span class="nt">successCondition</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">result[0] &gt;= 0.95</span>
+<span class="w"> </span><span class="nt">interval</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">5m</span>
+<span class="w"> </span><span class="nt">count</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">3</span>
+<span class="w"> </span><span class="nt">provider</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">prometheus</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">address</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">http://prometheus.monitoring.svc.cluster.local:9090</span>
+<span class="w"> </span><span class="nt">query</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">|</span>
+<span class="w"> </span><span class="no">sum(rate(http_requests_total{service=&quot;{{args.service-name}}&quot;,status=~&quot;2..&quot;}[5m])) /</span>
+<span class="w"> </span><span class="no">sum(rate(http_requests_total{service=&quot;{{args.service-name}}&quot;}[5m]))</span> <span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">avg-response-time</span>
+<span class="w"> </span><span class="nt">successCondition</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">result[0] &lt;= 0.5</span>
+<span class="w"> </span><span class="nt">interval</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">5m</span>
+<span class="w"> </span><span class="nt">count</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">3</span>
+<span class="w"> </span><span class="nt">provider</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">prometheus</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">address</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">http://prometheus.monitoring.svc.cluster.local:9090</span>
+<span class="w"> </span><span class="nt">query</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">|</span>
+<span class="w"> </span><span class="no">avg(rate(http_request_duration_seconds_sum{service=&quot;{{args.service-name}}&quot;}[5m]) / </span>
+<span class="w"> </span><span class="no">rate(http_request_duration_seconds_count{service=&quot;{{args.service-name}}&quot;}[5m]))</span>
+</code></pre></div> <h2>Advanced Automation Patterns</h2>
+<h3>1. Self-Healing Infrastructure</h3>
+<h4>Automated Issue Detection and Response</h4>
+<div class="codehilite"><pre><span></span><code><span class="c1"># prometheus/rules/self-healing-rules.yml</span>
+<span class="nt">groups</span><span class="p">:</span>
+<span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">self-healing</span>
+<span class="w"> </span><span class="nt">rules</span><span class="p">:</span>
+<span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">alert</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">ServiceHighErrorRate</span>
+<span class="w"> </span><span class="nt">expr</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">rate(http_requests_total{status=~&quot;5..&quot;}[5m]) &gt; 0.1</span>
+<span class="w"> </span><span class="nt">for</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">2m</span>
+<span class="w"> </span><span class="nt">labels</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">severity</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">critical</span>
+<span class="w"> </span><span class="nt">automation</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">restart-pod</span>
+<span class="w"> </span><span class="nt">annotations</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">summary</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;High</span><span class="nv"> </span><span class="s">error</span><span class="nv"> </span><span class="s">rate</span><span class="nv"> </span><span class="s">detected</span><span class="nv"> </span><span class="s">in</span><span class="nv"> </span><span class="s">{{</span><span class="nv"> </span><span class="s">$labels.service</span><span class="nv"> </span><span class="s">}}&quot;</span>
+<span class="w"> </span><span class="nt">action</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;Restart</span><span class="nv"> </span><span class="s">pod</span><span class="nv"> </span><span class="s">to</span><span class="nv"> </span><span class="s">recover</span><span class="nv"> </span><span class="s">from</span><span class="nv"> </span><span class="s">error</span><span class="nv"> </span><span class="s">state&quot;</span> <span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">alert</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">ServiceHighMemoryUsage</span>
+<span class="w"> </span><span class="nt">expr</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">container_memory_usage_bytes / container_spec_memory_limit_bytes &gt; 0.9</span>
+<span class="w"> </span><span class="nt">for</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">5m</span>
+<span class="w"> </span><span class="nt">labels</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">severity</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">warning</span>
+<span class="w"> </span><span class="nt">automation</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">scale-up</span>
+<span class="w"> </span><span class="nt">annotations</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">summary</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;High</span><span class="nv"> </span><span class="s">memory</span><span class="nv"> </span><span class="s">usage</span><span class="nv"> </span><span class="s">in</span><span class="nv"> </span><span class="s">{{</span><span class="nv"> </span><span class="s">$labels.pod</span><span class="nv"> </span><span class="s">}}&quot;</span>
+<span class="w"> </span><span class="nt">action</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;Scale</span><span class="nv"> </span><span class="s">up</span><span class="nv"> </span><span class="s">deployment</span><span class="nv"> </span><span class="s">to</span><span class="nv"> </span><span class="s">handle</span><span class="nv"> </span><span class="s">load&quot;</span> <span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">alert</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">ServiceCrashLooping</span>
+<span class="w"> </span><span class="nt">expr</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">rate(kube_pod_container_status_restarts_total[15m]) &gt; 0</span>
+<span class="w"> </span><span class="nt">for</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">10m</span>
+<span class="w"> </span><span class="nt">labels</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">severity</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">critical</span>
+<span class="w"> </span><span class="nt">automation</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">rollback</span>
+<span class="w"> </span><span class="nt">annotations</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">summary</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;Pod</span><span class="nv"> </span><span class="s">{{</span><span class="nv"> </span><span class="s">$labels.pod</span><span class="nv"> </span><span class="s">}}</span><span class="nv"> </span><span class="s">is</span><span class="nv"> </span><span class="s">crash</span><span class="nv"> </span><span class="s">looping&quot;</span>
+<span class="w"> </span><span class="nt">action</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;Rollback</span><span class="nv"> </span><span class="s">to</span><span class="nv"> </span><span class="s">previous</span><span class="nv"> </span><span class="s">stable</span><span class="nv"> </span><span class="s">version&quot;</span>
+</code></pre></div> <h4>Automated Recovery Actions</h4>
+<div class="codehilite"><pre><span></span><code><span class="ch">#!/bin/bash</span>
+<span class="c1"># scripts/automated-recovery.sh</span> <span class="nb">set</span><span class="w"> </span>-euo<span class="w"> </span>pipefail <span class="nv">ACTION</span><span class="o">=</span><span class="nv">$1</span>
+<span class="nv">SERVICE</span><span class="o">=</span><span class="nv">$2</span>
+<span class="nv">NAMESPACE</span><span class="o">=</span><span class="si">${</span><span class="nv">3</span><span class="k">:-</span><span class="nv">default</span><span class="si">}</span> <span class="k">case</span><span class="w"> </span><span class="nv">$ACTION</span><span class="w"> </span><span class="k">in</span>
+<span class="w"> </span><span class="s2">&quot;restart-pod&quot;</span><span class="o">)</span>
+<span class="w"> </span><span class="nb">echo</span><span class="w"> </span><span class="s2">&quot;Restarting pods for service: </span><span class="nv">$SERVICE</span><span class="s2">&quot;</span>
+<span class="w"> </span>kubectl<span class="w"> </span>rollout<span class="w"> </span>restart<span class="w"> </span>deployment/<span class="nv">$SERVICE</span><span class="w"> </span>-n<span class="w"> </span><span class="nv">$NAMESPACE</span>
+<span class="w"> </span>kubectl<span class="w"> </span>rollout<span class="w"> </span>status<span class="w"> </span>deployment/<span class="nv">$SERVICE</span><span class="w"> </span>-n<span class="w"> </span><span class="nv">$NAMESPACE</span><span class="w"> </span>--timeout<span class="o">=</span>300s
+<span class="w"> </span><span class="p">;;</span> <span class="w"> </span><span class="s2">&quot;scale-up&quot;</span><span class="o">)</span>
+<span class="w"> </span><span class="nb">echo</span><span class="w"> </span><span class="s2">&quot;Scaling up service: </span><span class="nv">$SERVICE</span><span class="s2">&quot;</span>
+<span class="w"> </span><span class="nv">CURRENT_REPLICAS</span><span class="o">=</span><span class="k">$(</span>kubectl<span class="w"> </span>get<span class="w"> </span>deployment<span class="w"> </span><span class="nv">$SERVICE</span><span class="w"> </span>-n<span class="w"> </span><span class="nv">$NAMESPACE</span><span class="w"> </span>-o<span class="w"> </span><span class="nv">jsonpath</span><span class="o">=</span><span class="s1">&#39;{.spec.replicas}&#39;</span><span class="k">)</span>
+<span class="w"> </span><span class="nv">NEW_REPLICAS</span><span class="o">=</span><span class="k">$((</span><span class="nv">CURRENT_REPLICAS</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="m">1</span><span class="k">))</span>
+<span class="w"> </span>kubectl<span class="w"> </span>scale<span class="w"> </span>deployment<span class="w"> </span><span class="nv">$SERVICE</span><span class="w"> </span>--replicas<span class="o">=</span><span class="nv">$NEW_REPLICAS</span><span class="w"> </span>-n<span class="w"> </span><span class="nv">$NAMESPACE</span>
+<span class="w"> </span><span class="p">;;</span> <span class="w"> </span><span class="s2">&quot;rollback&quot;</span><span class="o">)</span>
+<span class="w"> </span><span class="nb">echo</span><span class="w"> </span><span class="s2">&quot;Rolling back service: </span><span class="nv">$SERVICE</span><span class="s2">&quot;</span>
+<span class="w"> </span>kubectl<span class="w"> </span>rollout<span class="w"> </span>undo<span class="w"> </span>deployment/<span class="nv">$SERVICE</span><span class="w"> </span>-n<span class="w"> </span><span class="nv">$NAMESPACE</span>
+<span class="w"> </span>kubectl<span class="w"> </span>rollout<span class="w"> </span>status<span class="w"> </span>deployment/<span class="nv">$SERVICE</span><span class="w"> </span>-n<span class="w"> </span><span class="nv">$NAMESPACE</span><span class="w"> </span>--timeout<span class="o">=</span>300s
+<span class="w"> </span><span class="p">;;</span> <span class="w"> </span>*<span class="o">)</span>
+<span class="w"> </span><span class="nb">echo</span><span class="w"> </span><span class="s2">&quot;Unknown action: </span><span class="nv">$ACTION</span><span class="s2">&quot;</span>
+<span class="w"> </span><span class="nb">exit</span><span class="w"> </span><span class="m">1</span>
+<span class="w"> </span><span class="p">;;</span>
+<span class="k">esac</span> <span class="c1"># Validate service health after action</span>
+sleep<span class="w"> </span><span class="m">30</span>
+kubectl<span class="w"> </span>get<span class="w"> </span>pods<span class="w"> </span>-l<span class="w"> </span><span class="nv">app</span><span class="o">=</span><span class="nv">$SERVICE</span><span class="w"> </span>-n<span class="w"> </span><span class="nv">$NAMESPACE</span>
+kubectl<span class="w"> </span>top<span class="w"> </span>pods<span class="w"> </span>-l<span class="w"> </span><span class="nv">app</span><span class="o">=</span><span class="nv">$SERVICE</span><span class="w"> </span>-n<span class="w"> </span><span class="nv">$NAMESPACE</span><span class="w"> </span><span class="o">||</span><span class="w"> </span><span class="nb">true</span> <span class="nb">echo</span><span class="w"> </span><span class="s2">&quot;Recovery action </span><span class="nv">$ACTION</span><span class="s2"> completed for </span><span class="nv">$SERVICE</span><span class="s2">&quot;</span>
+</code></pre></div> <h3>2. Intelligent Deployment Strategies</h3>
+<h4>Feature Flag Integration</h4>
+<div class="codehilite"><pre><span></span><code><span class="c1"># kubernetes/configmaps/feature-flags.yml</span>
+<span class="nt">apiVersion</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">v1</span>
+<span class="nt">kind</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">ConfigMap</span>
+<span class="nt">metadata</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">wireless-billing-features</span>
+<span class="w"> </span><span class="nt">namespace</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">wireless-billing-prod</span>
+<span class="nt">data</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">features.yaml</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">|</span>
+<span class="w"> </span><span class="no">flags:</span>
+<span class="w"> </span><span class="no">new-billing-api:</span>
+<span class="w"> </span><span class="no">enabled: false</span>
+<span class="w"> </span><span class="no">rollout_percentage: 0</span>
+<span class="w"> </span><span class="no">conditions:</span>
+<span class="w"> </span><span class="no">- key: &quot;subscriber_type&quot;</span>
+<span class="w"> </span><span class="no">operator: &quot;equals&quot;</span>
+<span class="w"> </span><span class="no">value: &quot;premium&quot;</span> <span class="w"> </span><span class="no">enhanced-fraud-detection:</span>
+<span class="w"> </span><span class="no">enabled: true</span>
+<span class="w"> </span><span class="no">rollout_percentage: 25</span>
+<span class="w"> </span><span class="no">conditions:</span>
+<span class="w"> </span><span class="no">- key: &quot;region&quot;</span>
+<span class="w"> </span><span class="no">operator: &quot;in&quot;</span>
+<span class="w"> </span><span class="no">values: [&quot;us-east&quot;, &quot;eu-west&quot;]</span> <span class="w"> </span><span class="no">real-time-analytics:</span>
+<span class="w"> </span><span class="no">enabled: true</span>
+<span class="w"> </span><span class="no">rollout_percentage: 100</span> <span class="w"> </span><span class="no">overrides:</span>
+<span class="w"> </span><span class="no">development:</span>
+<span class="w"> </span><span class="no">new-billing-api:</span>
+<span class="w"> </span><span class="no">enabled: true</span>
+<span class="w"> </span><span class="no">rollout_percentage: 100</span>
+<span class="w"> </span><span class="no">staging:</span>
+<span class="w"> </span><span class="no">new-billing-api:</span>
+<span class="w"> </span><span class="no">enabled: true</span>
+<span class="w"> </span><span class="no">rollout_percentage: 50</span>
+</code></pre></div> <h4>Canary Deployment with Automated Analysis</h4>
+<div class="codehilite"><pre><span></span><code><span class="c1"># argo-rollouts/canary-analysis.yml</span>
+<span class="nt">apiVersion</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">argoproj.io/v1alpha1</span>
+<span class="nt">kind</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Rollout</span>
+<span class="nt">metadata</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">wireless-manager-canary</span>
+<span class="nt">spec</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">replicas</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">10</span>
+<span class="w"> </span><span class="nt">strategy</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">canary</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">canaryService</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">wireless-manager-canary</span>
+<span class="w"> </span><span class="nt">stableService</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">wireless-manager-stable</span>
+<span class="w"> </span><span class="nt">trafficRouting</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">nginx</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">stableIngress</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">wireless-manager-stable</span>
+<span class="w"> </span><span class="nt">annotationPrefix</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">nginx.ingress.kubernetes.io</span>
+<span class="w"> </span><span class="nt">additionalIngressAnnotations</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">canary-by-header</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">X-Canary</span>
+<span class="w"> </span><span class="nt">canary-by-header-value</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;true&quot;</span>
+<span class="w"> </span><span class="nt">analysis</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">templates</span><span class="p">:</span>
+<span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">templateName</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">comprehensive-analysis</span>
+<span class="w"> </span><span class="nt">startingStep</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">2</span>
+<span class="w"> </span><span class="nt">args</span><span class="p">:</span>
+<span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">service-name</span>
+<span class="w"> </span><span class="nt">value</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">wireless-manager-canary</span>
+<span class="w"> </span><span class="nt">steps</span><span class="p">:</span>
+<span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">setWeight</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">10</span>
+<span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">pause</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">duration</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">2m</span>
+<span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">setWeight</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">20</span>
+<span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">pause</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">duration</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">2m</span>
+<span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">analysis</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">templates</span><span class="p">:</span>
+<span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">templateName</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">comprehensive-analysis</span>
+<span class="w"> </span><span class="nt">args</span><span class="p">:</span>
+<span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">service-name</span>
+<span class="w"> </span><span class="nt">value</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">wireless-manager-canary</span>
+<span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">setWeight</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">50</span>
+<span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">pause</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">duration</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">5m</span>
+<span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">setWeight</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">75</span>
+<span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">pause</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">duration</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">5m</span>
+<span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">setWeight</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">100</span>
+<span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">pause</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">duration</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">2m</span> <span class="nn">---</span>
+<span class="nt">apiVersion</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">argoproj.io/v1alpha1</span>
+<span class="nt">kind</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">AnalysisTemplate</span>
+<span class="nt">metadata</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">comprehensive-analysis</span>
+<span class="nt">spec</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">args</span><span class="p">:</span>
+<span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">service-name</span>
+<span class="w"> </span><span class="nt">metrics</span><span class="p">:</span>
+<span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">success-rate</span>
+<span class="w"> </span><span class="nt">successCondition</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">result[0] &gt;= 0.99</span>
+<span class="w"> </span><span class="nt">failureCondition</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">result[0] &lt; 0.95</span>
+<span class="w"> </span><span class="nt">interval</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1m</span>
+<span class="w"> </span><span class="nt">count</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">5</span>
+<span class="w"> </span><span class="nt">provider</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">prometheus</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">address</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">http://prometheus.monitoring.svc.cluster.local:9090</span>
+<span class="w"> </span><span class="nt">query</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">|</span>
+<span class="w"> </span><span class="no">sum(rate(http_requests_total{service=&quot;{{args.service-name}}&quot;,status=~&quot;2..&quot;}[2m])) /</span>
+<span class="w"> </span><span class="no">sum(rate(http_requests_total{service=&quot;{{args.service-name}}&quot;}[2m]))</span> <span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">error-rate</span>
+<span class="w"> </span><span class="nt">successCondition</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">result[0] &lt;= 0.01</span>
+<span class="w"> </span><span class="nt">failureCondition</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">result[0] &gt; 0.05</span>
+<span class="w"> </span><span class="nt">interval</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1m</span>
+<span class="w"> </span><span class="nt">count</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">5</span>
+<span class="w"> </span><span class="nt">provider</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">prometheus</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">address</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">http://prometheus.monitoring.svc.cluster.local:9090</span>
+<span class="w"> </span><span class="nt">query</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">|</span>
+<span class="w"> </span><span class="no">sum(rate(http_requests_total{service=&quot;{{args.service-name}}&quot;,status=~&quot;5..&quot;}[2m])) /</span>
+<span class="w"> </span><span class="no">sum(rate(http_requests_total{service=&quot;{{args.service-name}}&quot;}[2m]))</span> <span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">avg-response-time</span>
+<span class="w"> </span><span class="nt">successCondition</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">result[0] &lt;= 0.5</span>
+<span class="w"> </span><span class="nt">failureCondition</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">result[0] &gt; 1.0</span>
+<span class="w"> </span><span class="nt">interval</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1m</span>
+<span class="w"> </span><span class="nt">count</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">5</span>
+<span class="w"> </span><span class="nt">provider</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">prometheus</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">address</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">http://prometheus.monitoring.svc.cluster.local:9090</span>
+<span class="w"> </span><span class="nt">query</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">|</span>
+<span class="w"> </span><span class="no">avg(rate(http_request_duration_seconds_sum{service=&quot;{{args.service-name}}&quot;}[2m]) / </span>
+<span class="w"> </span><span class="no">rate(http_request_duration_seconds_count{service=&quot;{{args.service-name}}&quot;}[2m]))</span>
+</code></pre></div> <h3>3. Cross-Region Deployment Coordination</h3>
+<h4>Multi-Region Deployment Pipeline</h4>
+<div class="codehilite"><pre><span></span><code><span class="c1"># .github/workflows/multi-region-deploy.yml</span>
+<span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Multi-Region Production Deploy</span> <span class="nt">on</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">push</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">branches</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">main</span><span class="p p-Indicator">]</span>
+<span class="w"> </span><span class="nt">paths</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="s">&#39;**/meta-prod.yml&#39;</span><span class="p p-Indicator">]</span> <span class="nt">jobs</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">deploy-primary-region</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">runs-on</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">ubuntu-latest</span>
+<span class="w"> </span><span class="nt">environment</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">production-us-central</span>
+<span class="w"> </span><span class="nt">steps</span><span class="p">:</span>
+<span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Deploy to US Central (Primary)</span>
+<span class="w"> </span><span class="nt">run</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">|</span>
+<span class="w"> </span><span class="no"># Deploy to primary region first</span>
+<span class="w"> </span><span class="no">kubectl apply -f wireless-*/meta-prod.yml --context=us-central-prod</span> <span class="w"> </span><span class="no"># Wait for deployment to stabilize</span>
+<span class="w"> </span><span class="no">for service in wireless-billing wireless-admin wireless-manager; do</span>
+<span class="w"> </span><span class="no">kubectl rollout status deployment/$service -n production --timeout=600s --context=us-central-prod</span>
+<span class="w"> </span><span class="no">done</span> <span class="w"> </span><span class="no"># Run integration tests</span>
+<span class="w"> </span><span class="no">./scripts/integration-tests.sh us-central-prod</span> <span class="w"> </span><span class="nt">deploy-secondary-regions</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">needs</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">deploy-primary-region</span>
+<span class="w"> </span><span class="nt">runs-on</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">ubuntu-latest</span>
+<span class="w"> </span><span class="nt">environment</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">production-global</span>
+<span class="w"> </span><span class="nt">strategy</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">matrix</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">region</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">eu-west-prod</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">ap-southeast-prod</span><span class="p p-Indicator">]</span>
+<span class="w"> </span><span class="nt">steps</span><span class="p">:</span>
+<span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Deploy to {{ matrix.region }}</span>
+<span class="w"> </span><span class="nt">run</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">|</span>
+<span class="w"> </span><span class="no"># Deploy to secondary regions after primary succeeds</span>
+<span class="w"> </span><span class="no">kubectl apply -f wireless-*/meta-prod.yml --context=${{ matrix.region }}</span> <span class="w"> </span><span class="no"># Wait for regional deployment</span>
+<span class="w"> </span><span class="no">for service in wireless-billing wireless-admin wireless-manager; do</span>
+<span class="w"> </span><span class="no">kubectl rollout status deployment/$service -n production --timeout=600s --context=${{ matrix.region }}</span>
+<span class="w"> </span><span class="no">done</span> <span class="w"> </span><span class="no"># Regional validation</span>
+<span class="w"> </span><span class="no">./scripts/regional-validation.sh ${{ matrix.region }}</span> <span class="w"> </span><span class="nt">post-deployment-validation</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">needs</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">deploy-primary-region</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">deploy-secondary-regions</span><span class="p p-Indicator">]</span>
+<span class="w"> </span><span class="nt">runs-on</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">ubuntu-latest</span>
+<span class="w"> </span><span class="nt">steps</span><span class="p">:</span>
+<span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Global service validation</span>
+<span class="w"> </span><span class="nt">run</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">|</span>
+<span class="w"> </span><span class="no"># Test cross-region connectivity</span>
+<span class="w"> </span><span class="no">./scripts/cross-region-tests.sh</span> <span class="w"> </span><span class="no"># Validate load balancing</span>
+<span class="w"> </span><span class="no">./scripts/load-balancer-validation.sh</span> <span class="w"> </span><span class="no"># Check monitoring and alerting</span>
+<span class="w"> </span><span class="no">./scripts/monitoring-validation.sh</span> <span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Update deployment status</span>
+<span class="w"> </span><span class="nt">if</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">success()</span>
+<span class="w"> </span><span class="nt">run</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">|</span>
+<span class="w"> </span><span class="no"># Update deployment tracking</span>
+<span class="w"> </span><span class="no">curl -X POST &quot;$DEPLOYMENT_WEBHOOK&quot; \</span>
+<span class="w"> </span><span class="no">-H &quot;Content-Type: application/json&quot; \</span>
+<span class="w"> </span><span class="no">-d &#39;{</span>
+<span class="w"> </span><span class="no">&quot;deployment_id&quot;: &quot;&#39;$GITHUB_RUN_ID&#39;&quot;,</span>
+<span class="w"> </span><span class="no">&quot;status&quot;: &quot;success&quot;,</span>
+<span class="w"> </span><span class="no">&quot;regions&quot;: [&quot;us-central&quot;, &quot;eu-west&quot;, &quot;ap-southeast&quot;],</span>
+<span class="w"> </span><span class="no">&quot;services&quot;: [&quot;wireless-billing&quot;, &quot;wireless-admin&quot;, &quot;wireless-manager&quot;],</span>
+<span class="w"> </span><span class="no">&quot;timestamp&quot;: &quot;&#39;$(date -u -Iseconds)&#39;&quot;</span>
+<span class="w"> </span><span class="no">}&#39;</span>
+</code></pre></div> <h2>Monitoring and Observability Integration</h2>
+<h3>Deployment Metrics and Analytics</h3>
+<div class="codehilite"><pre><span></span><code><span class="c1"># prometheus/deployment-metrics.yml</span>
+<span class="nt">groups</span><span class="p">:</span>
+<span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">deployment-metrics</span>
+<span class="w"> </span><span class="nt">rules</span><span class="p">:</span>
+<span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">record</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">deployment:success_rate</span>
+<span class="w"> </span><span class="nt">expr</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">|</span>
+<span class="w"> </span><span class="no">sum(rate(deployment_attempts_total{result=&quot;success&quot;}[1h])) /</span>
+<span class="w"> </span><span class="no">sum(rate(deployment_attempts_total[1h]))</span> <span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">record</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">deployment:average_duration_minutes</span>
+<span class="w"> </span><span class="nt">expr</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">|</span>
+<span class="w"> </span><span class="no">avg(deployment_duration_seconds / 60) by (service, environment)</span> <span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">record</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">deployment:rollback_rate</span>
+<span class="w"> </span><span class="nt">expr</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">|</span>
+<span class="w"> </span><span class="no">sum(rate(deployment_rollbacks_total[24h])) /</span>
+<span class="w"> </span><span class="no">sum(rate(deployment_attempts_total[24h]))</span> <span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">alert</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">HighDeploymentFailureRate</span>
+<span class="w"> </span><span class="nt">expr</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">deployment:success_rate &lt; 0.95</span>
+<span class="w"> </span><span class="nt">for</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">15m</span>
+<span class="w"> </span><span class="nt">labels</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">severity</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">warning</span>
+<span class="w"> </span><span class="nt">team</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">devops</span>
+<span class="w"> </span><span class="nt">annotations</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">summary</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;Deployment</span><span class="nv"> </span><span class="s">success</span><span class="nv"> </span><span class="s">rate</span><span class="nv"> </span><span class="s">is</span><span class="nv"> </span><span class="s">below</span><span class="nv"> </span><span class="s">95%&quot;</span>
+<span class="w"> </span><span class="nt">description</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;Current</span><span class="nv"> </span><span class="s">deployment</span><span class="nv"> </span><span class="s">success</span><span class="nv"> </span><span class="s">rate:</span><span class="nv"> </span><span class="s">{{</span><span class="nv"> </span><span class="s">$value</span><span class="nv"> </span><span class="s">|</span><span class="nv"> </span><span class="s">humanizePercentage</span><span class="nv"> </span><span class="s">}}&quot;</span> <span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">alert</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">DeploymentTimeoutExceeded</span>
+<span class="w"> </span><span class="nt">expr</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">deployment:average_duration_minutes &gt; 30</span>
+<span class="w"> </span><span class="nt">for</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">10m</span>
+<span class="w"> </span><span class="nt">labels</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">severity</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">warning</span>
+<span class="w"> </span><span class="nt">team</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">devops</span>
+<span class="w"> </span><span class="nt">annotations</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">summary</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;Average</span><span class="nv"> </span><span class="s">deployment</span><span class="nv"> </span><span class="s">time</span><span class="nv"> </span><span class="s">exceeds</span><span class="nv"> </span><span class="s">30</span><span class="nv"> </span><span class="s">minutes&quot;</span>
+<span class="w"> </span><span class="nt">description</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;Current</span><span class="nv"> </span><span class="s">average</span><span class="nv"> </span><span class="s">deployment</span><span class="nv"> </span><span class="s">time:</span><span class="nv"> </span><span class="s">{{</span><span class="nv"> </span><span class="s">$value</span><span class="nv"> </span><span class="s">}}</span><span class="nv"> </span><span class="s">minutes&quot;</span>
+</code></pre></div> <h3>Automated Testing Integration</h3>
+<div class="codehilite"><pre><span></span><code><span class="ch">#!/bin/bash</span>
+<span class="c1"># scripts/comprehensive-tests.sh</span> <span class="nb">set</span><span class="w"> </span>-euo<span class="w"> </span>pipefail <span class="nv">SERVICE</span><span class="o">=</span><span class="nv">$1</span>
+<span class="nv">ENVIRONMENT</span><span class="o">=</span><span class="nv">$2</span>
+<span class="nv">REGION</span><span class="o">=</span><span class="si">${</span><span class="nv">3</span><span class="k">:-</span><span class="nv">us</span><span class="p">-central</span><span class="si">}</span> <span class="nb">echo</span><span class="w"> </span><span class="s2">&quot;Running comprehensive tests for </span><span class="nv">$SERVICE</span><span class="s2"> in </span><span class="nv">$ENVIRONMENT</span><span class="s2"> (</span><span class="nv">$REGION</span><span class="s2">)&quot;</span> <span class="c1"># Unit tests</span>
+<span class="nb">echo</span><span class="w"> </span><span class="s2">&quot;Running unit tests...&quot;</span>
+<span class="k">if</span><span class="w"> </span><span class="o">[</span><span class="w"> </span>-f<span class="w"> </span><span class="s2">&quot;</span><span class="nv">$SERVICE</span><span class="s2">/Makefile&quot;</span><span class="w"> </span><span class="o">]</span><span class="p">;</span><span class="w"> </span><span class="k">then</span>
+<span class="w"> </span><span class="nb">cd</span><span class="w"> </span><span class="nv">$SERVICE</span><span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span>make<span class="w"> </span><span class="nb">test</span>
+<span class="k">else</span>
+<span class="w"> </span><span class="nb">echo</span><span class="w"> </span><span class="s2">&quot;No unit tests found for </span><span class="nv">$SERVICE</span><span class="s2">&quot;</span>
+<span class="k">fi</span> <span class="c1"># Integration tests</span>
+<span class="nb">echo</span><span class="w"> </span><span class="s2">&quot;Running integration tests...&quot;</span>
+./scripts/integration-tests.sh<span class="w"> </span><span class="nv">$SERVICE</span><span class="w"> </span><span class="nv">$ENVIRONMENT</span><span class="w"> </span><span class="nv">$REGION</span> <span class="c1"># Load tests</span>
+<span class="nb">echo</span><span class="w"> </span><span class="s2">&quot;Running load tests...&quot;</span>
+./scripts/load-tests.sh<span class="w"> </span><span class="nv">$SERVICE</span><span class="w"> </span><span class="nv">$ENVIRONMENT</span><span class="w"> </span><span class="nv">$REGION</span> <span class="c1"># Security tests</span>
+<span class="nb">echo</span><span class="w"> </span><span class="s2">&quot;Running security tests...&quot;</span>
+./scripts/security-tests.sh<span class="w"> </span><span class="nv">$SERVICE</span><span class="w"> </span><span class="nv">$ENVIRONMENT</span><span class="w"> </span><span class="nv">$REGION</span> <span class="c1"># API contract tests</span>
+<span class="nb">echo</span><span class="w"> </span><span class="s2">&quot;Running API contract tests...&quot;</span>
+./scripts/contract-tests.sh<span class="w"> </span><span class="nv">$SERVICE</span><span class="w"> </span><span class="nv">$ENVIRONMENT</span><span class="w"> </span><span class="nv">$REGION</span> <span class="c1"># End-to-end tests</span>
+<span class="nb">echo</span><span class="w"> </span><span class="s2">&quot;Running E2E tests...&quot;</span>
+./scripts/e2e-tests.sh<span class="w"> </span><span class="nv">$SERVICE</span><span class="w"> </span><span class="nv">$ENVIRONMENT</span><span class="w"> </span><span class="nv">$REGION</span> <span class="nb">echo</span><span class="w"> </span><span class="s2">&quot;All tests completed successfully for </span><span class="nv">$SERVICE</span><span class="s2">&quot;</span>
+</code></pre></div> <h2>Results and Impact</h2>
+<h3>Deployment Efficiency Improvements</h3>
+<p><strong>Speed and Frequency:</strong>
+- <strong>Deployment time</strong>: Reduced from 4-8 hours to 15-30 minutes
+- <strong>Deployment frequency</strong>: Increased from weekly to multiple times per day
+- <strong>Success rate</strong>: Improved from 70% to 98.5%
+- <strong>Rollback time</strong>: Reduced from 45 minutes to under 2 minutes</p>
+<p><strong>Quality and Reliability:</strong>
+- <strong>Failed deployments</strong>: Reduced by 85% through automated validation
+- <strong>Production incidents</strong>: 70% reduction in deployment-related issues
+- <strong>Mean time to recovery</strong>: Improved from 45 minutes to 5 minutes
+- <strong>Change failure rate</strong>: Reduced from 30% to 2%</p>
+<h3>Operational Efficiency Gains</h3>
+<p><strong>Developer Productivity:</strong>
+- <strong>Toil reduction</strong>: 60% reduction in manual deployment tasks
+- <strong>Developer velocity</strong>: 40% increase in feature delivery speed
+- <strong>Context switching</strong>: 50% reduction through automated pipelines
+- <strong>On-call burden</strong>: 70% reduction in deployment-related pages</p>
+<p><strong>Infrastructure Utilization:</strong>
+- <strong>Resource efficiency</strong>: 35% improvement through right-sizing
+- <strong>Cost optimization</strong>: 25% reduction in infrastructure costs
+- <strong>Scaling efficiency</strong>: Automated scaling reducing over-provisioning by 40%
+- <strong>Capacity planning</strong>: Predictive scaling improving utilization by 30%</p>
+<h3>Business Impact Metrics</h3>
+<p><strong>Service Reliability:</strong>
+- <strong>Overall uptime</strong>: Improved from 99.95% to 99.99%
+- <strong>Service availability</strong>: Zero deployment-related outages in last 12 months
+- <strong>Customer satisfaction</strong>: 25% improvement in deployment-related metrics
+- <strong>SLA compliance</strong>: 100% achievement across all service commitments</p>
+<p><strong>Time to Market:</strong>
+- <strong>Feature delivery</strong>: 50% faster time from development to production
+- <strong>Hotfix deployment</strong>: Critical fixes deployed in under 10 minutes
+- <strong>Regulatory compliance</strong>: Automated compliance validation reducing audit time by 60%
+- <strong>Innovation velocity</strong>: 3x increase in experimental feature deployment</p>
+<h2>Lessons Learned and Best Practices</h2>
+<h3>1. Start with Culture, Not Tools</h3>
+<p><strong>Key Learning:</strong> Automation success depends more on organizational culture than technology choices.
+<strong>Implementation:</strong> Focus on collaboration between development and operations teams before implementing tools.
+<strong>Best Practice:</strong> Establish shared responsibilities and success metrics across teams.</p>
+<h3>2. Observability Before Automation</h3>
+<p><strong>Key Learning:</strong> You cannot automate what you cannot measure.
+<strong>Implementation:</strong> Implement comprehensive monitoring and logging before adding automation layers.
+<strong>Best Practice:</strong> Use metrics to drive automation decisions and validate improvements.</p>
+<h3>3. Gradual Automation Adoption</h3>
+<p><strong>Key Learning:</strong> Big-bang automation implementations often fail due to complexity and resistance.
+<strong>Implementation:</strong> Start with simple, high-impact automation and gradually expand scope.
+<strong>Best Practice:</strong> Demonstrate value early and build confidence through incremental wins.</p>
+<h3>4. Security and Compliance as Code</h3>
+<p><strong>Key Learning:</strong> Security and compliance cannot be afterthoughts in automated systems.
+<strong>Implementation:</strong> Integrate security scanning, policy enforcement, and compliance validation into all pipelines.
+<strong>Best Practice:</strong> Treat security and compliance requirements as automated tests that must pass.</p>
+<h3>5. Chaos Engineering Integration</h3>
+<p><strong>Key Learning:</strong> Automated systems must be resilient to failures and unexpected conditions.
+<strong>Implementation:</strong> Regular chaos engineering exercises to validate automation resilience.
+<strong>Best Practice:</strong> Build failure scenarios into testing and validation processes.</p>
+<h2>Future Directions</h2>
+<h3>AI/ML Integration</h3>
+<p><strong>Intelligent Automation:</strong>
+- Machine learning models for deployment risk assessment
+- Predictive analysis for optimal deployment timing
+- Automated capacity planning based on usage patterns
+- Intelligent routing and traffic management</p>
+<p><strong>Anomaly Detection:</strong>
+- AI-powered detection of deployment anomalies
+- Automated root cause analysis for failures
+- Predictive maintenance for infrastructure components
+- Smart alerting with reduced false positives</p>
+<h3>Edge Computing Integration</h3>
+<p><strong>Edge Deployment Automation:</strong>
+- Automated deployment to hundreds of edge locations
+- Network-aware deployment strategies
+- Edge-specific testing and validation
+- Bandwidth-optimized artifact distribution</p>
+<h3>Advanced GitOps Patterns</h3>
+<p><strong>Multi-Repository Management:</strong>
+- Cross-repository dependency management
+- Automated policy synchronization
+- Global configuration management
+- Advanced approval workflows</p>
+<p><strong>Progressive Delivery Enhancement:</strong>
+- Automated canary analysis expansion
+- Feature flag integration with deployment pipelines
+- User-experience-driven rollout decisions
+- Multi-dimensional deployment strategies</p>
+<h2>Conclusion</h2>
+<p>The journey from manual deployment processes to comprehensive DevOps automation in telecommunications infrastructure represents a fundamental transformation in how we approach service delivery and operations. Through careful planning, incremental implementation, and continuous improvement, we've built a robust automation platform that not only improves operational efficiency but enables innovation and growth.</p>
+<p>Key takeaways from this automation journey:</p>
+<ol>
+<li><strong>Automation amplifies culture</strong>: Technology solutions are only as good as the organizational culture that supports them</li>
+<li><strong>Observability drives automation</strong>: You cannot automate effectively without comprehensive visibility</li>
+<li><strong>Start simple, iterate rapidly</strong>: Complex automation systems are built through incremental improvement</li>
+<li><strong>Security and compliance are foundational</strong>: These cannot be retrofitted into automation systems</li>
+<li><strong>Resilience must be designed in</strong>: Automated systems must gracefully handle failures and edge cases</li>
+</ol>
+<p>The automation platform we've built provides a solid foundation for the future of telecommunications infrastructure. As networks become more complex with 5G, edge computing, and network virtualization, the automation principles and practices detailed in this post will become even more critical for operational success.</p>
+<p>The investment in comprehensive automation pays dividends not just in operational efficiency, but in service quality, developer productivity, and business agility. For telecommunications providers embarking on similar automation journeys, the lessons learned and patterns established in this implementation provide a proven roadmap to success.</p>
+<hr />
+<p><em>This blog post chronicles real-world implementations of DevOps automation supporting critical telecommunications infrastructure across multiple geographic regions and serving millions of subscribers.</em></p>
+<p><strong>Key Technologies:</strong> GitHub Actions, project, ArgoCD, Kubernetes, Prometheus, Grafana<br />
+<strong>Scope:</strong> 20+ automation implementations, Multi-region deployment, Production-grade CI/CD<br />
+<strong>Impact:</strong> 98.5% deployment success rate, 60% reduction in toil, 99.99% service availability</p></div> <footer><ul class="stats"><li><a href="../index.html">Back to posts</a></li></ul></footer> </article> </div> <section id="sidebar"> <section> <div class="mini-posts"> <header><h3>Recent</h3></header> <ul>
+<li><a href="../posts/project--devops-automation-blog.html">Infrastructure as Code in Telecommunications: Scaling DevOps for Mission-Critical Networks</a> <span class=\"published\">DevOps</span></li>
+<li><a href="../posts/project--dra-infrastructure-blog.html">Modernizing Diameter Routing Agent (DRA) Infrastructure: A Journey from Monolith to Microservices</a> <span class=\"published\">Infra</span></li>
+<li><a href="../posts/project--ims-modernization-blog.html">IMS Service Modernization: Transforming IP Multimedia Subsystem for Cloud-Native Networks</a> <span class=\"published\">Telecom</span></li>
+<li><a href="../posts/project--telecommunications-architecture-blog.html">Building Cloud-Native Telecommunications Architecture: From Legacy Networks to 5G-Ready Infrastructure</a> <span class=\"published\">Telecom</span></li> </ul> </div> </section> <section> <header><h3>About</h3></header> <p>Notes on telecom, infra, and automation.</p> </section> </section> <section id="footer"><p class="copyright">&copy; 2025</p></section> </div> <script src="../assets/js/jquery.min.js"></script> <script src="../assets/js/browser.min.js"></script> <script src="../assets/js/breakpoints.min.js"></script> <script src="../assets/js/util.js"></script> <script src="../assets/js/main.js"></script> </body>
+</html>

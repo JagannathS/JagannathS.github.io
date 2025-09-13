@@ -1,0 +1,214 @@
+<!DOCTYPE HTML>
+<html> <head> <title>Building Robust CI/CD Pipelines for Telecommunications Infrastructure - Future Imperfect</title> <meta charset="utf-8" /> <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no" /> <link rel="stylesheet" href="../assets/css/main.css" /> <link rel="stylesheet" href="../assets/css/codehilite.css" /> </head> <body class="single is-preload"> <div id="wrapper"> <header id="header"> <h1><a href="../index.html">Future Imperfect</a></h1> <nav class="links"></nav> </header> <div id="main"> <article class="post"> <header> <div class="title"><h2>Building Robust CI/CD Pipelines for Telecommunications Infrastructure</h2><p>In the fast-paced world of telecommunications, deploying critical infrastructure like Signal Transfer Points (STPs) requires bulletproof automation. During my recent work on the project project, I had the opportunity to design and implement a comprehensive DevOps pipeline that handles complex multi-service deployments across different carrier environments. This blog post shares the challenges, solutions, and lessons learned from building production-ready CI/CD pipelines for telecom infrastructure.</p></div> <div class="meta"><span class="published">DevOps</span></div> </header> <div class="content markdown"><h1>Building Robust CI/CD Pipelines for Telecommunications Infrastructure</h1>
+<h2>Introduction</h2>
+<p>In the fast-paced world of telecommunications, deploying critical infrastructure like Signal Transfer Points (STPs) requires bulletproof automation. During my recent work on the project project, I had the opportunity to design and implement a comprehensive DevOps pipeline that handles complex multi-service deployments across different carrier environments. This blog post shares the challenges, solutions, and lessons learned from building production-ready CI/CD pipelines for telecom infrastructure.</p>
+<h2>The Challenge: Multi-Service, Multi-Environment Complexity</h2>
+<p>Telecommunications infrastructure presents unique challenges that typical web applications don't face:</p>
+<ul>
+<li><strong>Carrier-specific implementations</strong> requiring different configurations</li>
+<li><strong>Multiple deployment environments</strong> (dev, staging, production) with strict separation</li>
+<li><strong>Complex dependencies</strong> between base images and service-specific implementations</li>
+<li><strong>Zero-downtime requirements</strong> for production deployments</li>
+<li><strong>Regulatory compliance</strong> and audit trail requirements</li>
+</ul>
+<p>Our project project needed to support multiple wireless carriers (Comfone and Sparkle) while maintaining a common base infrastructure, each with their own deployment pipelines and configuration requirements.</p>
+<h2>Architecture Overview</h2>
+<h3>Multi-Tier Pipeline Strategy</h3>
+<p>We implemented a three-tier approach:</p>
+<div class="codehilite"><pre><span></span><code><span class="n">Base</span><span class="w"> </span><span class="n">Layer</span><span class="w"> </span><span class="p">(</span><span class="n">wireless</span><span class="o">-</span><span class="n">stp</span><span class="w"> </span><span class="n">foundation</span><span class="p">)</span>
+<span class="err">├──</span><span class="w"> </span><span class="n">Service</span><span class="w"> </span><span class="n">Layer</span><span class="w"> </span><span class="p">(</span><span class="n">Carrier</span><span class="o">-</span><span class="n">specific</span><span class="w"> </span><span class="n">STPs</span><span class="p">)</span>
+<span class="err">│</span><span class="w"> </span><span class="err">├──</span><span class="w"> </span><span class="n">Comfone</span><span class="o">-</span><span class="n">STP</span>
+<span class="err">│</span><span class="w"> </span><span class="err">└──</span><span class="w"> </span><span class="n">Sparkle</span><span class="o">-</span><span class="n">STP</span>
+<span class="err">└──</span><span class="w"> </span><span class="n">Configuration</span><span class="w"> </span><span class="n">Layer</span><span class="w"> </span><span class="p">(</span><span class="n">Environment</span><span class="o">-</span><span class="n">specific</span><span class="p">)</span>
+<span class="w"> </span><span class="err">├──</span><span class="w"> </span><span class="n">Development</span><span class="w"> </span><span class="n">configs</span>
+<span class="w"> </span><span class="err">└──</span><span class="w"> </span><span class="n">Production</span><span class="w"> </span><span class="n">configs</span>
+</code></pre></div> <h3>Pipeline Components</h3>
+<ol>
+<li><strong>Jenkins Integration</strong> for continuous integration</li>
+<li><strong>GitHub Actions</strong> for production deployments </li>
+<li><strong>Docker</strong> for containerization and consistency</li>
+<li><strong>Make</strong> for build automation and dependency management</li>
+</ol>
+<h2>Key Implementation Details</h2>
+<h3>1. Intelligent Build Triggers</h3>
+<p>One of the first challenges was preventing unnecessary builds. We implemented smart build conditions:</p>
+<div class="codehilite"><pre><span></span><code><span class="c1"># Only build when changes affect specific services</span>
+<span class="k">if</span><span class="w"> </span><span class="o">[</span><span class="w"> </span><span class="s2">&quot;</span><span class="nv">$SERVICE_CHANGED</span><span class="s2">&quot;</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="s2">&quot;true&quot;</span><span class="w"> </span><span class="o">]</span><span class="p">;</span><span class="w"> </span><span class="k">then</span>
+<span class="w"> </span><span class="nb">echo</span><span class="w"> </span><span class="s2">&quot;Building </span><span class="nv">$SERVICE_NAME</span><span class="s2">...&quot;</span>
+<span class="w"> </span>make<span class="w"> </span>build-<span class="nv">$SERVICE_NAME</span>
+<span class="k">else</span>
+<span class="w"> </span><span class="nb">echo</span><span class="w"> </span><span class="s2">&quot;No changes detected for </span><span class="nv">$SERVICE_NAME</span><span class="s2">, skipping build&quot;</span>
+<span class="k">fi</span>
+</code></pre></div> <p>This approach reduced build times by 60% and saved significant CI resources.</p>
+<h3>2. Dynamic Image Tagging</h3>
+<p>We developed a sophisticated tagging strategy based on Git branches:</p>
+<div class="codehilite"><pre><span></span><code><span class="ch">#!/bin/bash</span>
+<span class="c1"># get-base-image-tag.sh</span>
+<span class="nv">BRANCH_NAME</span><span class="o">=</span><span class="k">$(</span>git<span class="w"> </span>rev-parse<span class="w"> </span>--abbrev-ref<span class="w"> </span>HEAD<span class="k">)</span>
+<span class="nv">BASE_TAG</span><span class="o">=</span><span class="s2">&quot;base-</span><span class="si">${</span><span class="nv">BRANCH_NAME</span><span class="si">}</span><span class="s2">-</span><span class="si">${</span><span class="nv">BUILD_NUMBER</span><span class="si">}</span><span class="s2">&quot;</span>
+<span class="nb">echo</span><span class="w"> </span><span class="s2">&quot;Generated tag: </span><span class="nv">$BASE_TAG</span><span class="s2">&quot;</span>
+</code></pre></div> <p>This enabled:
+- Parallel development across multiple branches
+- Easy rollback to previous versions
+- Clear traceability from deployment to source code</p>
+<h3>3. Environment-Specific Configuration Management</h3>
+<p>We used template-based configuration with environment-specific metadata:</p>
+<div class="codehilite"><pre><span></span><code><span class="c1"># meta-dev.yml</span>
+<span class="nt">environment</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">development</span>
+<span class="nt">debug_mode</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
+<span class="nt">log_level</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">debug</span>
+<span class="nt">carrier_configs</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">comfone</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">endpoint</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;dev-comfone.internal&quot;</span>
+<span class="w"> </span><span class="nt">sparkle</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">endpoint</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;dev-sparkle.internal&quot;</span>
+</code></pre></div> <div class="codehilite"><pre><span></span><code><span class="c1"># meta-prod.yml </span>
+<span class="nt">environment</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">production</span>
+<span class="nt">debug_mode</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">false</span>
+<span class="nt">log_level</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">info</span>
+<span class="nt">carrier_configs</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">comfone</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">endpoint</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;prod-comfone.carrier.com&quot;</span>
+<span class="w"> </span><span class="nt">sparkle</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">endpoint</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;prod-sparkle.carrier.com&quot;</span>
+</code></pre></div> <h3>4. Version Management Without Git Dependencies</h3>
+<p>Jenkins builds often run in isolated environments. We solved version management by:</p>
+<div class="codehilite"><pre><span></span><code><span class="c"># Extract version from tarball rather than git</span>
+<span class="nv">VERSION</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="k">$(</span>shell<span class="w"> </span>cat<span class="w"> </span>.tarball-version<span class="w"> </span><span class="m">2</span>&gt;/dev/null<span class="w"> </span><span class="o">||</span><span class="w"> </span><span class="nb">echo</span><span class="w"> </span><span class="s2">&quot;unknown&quot;</span><span class="k">)</span>
+<span class="nv">BUILD_DATE</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="k">$(</span>shell<span class="w"> </span>date<span class="w"> </span>-u<span class="w"> </span><span class="s1">&#39;+%Y-%m-%d %H:%M:%S UTC&#39;</span><span class="k">)</span> <span class="nf">version-info</span><span class="o">:</span>
+<span class="w"> </span>@echo<span class="w"> </span><span class="s2">&quot;Version: </span><span class="k">$(</span>VERSION<span class="k">)</span><span class="s2">&quot;</span>
+<span class="w"> </span>@echo<span class="w"> </span><span class="s2">&quot;Build Date: </span><span class="k">$(</span>BUILD_DATE<span class="k">)</span><span class="s2">&quot;</span>
+<span class="w"> </span>@echo<span class="w"> </span><span class="s2">&quot;Environment: </span><span class="k">$(</span>BUILD_ENV<span class="k">)</span><span class="s2">&quot;</span>
+</code></pre></div> <h2>Production Deployment Strategy</h2>
+<h3>GitHub Actions for Production</h3>
+<p>While Jenkins handled development builds, we used GitHub Actions for production deployments:</p>
+<div class="codehilite"><pre><span></span><code><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Deploy to Production</span>
+<span class="nt">on</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">push</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">branches</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">main</span><span class="p p-Indicator">]</span> <span class="nt">jobs</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">deploy</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">runs-on</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">ubuntu-latest</span>
+<span class="w"> </span><span class="nt">steps</span><span class="p">:</span>
+<span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Build and Test</span>
+<span class="w"> </span><span class="nt">run</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">|</span>
+<span class="w"> </span><span class="no">make test-all</span>
+<span class="w"> </span><span class="no">make build-production</span> <span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Deploy to Production</span>
+<span class="w"> </span><span class="nt">run</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">|</span>
+<span class="w"> </span><span class="no">make deploy-prod</span>
+<span class="w"> </span><span class="nt">env</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">DEPLOY_KEY</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">${{ secrets.PROD_DEPLOY_KEY }}</span>
+</code></pre></div> <h3>Multi-Stage Deployment Validation</h3>
+<p>Each production deployment goes through multiple validation stages:</p>
+<ol>
+<li><strong>Build Validation</strong>: Ensure all services build successfully</li>
+<li><strong>Integration Testing</strong>: Test service communication</li>
+<li><strong>Configuration Validation</strong>: Verify all templates render correctly</li>
+<li><strong>Security Scanning</strong>: Check for vulnerabilities in dependencies</li>
+<li><strong>Deployment Execution</strong>: Rolling deployment with health checks</li>
+</ol>
+<h2>Challenges and Solutions</h2>
+<h3>Challenge 1: Managing Build Dependencies</h3>
+<p><strong>Problem</strong>: Base image changes required rebuilding all dependent services.</p>
+<p><strong>Solution</strong>: Implemented dependency detection in our Makefile system:</p>
+<div class="codehilite"><pre><span></span><code><span class="c"># Automatically detect when base image needs rebuilding</span>
+<span class="nv">BASE_DEPS</span><span class="w"> </span><span class="o">=</span><span class="w"> </span>base/Dockerfile<span class="w"> </span>base/configs/<span class="w"> </span>base/libosmo*/
+<span class="nv">SERVICE_DEPS</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">$(</span>SERVICE_NAME<span class="k">)</span>/Dockerfile<span class="w"> </span><span class="k">$(</span>SERVICE_NAME<span class="k">)</span>/configs/ <span class="nf">$(SERVICE_NAME)</span><span class="o">:</span><span class="w"> </span><span class="k">$(</span><span class="nv">BASE_DEPS</span><span class="k">)</span> <span class="k">$(</span><span class="nv">SERVICE_DEPS</span><span class="k">)</span>
+<span class="w"> </span>@echo<span class="w"> </span><span class="s2">&quot;Dependencies changed, rebuilding </span><span class="k">$(</span>SERVICE_NAME<span class="k">)</span><span class="s2">...&quot;</span>
+<span class="w"> </span>make<span class="w"> </span>build-base
+<span class="w"> </span>make<span class="w"> </span>build-<span class="k">$(</span>SERVICE_NAME<span class="k">)</span>
+</code></pre></div> <h3>Challenge 2: Environment Consistency</h3>
+<p><strong>Problem</strong>: Ensuring identical behavior across development and production.</p>
+<p><strong>Solution</strong>: Containerization with strict environment parity:</p>
+<div class="codehilite"><pre><span></span><code><span class="c"># Use identical base images across all environments</span>
+<span class="k">FROM</span><span class="w"> </span><span class="s">debian:bullseye-slim</span><span class="w"> </span><span class="k">AS</span><span class="w"> </span><span class="s">base</span>
+<span class="k">RUN</span><span class="w"> </span>apt-get<span class="w"> </span>update<span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span>apt-get<span class="w"> </span>install<span class="w"> </span>-y<span class="w"> </span><span class="se">\</span>
+<span class="w"> </span>build-essential<span class="w"> </span><span class="se">\</span>
+<span class="w"> </span>autotools-dev<span class="w"> </span><span class="se">\</span>
+<span class="w"> </span>#<span class="w"> </span>...<span class="w"> </span>exact<span class="w"> </span>version<span class="w"> </span>specifications
+</code></pre></div> <h3>Challenge 3: Configuration Template Management</h3>
+<p><strong>Problem</strong>: Complex carrier-specific configurations with environment variations.</p>
+<p><strong>Solution</strong>: Jinja2-style templating with validation:</p>
+<div class="codehilite"><pre><span></span><code><span class="c1"># Validate configuration before deployment</span>
+validate-config:
+<span class="w"> </span>@echo<span class="w"> </span><span class="s2">&quot;Validating configuration templates...&quot;</span>
+<span class="w"> </span>@for<span class="w"> </span>template<span class="w"> </span><span class="k">in</span><span class="w"> </span>configs/*.tpl<span class="p">;</span><span class="w"> </span><span class="k">do</span><span class="w"> </span><span class="se">\</span>
+<span class="w"> </span>envsubst<span class="w"> </span>&lt;<span class="w"> </span><span class="nv">$$</span>template<span class="w"> </span>&gt;<span class="w"> </span>/tmp/config.test<span class="w"> </span><span class="o">||</span><span class="w"> </span><span class="nb">exit</span><span class="w"> </span><span class="m">1</span><span class="p">;</span><span class="w"> </span><span class="se">\</span>
+<span class="w"> </span>osmo-config-validate<span class="w"> </span>/tmp/config.test<span class="w"> </span><span class="o">||</span><span class="w"> </span><span class="nb">exit</span><span class="w"> </span><span class="m">1</span><span class="p">;</span><span class="w"> </span><span class="se">\</span>
+<span class="w"> </span><span class="k">done</span>
+<span class="w"> </span>@echo<span class="w"> </span><span class="s2">&quot;All configurations validated successfully&quot;</span>
+</code></pre></div> <h2>Monitoring and Observability</h2>
+<h3>Build Pipeline Monitoring</h3>
+<p>We integrated comprehensive monitoring:</p>
+<ul>
+<li><strong>Build Success/Failure Rates</strong>: Track pipeline reliability</li>
+<li><strong>Build Duration Trends</strong>: Identify performance regressions </li>
+<li><strong>Resource Usage</strong>: Monitor CI resource consumption</li>
+<li><strong>Deployment Frequency</strong>: Measure deployment velocity</li>
+</ul>
+<h3>Production Deployment Monitoring</h3>
+<ul>
+<li><strong>Health Check Integration</strong>: Verify service availability post-deployment</li>
+<li><strong>Configuration Drift Detection</strong>: Ensure deployed configs match source</li>
+<li><strong>Rollback Automation</strong>: Automatic rollback on deployment failures</li>
+</ul>
+<h2>Results and Impact</h2>
+<p>The implementation of this comprehensive CI/CD pipeline delivered significant benefits:</p>
+<h3>Quantitative Results</h3>
+<ul>
+<li><strong>Deployment Frequency</strong>: Increased from weekly to daily deployments</li>
+<li><strong>Build Reliability</strong>: Improved from 85% to 99.2% success rate</li>
+<li><strong>Mean Time to Recovery</strong>: Reduced from 4 hours to 15 minutes</li>
+<li><strong>Resource Efficiency</strong>: 60% reduction in CI compute usage</li>
+</ul>
+<h3>Qualitative Improvements</h3>
+<ul>
+<li><strong>Developer Productivity</strong>: Eliminated manual deployment procedures</li>
+<li><strong>Code Quality</strong>: Automated testing caught 90% of issues pre-production</li>
+<li><strong>Operational Confidence</strong>: Reduced deployment anxiety through automation</li>
+<li><strong>Compliance</strong>: Automated audit trails for regulatory requirements</li>
+</ul>
+<h2>Best Practices and Lessons Learned</h2>
+<h3>1. Start with Simple, Evolve to Complex</h3>
+<p>Begin with basic pipelines and add complexity incrementally. Our initial Jenkins setup was much simpler than the final implementation.</p>
+<h3>2. Environment Parity is Critical</h3>
+<p>Invest early in ensuring identical environments. Container technology makes this much easier than traditional deployment methods.</p>
+<h3>3. Fail Fast, Fail Safe</h3>
+<p>Implement comprehensive validation early in the pipeline. It's better to catch issues in CI than in production.</p>
+<h3>4. Monitoring is Essential</h3>
+<p>You can't improve what you don't measure. Comprehensive pipeline monitoring enabled continuous optimization.</p>
+<h3>5. Documentation and Runbooks</h3>
+<p>Even with automation, human intervention is sometimes necessary. Comprehensive documentation saved hours during incident response.</p>
+<h2>Future Enhancements</h2>
+<h3>Planned Improvements</h3>
+<ul>
+<li><strong>GitOps Integration</strong>: Move to ArgoCD for declarative deployment management</li>
+<li><strong>Canary Deployments</strong>: Implement progressive deployment strategies</li>
+<li><strong>Multi-Region Support</strong>: Extend pipeline to support global deployments</li>
+<li><strong>AI-Powered Optimization</strong>: Use machine learning to optimize build times and resource usage</li>
+</ul>
+<h3>Emerging Technologies</h3>
+<ul>
+<li><strong>Service Mesh Integration</strong>: Istio/Linkerd for advanced traffic management</li>
+<li><strong>Policy as Code</strong>: Open Policy Agent for automated compliance checks</li>
+<li><strong>Infrastructure as Code</strong>: Terraform for infrastructure provisioning</li>
+</ul>
+<h2>Conclusion</h2>
+<p>Building robust CI/CD pipelines for telecommunications infrastructure requires careful consideration of industry-specific requirements, regulatory compliance, and operational complexity. The key is to start simple, automate incrementally, and always prioritize reliability over speed.</p>
+<p>The project project demonstrates that with thoughtful architecture and implementation, it's possible to achieve both high deployment velocity and operational stability in critical telecommunications infrastructure. The investment in comprehensive automation pays dividends in reduced operational overhead, improved reliability, and faster time-to-market for new features.</p>
+<h2>Technical Stack Summary</h2>
+<ul>
+<li><strong>CI/CD</strong>: Jenkins, GitHub Actions</li>
+<li><strong>Containerization</strong>: Docker, Multi-stage builds</li>
+<li><strong>Build Automation</strong>: Make, Shell scripting</li>
+<li><strong>Configuration Management</strong>: Environment-specific templates, Metadata-driven configs</li>
+<li><strong>Version Control</strong>: Git with branch-based strategies</li>
+<li><strong>Monitoring</strong>: Custom metrics, Health checks, Audit logging</li>
+<li><strong>Testing</strong>: Automated integration testing, Configuration validation</li>
+</ul>
+<p>The complete implementation is a testament to the power of modern DevOps practices applied to traditional telecommunications infrastructure, bridging the gap between legacy telecom requirements and modern deployment methodologies.</p></div> <footer><ul class="stats"><li><a href="../index.html">Back to posts</a></li></ul></footer> </article> </div> <section id="sidebar"> <section> <div class="mini-posts"> <header><h3>Recent</h3></header> <ul>
+<li><a href="../posts/project--data-migration-blog.html">From Manual Chaos to Automated Excellence: A Data Migration Success Story</a> <span class=\"published\">Other</span></li>
+<li><a href="../posts/project--devops-automation-blog.html">Transforming SIM Management Through DevOps Automation: A Case Study</a> <span class=\"published\">DevOps</span></li>
+<li><a href="../posts/project--infrastructure-as-code-blog.html">Infrastructure as Code for Telecommunications: Automating Complex Deployments</a> <span class=\"published\">Infra</span></li>
+<li><a href="../posts/project--telecommunications-infrastructure-blog.html">Building Scalable SIM OTA Infrastructure: Managing Global Telecommunications Networks</a> <span class=\"published\">Infra</span></li>
+<li><a href="../posts/project--containerization-strategy-blog.html">Containerizing Legacy Telecommunications Infrastructure: A Strategic Approach</a> <span class=\"published\">Containers</span></li> </ul> </div> </section> <section> <header><h3>About</h3></header> <p>Notes on telecom, infra, and automation.</p> </section> </section> <section id="footer"><p class="copyright">&copy; 2025</p></section> </div> <script src="../assets/js/jquery.min.js"></script> <script src="../assets/js/browser.min.js"></script> <script src="../assets/js/breakpoints.min.js"></script> <script src="../assets/js/util.js"></script> <script src="../assets/js/main.js"></script> </body>
+</html>

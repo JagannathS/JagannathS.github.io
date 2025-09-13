@@ -1,0 +1,603 @@
+<!DOCTYPE HTML>
+<html> <head> <title>Modernizing IMS Infrastructure: From Legacy Systems to Cloud-Native Excellence - Future Imperfect</title> <meta charset="utf-8" /> <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no" /> <link rel="stylesheet" href="../assets/css/main.css" /> <link rel="stylesheet" href="../assets/css/codehilite.css" /> </head> <body class="single is-preload"> <div id="wrapper"> <header id="header"> <h1><a href="../index.html">Future Imperfect</a></h1> <nav class="links"></nav> </header> <div id="main"> <article class="post"> <header> <div class="title"><h2>Modernizing IMS Infrastructure: From Legacy Systems to Cloud-Native Excellence</h2><p>The IP Multimedia Subsystem (IMS) represents the backbone of modern telecommunications, enabling everything from voice calls to video conferencing, messaging, and rich communication services. As telecommunications providers transition from legacy circuit-switched networks to all-IP infrastructure, the challenge of modernizing IMS components while maintaining service continuity becomes paramount.</p></div> <div class="meta"><span class="published">Infra</span></div> </header> <div class="content markdown"><h1>Modernizing IMS Infrastructure: From Legacy Systems to Cloud-Native Excellence</h1>
+<h2>Introduction</h2>
+<p>The IP Multimedia Subsystem (IMS) represents the backbone of modern telecommunications, enabling everything from voice calls to video conferencing, messaging, and rich communication services. As telecommunications providers transition from legacy circuit-switched networks to all-IP infrastructure, the challenge of modernizing IMS components while maintaining service continuity becomes paramount.</p>
+<p>This blog post chronicles the journey of implementing cloud-native IMS DNS and MySQL services, representing a significant milestone in the digital transformation of telecommunications infrastructure. Through 15+ commits and months of architectural planning, we successfully deployed production-ready IMS services that support millions of subscribers worldwide.</p>
+<h2>Understanding IMS: The Foundation of Modern Communications</h2>
+<h3>What is IMS?</h3>
+<p>The IP Multimedia Subsystem is an architectural framework that enables the delivery of multimedia services over IP networks. Unlike traditional telephony systems, IMS provides:</p>
+<ul>
+<li><strong>Service convergence</strong>: Voice, video, messaging, and data services on a unified platform</li>
+<li><strong>Quality of Service (QoS)</strong>: Guaranteed service levels for real-time communications</li>
+<li><strong>Interoperability</strong>: Standards-based protocols ensuring cross-vendor compatibility</li>
+<li><strong>Rich services</strong>: Beyond basic calling, enabling presence, conferencing, and multimedia sharing</li>
+</ul>
+<h3>Core IMS Components</h3>
+<div class="codehilite"><pre><span></span><code>┌─────────────────┐ ┌─────────────────┐ ┌─────────────────┐
+│ P-CSCF │ │ I-CSCF │ │ S-CSCF │
+│ (Proxy CSCF) │ │ (Interrogating │ │ (Serving CSCF) │
+│ │ │ CSCF) │ │ │
+└─────────────────┘ └─────────────────┘ └─────────────────┘ │ │ │ └───────────────────────┼───────────────────────┘ │ ┌─────────────────┐ │ HSS │ │ (Home Subscriber│ │ Server) │ └─────────────────┘ │ ┌─────────────────┐ │ IMS DNS │ │ IMS MySQL │ └─────────────────┘
+</code></pre></div> <h2>The Modernization Challenge</h2>
+<h3>Legacy Infrastructure Limitations</h3>
+<p>Our journey began with legacy IMS infrastructure that presented several challenges:</p>
+<p><strong>Scalability Constraints:</strong>
+- Monolithic architecture limiting horizontal scaling
+- Hardware-dependent deployments requiring physical infrastructure changes
+- Single points of failure affecting entire service regions</p>
+<p><strong>Operational Complexity:</strong>
+- Manual deployment processes taking days to complete
+- Inconsistent environments between development, staging, and production
+- Limited observability into system performance and health</p>
+<p><strong>Technology Debt:</strong>
+- Outdated database systems with limited replication capabilities
+- DNS infrastructure lacking modern features like service discovery
+- Integration challenges with cloud-native services</p>
+<h3>Business Drivers for Change</h3>
+<p>The modernization was driven by critical business requirements:</p>
+<p><strong>Subscriber Growth:</strong>
+- 300% increase in IMS-registered devices over 18 months
+- Peak traffic exceeding original system design capacity
+- Need for rapid scaling during high-demand events</p>
+<p><strong>Service Innovation:</strong>
+- Requirements for new RCS (Rich Communication Services) features
+- Integration with WebRTC and other modern communication protocols
+- API-driven service provisioning for digital channels</p>
+<p><strong>Operational Efficiency:</strong>
+- Demand for 99.99% uptime with rapid recovery capabilities
+- Cost pressure requiring more efficient resource utilization
+- Regulatory requirements for service availability and data protection</p>
+<h2>Architecture Design: Cloud-Native IMS Services</h2>
+<h3>IMS DNS Service Implementation</h3>
+<p>The IMS DNS service serves as the foundation for service discovery within the IMS infrastructure, enabling SIP endpoints to locate appropriate CSCF servers and other IMS components.</p>
+<h4>Service Architecture</h4>
+<div class="codehilite"><pre><span></span><code><span class="nt">apiVersion</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">apps/v1</span>
+<span class="nt">kind</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Deployment</span>
+<span class="nt">metadata</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">ims-dns</span>
+<span class="w"> </span><span class="nt">namespace</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">ims-infrastructure</span>
+<span class="nt">spec</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">replicas</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">3</span><span class="w"> </span><span class="c1"># High availability across zones</span>
+<span class="w"> </span><span class="nt">strategy</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">RollingUpdate</span>
+<span class="w"> </span><span class="nt">rollingUpdate</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">maxUnavailable</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1</span>
+<span class="w"> </span><span class="nt">maxSurge</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1</span>
+<span class="w"> </span><span class="nt">selector</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">matchLabels</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">app</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">ims-dns</span>
+<span class="w"> </span><span class="nt">template</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">metadata</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">labels</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">app</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">ims-dns</span>
+<span class="w"> </span><span class="nt">spec</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">containers</span><span class="p">:</span>
+<span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">ims-dns</span>
+<span class="w"> </span><span class="nt">image</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">telecom/ims-dns:v2.4.1</span>
+<span class="w"> </span><span class="nt">ports</span><span class="p">:</span>
+<span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">containerPort</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">53</span>
+<span class="w"> </span><span class="nt">protocol</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">UDP</span>
+<span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">dns-udp</span>
+<span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">containerPort</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">53</span>
+<span class="w"> </span><span class="nt">protocol</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">TCP</span>
+<span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">dns-tcp</span>
+<span class="w"> </span><span class="nt">env</span><span class="p">:</span>
+<span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">DNS_ZONE_CONFIG</span>
+<span class="w"> </span><span class="nt">valueFrom</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">configMapRef</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">ims-dns-zones</span>
+<span class="w"> </span><span class="nt">resources</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">requests</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">memory</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;256Mi&quot;</span>
+<span class="w"> </span><span class="nt">cpu</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;200m&quot;</span>
+<span class="w"> </span><span class="nt">limits</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">memory</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;512Mi&quot;</span>
+<span class="w"> </span><span class="nt">cpu</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;500m&quot;</span>
+</code></pre></div> <h4>Key Features Implemented:</h4>
+<p><strong>Service Discovery Integration:</strong>
+- Automatic registration of CSCF servers
+- Dynamic load balancing based on server capacity
+- Geographic routing for optimal latency</p>
+<p><strong>High Availability Design:</strong>
+- Multi-zone deployment with automated failover
+- Real-time zone synchronization
+- Health checking with automatic recovery</p>
+<p><strong>Performance Optimization:</strong>
+- DNS caching strategies for frequently accessed records
+- Connection pooling for database queries
+- Prometheus metrics integration for performance monitoring</p>
+<h4>Configuration Management</h4>
+<div class="codehilite"><pre><span></span><code><span class="c1"># IMS DNS ConfigMap</span>
+<span class="nt">apiVersion</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">v1</span>
+<span class="nt">kind</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">ConfigMap</span>
+<span class="nt">metadata</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">ims-dns-zones</span>
+<span class="nt">data</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">ims.example.com.zone</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">|</span>
+<span class="w"> </span><span class="no">$TTL 300</span>
+<span class="w"> </span><span class="no">@ IN SOA dns1.ims.example.com. admin.example.com. (</span>
+<span class="w"> </span><span class="no">2024041501 ; Serial</span>
+<span class="w"> </span><span class="no">3600 ; Refresh</span>
+<span class="w"> </span><span class="no">1800 ; Retry</span>
+<span class="w"> </span><span class="no">1209600 ; Expire</span>
+<span class="w"> </span><span class="no">300 ; Minimum TTL</span>
+<span class="w"> </span><span class="no">)</span> <span class="w"> </span><span class="no">; Name servers</span>
+<span class="w"> </span><span class="no">@ IN NS dns1.ims.example.com.</span>
+<span class="w"> </span><span class="no">@ IN NS dns2.ims.example.com.</span> <span class="w"> </span><span class="no">; CSCF servers with SRV records</span>
+<span class="w"> </span><span class="no">_sip._tcp.ims.example.com. IN SRV 10 50 5060 pcscf1.ims.example.com.</span>
+<span class="w"> </span><span class="no">_sip._tcp.ims.example.com. IN SRV 10 50 5060 pcscf2.ims.example.com.</span> <span class="w"> </span><span class="no">; A records for CSCF servers</span>
+<span class="w"> </span><span class="no">pcscf1 IN A 10.0.1.10</span>
+<span class="w"> </span><span class="no">pcscf2 IN A 10.0.1.11</span>
+<span class="w"> </span><span class="no">icscf1 IN A 10.0.1.20</span>
+<span class="w"> </span><span class="no">scscf1 IN A 10.0.1.30</span>
+</code></pre></div> <h3>IMS MySQL Service Implementation</h3>
+<p>The IMS MySQL service provides the data persistence layer for subscriber information, service profiles, and session data critical to IMS operations.</p>
+<h4>Database Architecture Design</h4>
+<div class="codehilite"><pre><span></span><code><span class="nt">apiVersion</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">apps/v1</span>
+<span class="nt">kind</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">StatefulSet</span>
+<span class="nt">metadata</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">ims-mysql</span>
+<span class="w"> </span><span class="nt">namespace</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">ims-infrastructure</span>
+<span class="nt">spec</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">serviceName</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">ims-mysql-headless</span>
+<span class="w"> </span><span class="nt">replicas</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">3</span><span class="w"> </span><span class="c1"># Master + 2 replicas</span>
+<span class="w"> </span><span class="nt">selector</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">matchLabels</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">app</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">ims-mysql</span>
+<span class="w"> </span><span class="nt">template</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">spec</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">containers</span><span class="p">:</span>
+<span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">mysql</span>
+<span class="w"> </span><span class="nt">image</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">mysql:8.0.32</span>
+<span class="w"> </span><span class="nt">env</span><span class="p">:</span>
+<span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">MYSQL_ROOT_PASSWORD</span>
+<span class="w"> </span><span class="nt">valueFrom</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">secretKeyRef</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">ims-mysql-secret</span>
+<span class="w"> </span><span class="nt">key</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">root-password</span>
+<span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">MYSQL_REPLICATION_USER</span>
+<span class="w"> </span><span class="nt">value</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;replicator&quot;</span>
+<span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">MYSQL_REPLICATION_PASSWORD</span>
+<span class="w"> </span><span class="nt">valueFrom</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">secretKeyRef</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">ims-mysql-secret</span>
+<span class="w"> </span><span class="nt">key</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">replication-password</span>
+<span class="w"> </span><span class="nt">ports</span><span class="p">:</span>
+<span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">containerPort</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">3306</span>
+<span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">mysql</span>
+<span class="w"> </span><span class="nt">volumeMounts</span><span class="p">:</span>
+<span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">mysql-persistent-storage</span>
+<span class="w"> </span><span class="nt">mountPath</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">/var/lib/mysql</span>
+<span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">mysql-config</span>
+<span class="w"> </span><span class="nt">mountPath</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">/etc/mysql/conf.d</span>
+<span class="w"> </span><span class="nt">resources</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">requests</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">memory</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;2Gi&quot;</span>
+<span class="w"> </span><span class="nt">cpu</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;1000m&quot;</span>
+<span class="w"> </span><span class="nt">limits</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">memory</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;4Gi&quot;</span>
+<span class="w"> </span><span class="nt">cpu</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;2000m&quot;</span>
+<span class="w"> </span><span class="nt">volumeClaimTemplates</span><span class="p">:</span>
+<span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">metadata</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">mysql-persistent-storage</span>
+<span class="w"> </span><span class="nt">spec</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">accessModes</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="s">&quot;ReadWriteOnce&quot;</span><span class="p p-Indicator">]</span>
+<span class="w"> </span><span class="nt">resources</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">requests</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">storage</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">100Gi</span>
+<span class="w"> </span><span class="nt">storageClassName</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">fast-ssd</span>
+</code></pre></div> <h4>Database Schema Optimization</h4>
+<div class="codehilite"><pre><span></span><code><span class="c1">-- IMS Subscriber Profile Table</span>
+<span class="k">CREATE</span><span class="w"> </span><span class="k">TABLE</span><span class="w"> </span><span class="n">subscriber_profiles</span><span class="w"> </span><span class="p">(</span>
+<span class="w"> </span><span class="n">subscriber_id</span><span class="w"> </span><span class="nb">VARCHAR</span><span class="p">(</span><span class="mi">50</span><span class="p">)</span><span class="w"> </span><span class="k">PRIMARY</span><span class="w"> </span><span class="k">KEY</span><span class="p">,</span>
+<span class="w"> </span><span class="n">public_user_identity</span><span class="w"> </span><span class="nb">VARCHAR</span><span class="p">(</span><span class="mi">255</span><span class="p">)</span><span class="w"> </span><span class="k">NOT</span><span class="w"> </span><span class="k">NULL</span><span class="p">,</span>
+<span class="w"> </span><span class="n">private_user_identity</span><span class="w"> </span><span class="nb">VARCHAR</span><span class="p">(</span><span class="mi">255</span><span class="p">)</span><span class="w"> </span><span class="k">NOT</span><span class="w"> </span><span class="k">NULL</span><span class="p">,</span>
+<span class="w"> </span><span class="n">scscf_name</span><span class="w"> </span><span class="nb">VARCHAR</span><span class="p">(</span><span class="mi">255</span><span class="p">),</span>
+<span class="w"> </span><span class="n">service_profile</span><span class="w"> </span><span class="nb">TEXT</span><span class="p">,</span>
+<span class="w"> </span><span class="n">registration_state</span><span class="w"> </span><span class="n">ENUM</span><span class="p">(</span><span class="s1">&#39;REGISTERED&#39;</span><span class="p">,</span><span class="w"> </span><span class="s1">&#39;UNREGISTERED&#39;</span><span class="p">,</span><span class="w"> </span><span class="s1">&#39;NOT_REGISTERED&#39;</span><span class="p">),</span>
+<span class="w"> </span><span class="n">expires_timestamp</span><span class="w"> </span><span class="k">TIMESTAMP</span><span class="w"> </span><span class="k">NULL</span><span class="p">,</span>
+<span class="w"> </span><span class="n">created_at</span><span class="w"> </span><span class="k">TIMESTAMP</span><span class="w"> </span><span class="k">DEFAULT</span><span class="w"> </span><span class="k">CURRENT_TIMESTAMP</span><span class="p">,</span>
+<span class="w"> </span><span class="n">updated_at</span><span class="w"> </span><span class="k">TIMESTAMP</span><span class="w"> </span><span class="k">DEFAULT</span><span class="w"> </span><span class="k">CURRENT_TIMESTAMP</span><span class="w"> </span><span class="k">ON</span><span class="w"> </span><span class="k">UPDATE</span><span class="w"> </span><span class="k">CURRENT_TIMESTAMP</span><span class="p">,</span> <span class="w"> </span><span class="k">INDEX</span><span class="w"> </span><span class="n">idx_public_identity</span><span class="w"> </span><span class="p">(</span><span class="n">public_user_identity</span><span class="p">),</span>
+<span class="w"> </span><span class="k">INDEX</span><span class="w"> </span><span class="n">idx_private_identity</span><span class="w"> </span><span class="p">(</span><span class="n">private_user_identity</span><span class="p">),</span>
+<span class="w"> </span><span class="k">INDEX</span><span class="w"> </span><span class="n">idx_scscf_name</span><span class="w"> </span><span class="p">(</span><span class="n">scscf_name</span><span class="p">),</span>
+<span class="w"> </span><span class="k">INDEX</span><span class="w"> </span><span class="n">idx_registration_state</span><span class="w"> </span><span class="p">(</span><span class="n">registration_state</span><span class="p">),</span>
+<span class="w"> </span><span class="k">INDEX</span><span class="w"> </span><span class="n">idx_expires</span><span class="w"> </span><span class="p">(</span><span class="n">expires_timestamp</span><span class="p">)</span>
+<span class="p">)</span><span class="w"> </span><span class="n">ENGINE</span><span class="o">=</span><span class="n">InnoDB</span><span class="w"> </span><span class="nb">CHARACTER</span><span class="w"> </span><span class="k">SET</span><span class="o">=</span><span class="n">utf8mb4</span><span class="w"> </span><span class="k">COLLATE</span><span class="o">=</span><span class="n">utf8mb4_unicode_ci</span><span class="p">;</span> <span class="c1">-- Service Profiles Table</span>
+<span class="k">CREATE</span><span class="w"> </span><span class="k">TABLE</span><span class="w"> </span><span class="n">service_profiles</span><span class="w"> </span><span class="p">(</span>
+<span class="w"> </span><span class="n">profile_id</span><span class="w"> </span><span class="nb">INT</span><span class="w"> </span><span class="n">AUTO_INCREMENT</span><span class="w"> </span><span class="k">PRIMARY</span><span class="w"> </span><span class="k">KEY</span><span class="p">,</span>
+<span class="w"> </span><span class="n">profile_name</span><span class="w"> </span><span class="nb">VARCHAR</span><span class="p">(</span><span class="mi">100</span><span class="p">)</span><span class="w"> </span><span class="k">NOT</span><span class="w"> </span><span class="k">NULL</span><span class="w"> </span><span class="k">UNIQUE</span><span class="p">,</span>
+<span class="w"> </span><span class="n">service_data</span><span class="w"> </span><span class="n">JSON</span><span class="p">,</span>
+<span class="w"> </span><span class="n">trigger_points</span><span class="w"> </span><span class="n">JSON</span><span class="p">,</span>
+<span class="w"> </span><span class="n">application_servers</span><span class="w"> </span><span class="n">JSON</span><span class="p">,</span>
+<span class="w"> </span><span class="n">created_at</span><span class="w"> </span><span class="k">TIMESTAMP</span><span class="w"> </span><span class="k">DEFAULT</span><span class="w"> </span><span class="k">CURRENT_TIMESTAMP</span><span class="p">,</span>
+<span class="w"> </span><span class="n">updated_at</span><span class="w"> </span><span class="k">TIMESTAMP</span><span class="w"> </span><span class="k">DEFAULT</span><span class="w"> </span><span class="k">CURRENT_TIMESTAMP</span><span class="w"> </span><span class="k">ON</span><span class="w"> </span><span class="k">UPDATE</span><span class="w"> </span><span class="k">CURRENT_TIMESTAMP</span><span class="p">,</span> <span class="w"> </span><span class="k">INDEX</span><span class="w"> </span><span class="n">idx_profile_name</span><span class="w"> </span><span class="p">(</span><span class="n">profile_name</span><span class="p">)</span>
+<span class="p">)</span><span class="w"> </span><span class="n">ENGINE</span><span class="o">=</span><span class="n">InnoDB</span><span class="w"> </span><span class="nb">CHARACTER</span><span class="w"> </span><span class="k">SET</span><span class="o">=</span><span class="n">utf8mb4</span><span class="w"> </span><span class="k">COLLATE</span><span class="o">=</span><span class="n">utf8mb4_unicode_ci</span><span class="p">;</span> <span class="c1">-- Session Data Table for Active IMS Sessions</span>
+<span class="k">CREATE</span><span class="w"> </span><span class="k">TABLE</span><span class="w"> </span><span class="n">ims_sessions</span><span class="w"> </span><span class="p">(</span>
+<span class="w"> </span><span class="n">session_id</span><span class="w"> </span><span class="nb">VARCHAR</span><span class="p">(</span><span class="mi">100</span><span class="p">)</span><span class="w"> </span><span class="k">PRIMARY</span><span class="w"> </span><span class="k">KEY</span><span class="p">,</span>
+<span class="w"> </span><span class="n">subscriber_id</span><span class="w"> </span><span class="nb">VARCHAR</span><span class="p">(</span><span class="mi">50</span><span class="p">)</span><span class="w"> </span><span class="k">NOT</span><span class="w"> </span><span class="k">NULL</span><span class="p">,</span>
+<span class="w"> </span><span class="n">call_id</span><span class="w"> </span><span class="nb">VARCHAR</span><span class="p">(</span><span class="mi">255</span><span class="p">),</span>
+<span class="w"> </span><span class="n">session_state</span><span class="w"> </span><span class="n">ENUM</span><span class="p">(</span><span class="s1">&#39;INVITE_SENT&#39;</span><span class="p">,</span><span class="w"> </span><span class="s1">&#39;EARLY_DIALOG&#39;</span><span class="p">,</span><span class="w"> </span><span class="s1">&#39;CONFIRMED&#39;</span><span class="p">,</span><span class="w"> </span><span class="s1">&#39;TERMINATED&#39;</span><span class="p">),</span>
+<span class="w"> </span><span class="n">media_components</span><span class="w"> </span><span class="n">JSON</span><span class="p">,</span>
+<span class="w"> </span><span class="n">session_start_time</span><span class="w"> </span><span class="k">TIMESTAMP</span><span class="w"> </span><span class="k">DEFAULT</span><span class="w"> </span><span class="k">CURRENT_TIMESTAMP</span><span class="p">,</span>
+<span class="w"> </span><span class="n">last_activity</span><span class="w"> </span><span class="k">TIMESTAMP</span><span class="w"> </span><span class="k">DEFAULT</span><span class="w"> </span><span class="k">CURRENT_TIMESTAMP</span><span class="w"> </span><span class="k">ON</span><span class="w"> </span><span class="k">UPDATE</span><span class="w"> </span><span class="k">CURRENT_TIMESTAMP</span><span class="p">,</span> <span class="w"> </span><span class="k">FOREIGN</span><span class="w"> </span><span class="k">KEY</span><span class="w"> </span><span class="p">(</span><span class="n">subscriber_id</span><span class="p">)</span><span class="w"> </span><span class="k">REFERENCES</span><span class="w"> </span><span class="n">subscriber_profiles</span><span class="p">(</span><span class="n">subscriber_id</span><span class="p">),</span>
+<span class="w"> </span><span class="k">INDEX</span><span class="w"> </span><span class="n">idx_subscriber_id</span><span class="w"> </span><span class="p">(</span><span class="n">subscriber_id</span><span class="p">),</span>
+<span class="w"> </span><span class="k">INDEX</span><span class="w"> </span><span class="n">idx_session_state</span><span class="w"> </span><span class="p">(</span><span class="n">session_state</span><span class="p">),</span>
+<span class="w"> </span><span class="k">INDEX</span><span class="w"> </span><span class="n">idx_last_activity</span><span class="w"> </span><span class="p">(</span><span class="n">last_activity</span><span class="p">)</span>
+<span class="p">)</span><span class="w"> </span><span class="n">ENGINE</span><span class="o">=</span><span class="n">InnoDB</span><span class="w"> </span><span class="nb">CHARACTER</span><span class="w"> </span><span class="k">SET</span><span class="o">=</span><span class="n">utf8mb4</span><span class="w"> </span><span class="k">COLLATE</span><span class="o">=</span><span class="n">utf8mb4_unicode_ci</span><span class="p">;</span>
+</code></pre></div> <h2>Deployment Strategy and Migration</h2>
+<h3>Phased Deployment Approach</h3>
+<p><strong>Phase 1: Infrastructure Setup</strong></p>
+<div class="codehilite"><pre><span></span><code><span class="c1"># Namespace creation and RBAC setup</span>
+<span class="nt">apiVersion</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">v1</span>
+<span class="nt">kind</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Namespace</span>
+<span class="nt">metadata</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">ims-infrastructure</span>
+<span class="w"> </span><span class="nt">labels</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">security.policy</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;strict&quot;</span>
+<span class="w"> </span><span class="nt">monitoring.enabled</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;true&quot;</span>
+<span class="nn">---</span>
+<span class="nt">apiVersion</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">rbac.authorization.k8s.io/v1</span>
+<span class="nt">kind</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Role</span>
+<span class="nt">metadata</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">namespace</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">ims-infrastructure</span>
+<span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">ims-service-role</span>
+<span class="nt">rules</span><span class="p">:</span>
+<span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">apiGroups</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="s">&quot;&quot;</span><span class="p p-Indicator">]</span>
+<span class="w"> </span><span class="nt">resources</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="s">&quot;configmaps&quot;</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="s">&quot;secrets&quot;</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="s">&quot;services&quot;</span><span class="p p-Indicator">]</span>
+<span class="w"> </span><span class="nt">verbs</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="s">&quot;get&quot;</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="s">&quot;list&quot;</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="s">&quot;create&quot;</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="s">&quot;update&quot;</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="s">&quot;patch&quot;</span><span class="p p-Indicator">]</span>
+<span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">apiGroups</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="s">&quot;apps&quot;</span><span class="p p-Indicator">]</span>
+<span class="w"> </span><span class="nt">resources</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="s">&quot;deployments&quot;</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="s">&quot;statefulsets&quot;</span><span class="p p-Indicator">]</span>
+<span class="w"> </span><span class="nt">verbs</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="s">&quot;get&quot;</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="s">&quot;list&quot;</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="s">&quot;create&quot;</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="s">&quot;update&quot;</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="s">&quot;patch&quot;</span><span class="p p-Indicator">]</span>
+</code></pre></div> <p><strong>Phase 2: Database Migration</strong>
+The database migration required careful orchestration to ensure zero data loss:</p>
+<div class="codehilite"><pre><span></span><code><span class="ch">#!/bin/bash</span>
+<span class="c1"># IMS Database Migration Script</span> <span class="nb">set</span><span class="w"> </span>-euo<span class="w"> </span>pipefail <span class="c1"># Phase 2a: Setup new MySQL cluster</span>
+kubectl<span class="w"> </span>apply<span class="w"> </span>-f<span class="w"> </span>ims-mysql-statefulset.yaml
+kubectl<span class="w"> </span><span class="nb">wait</span><span class="w"> </span>--for<span class="o">=</span><span class="nv">condition</span><span class="o">=</span>ready<span class="w"> </span>pod/ims-mysql-0<span class="w"> </span>--timeout<span class="o">=</span>300s <span class="c1"># Phase 2b: Initialize replication from legacy system</span>
+kubectl<span class="w"> </span><span class="nb">exec</span><span class="w"> </span>-i<span class="w"> </span>ims-mysql-0<span class="w"> </span>--<span class="w"> </span>mysql<span class="w"> </span>-uroot<span class="w"> </span>-p<span class="nv">$MYSQL_ROOT_PASSWORD</span><span class="w"> </span><span class="s">&lt;&lt; EOF</span>
+<span class="s">CHANGE MASTER TO</span>
+<span class="s"> MASTER_HOST=&#39;legacy-ims-db.internal&#39;,</span>
+<span class="s"> MASTER_USER=&#39;replication_user&#39;,</span>
+<span class="s"> MASTER_PASSWORD=&#39;$REPLICATION_PASSWORD&#39;,</span>
+<span class="s"> MASTER_LOG_FILE=&#39;mysql-bin.000001&#39;,</span>
+<span class="s"> MASTER_LOG_POS=12345;</span> <span class="s">START SLAVE;</span>
+<span class="s">SHOW SLAVE STATUS\G</span>
+<span class="s">EOF</span> <span class="c1"># Phase 2c: Verify data consistency</span>
+kubectl<span class="w"> </span><span class="nb">exec</span><span class="w"> </span>ims-mysql-0<span class="w"> </span>--<span class="w"> </span>mysqldump<span class="w"> </span>--single-transaction<span class="w"> </span>ims_database<span class="w"> </span><span class="p">|</span><span class="w"> </span>md5sum
+</code></pre></div> <p><strong>Phase 3: DNS Service Deployment</strong></p>
+<div class="codehilite"><pre><span></span><code><span class="c1"># Deploy IMS DNS with gradual traffic shifting</span>
+kubectl<span class="w"> </span>apply<span class="w"> </span>-f<span class="w"> </span>ims-dns-deployment.yaml <span class="c1"># Update DNS records with weighted routing</span>
+dig<span class="w"> </span>@ims-dns.ims-infrastructure.svc.cluster.local<span class="w"> </span>_sip._tcp.ims.example.com<span class="w"> </span>SRV <span class="c1"># Verify SIP endpoint resolution</span>
+nslookup<span class="w"> </span>pcscf1.ims.example.com<span class="w"> </span>ims-dns.ims-infrastructure.svc.cluster.local
+</code></pre></div> <p><strong>Phase 4: Service Integration and Testing</strong></p>
+<div class="codehilite"><pre><span></span><code><span class="c1"># Integration testing job</span>
+<span class="nt">apiVersion</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">batch/v1</span>
+<span class="nt">kind</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Job</span>
+<span class="nt">metadata</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">ims-integration-test</span>
+<span class="nt">spec</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">template</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">spec</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">containers</span><span class="p">:</span>
+<span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">test-runner</span>
+<span class="w"> </span><span class="nt">image</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">telecom/ims-test-suite:v1.2.0</span>
+<span class="w"> </span><span class="nt">command</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="s">&quot;./run-integration-tests.sh&quot;</span><span class="p p-Indicator">]</span>
+<span class="w"> </span><span class="nt">env</span><span class="p">:</span>
+<span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">IMS_DNS_SERVER</span>
+<span class="w"> </span><span class="nt">value</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;ims-dns.ims-infrastructure.svc.cluster.local&quot;</span>
+<span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">IMS_DATABASE_HOST</span>
+<span class="w"> </span><span class="nt">value</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;ims-mysql.ims-infrastructure.svc.cluster.local&quot;</span>
+<span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">TEST_SUBSCRIBERS</span>
+<span class="w"> </span><span class="nt">value</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;1000&quot;</span>
+<span class="w"> </span><span class="nt">restartPolicy</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Never</span>
+</code></pre></div> <h2>Performance Optimization and Scaling</h2>
+<h3>Database Performance Tuning</h3>
+<div class="codehilite"><pre><span></span><code><span class="c1">-- MySQL Configuration Optimizations</span>
+<span class="k">SET</span><span class="w"> </span><span class="k">GLOBAL</span><span class="w"> </span><span class="n">innodb_buffer_pool_size</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">3221225472</span><span class="p">;</span><span class="w"> </span><span class="c1">-- 3GB buffer pool</span>
+<span class="k">SET</span><span class="w"> </span><span class="k">GLOBAL</span><span class="w"> </span><span class="n">innodb_log_file_size</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">268435456</span><span class="p">;</span><span class="w"> </span><span class="c1">-- 256MB log files</span>
+<span class="k">SET</span><span class="w"> </span><span class="k">GLOBAL</span><span class="w"> </span><span class="n">innodb_flush_log_at_trx_commit</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">2</span><span class="p">;</span><span class="w"> </span><span class="c1">-- Performance optimization</span>
+<span class="k">SET</span><span class="w"> </span><span class="k">GLOBAL</span><span class="w"> </span><span class="n">query_cache_size</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">67108864</span><span class="p">;</span><span class="w"> </span><span class="c1">-- 64MB query cache</span>
+<span class="k">SET</span><span class="w"> </span><span class="k">GLOBAL</span><span class="w"> </span><span class="n">max_connections</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">1000</span><span class="p">;</span><span class="w"> </span><span class="c1">-- Support high concurrency</span> <span class="c1">-- Subscriber profile query optimization</span>
+<span class="k">EXPLAIN</span><span class="w"> </span><span class="k">SELECT</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="k">FROM</span><span class="w"> </span><span class="n">subscriber_profiles</span><span class="w"> </span>
+<span class="k">WHERE</span><span class="w"> </span><span class="n">public_user_identity</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s1">&#39;sip:user@example.com&#39;</span><span class="w"> </span>
+<span class="k">AND</span><span class="w"> </span><span class="n">registration_state</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s1">&#39;REGISTERED&#39;</span><span class="p">;</span> <span class="c1">-- Add covering index for common queries</span>
+<span class="k">CREATE</span><span class="w"> </span><span class="k">INDEX</span><span class="w"> </span><span class="n">idx_subscriber_lookup</span><span class="w"> </span><span class="k">ON</span><span class="w"> </span><span class="n">subscriber_profiles</span><span class="w"> </span>
+<span class="p">(</span><span class="n">public_user_identity</span><span class="p">,</span><span class="w"> </span><span class="n">registration_state</span><span class="p">,</span><span class="w"> </span><span class="n">scscf_name</span><span class="p">);</span>
+</code></pre></div> <h3>DNS Performance Optimization</h3>
+<div class="codehilite"><pre><span></span><code><span class="c1"># DNS service configuration for performance</span>
+<span class="nt">apiVersion</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">v1</span>
+<span class="nt">kind</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">ConfigMap</span>
+<span class="nt">metadata</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">ims-dns-config</span>
+<span class="nt">data</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">named.conf</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">|</span>
+<span class="w"> </span><span class="no">options {</span>
+<span class="w"> </span><span class="no">directory &quot;/var/cache/bind&quot;;</span>
+<span class="w"> </span><span class="no">recursion no;</span>
+<span class="w"> </span><span class="no">allow-transfer { 10.0.0.0/8; };</span> <span class="w"> </span><span class="no"># Performance optimizations</span>
+<span class="w"> </span><span class="no">tcp-clients 1000;</span>
+<span class="w"> </span><span class="no">recursive-clients 5000;</span>
+<span class="w"> </span><span class="no">max-cache-size 256m;</span>
+<span class="w"> </span><span class="no">cleaning-interval 60;</span> <span class="w"> </span><span class="no"># Security</span>
+<span class="w"> </span><span class="no">version none;</span>
+<span class="w"> </span><span class="no">hostname none;</span>
+<span class="w"> </span><span class="no">server-id none;</span>
+<span class="w"> </span><span class="no">};</span> <span class="w"> </span><span class="no"># Enable query logging for monitoring</span>
+<span class="w"> </span><span class="no">logging {</span>
+<span class="w"> </span><span class="no">channel query_log {</span>
+<span class="w"> </span><span class="no">file &quot;/var/log/bind/queries.log&quot;;</span>
+<span class="w"> </span><span class="no">severity info;</span>
+<span class="w"> </span><span class="no">print-time yes;</span>
+<span class="w"> </span><span class="no">print-category yes;</span>
+<span class="w"> </span><span class="no">};</span>
+<span class="w"> </span><span class="no">category queries { query_log; };</span>
+<span class="w"> </span><span class="no">};</span>
+</code></pre></div> <h3>Horizontal Pod Autoscaling</h3>
+<div class="codehilite"><pre><span></span><code><span class="nt">apiVersion</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">autoscaling/v2</span>
+<span class="nt">kind</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">HorizontalPodAutoscaler</span>
+<span class="nt">metadata</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">ims-dns-hpa</span>
+<span class="nt">spec</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">scaleTargetRef</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">apiVersion</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">apps/v1</span>
+<span class="w"> </span><span class="nt">kind</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Deployment</span>
+<span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">ims-dns</span>
+<span class="w"> </span><span class="nt">minReplicas</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">3</span>
+<span class="w"> </span><span class="nt">maxReplicas</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">10</span>
+<span class="w"> </span><span class="nt">metrics</span><span class="p">:</span>
+<span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Resource</span>
+<span class="w"> </span><span class="nt">resource</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">cpu</span>
+<span class="w"> </span><span class="nt">target</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Utilization</span>
+<span class="w"> </span><span class="nt">averageUtilization</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">70</span>
+<span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Resource</span>
+<span class="w"> </span><span class="nt">resource</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">memory</span>
+<span class="w"> </span><span class="nt">target</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Utilization</span>
+<span class="w"> </span><span class="nt">averageUtilization</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">80</span>
+<span class="w"> </span><span class="nt">behavior</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">scaleUp</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">stabilizationWindowSeconds</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">60</span>
+<span class="w"> </span><span class="nt">policies</span><span class="p">:</span>
+<span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Percent</span>
+<span class="w"> </span><span class="nt">value</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">50</span>
+<span class="w"> </span><span class="nt">periodSeconds</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">60</span>
+<span class="w"> </span><span class="nt">scaleDown</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">stabilizationWindowSeconds</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">300</span>
+<span class="w"> </span><span class="nt">policies</span><span class="p">:</span>
+<span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Percent</span>
+<span class="w"> </span><span class="nt">value</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">10</span>
+<span class="w"> </span><span class="nt">periodSeconds</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">60</span>
+</code></pre></div> <h2>Monitoring and Observability</h2>
+<h3>Comprehensive Monitoring Setup</h3>
+<div class="codehilite"><pre><span></span><code><span class="c1"># Prometheus ServiceMonitor for IMS services</span>
+<span class="nt">apiVersion</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">monitoring.coreos.com/v1</span>
+<span class="nt">kind</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">ServiceMonitor</span>
+<span class="nt">metadata</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">ims-services-monitor</span>
+<span class="nt">spec</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">selector</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">matchLabels</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">monitoring</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">enabled</span>
+<span class="w"> </span><span class="nt">endpoints</span><span class="p">:</span>
+<span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">port</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">metrics</span>
+<span class="w"> </span><span class="nt">interval</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">30s</span>
+<span class="w"> </span><span class="nt">path</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">/metrics</span> <span class="c1"># Custom IMS metrics</span>
+<span class="nt">apiVersion</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">v1</span>
+<span class="nt">kind</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">ConfigMap</span>
+<span class="nt">metadata</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">ims-metrics-config</span>
+<span class="nt">data</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">metrics.yaml</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">|</span>
+<span class="w"> </span><span class="no">- name: ims_subscriber_registrations_total</span>
+<span class="w"> </span><span class="no">help: Total number of subscriber registrations</span>
+<span class="w"> </span><span class="no">type: counter</span>
+<span class="w"> </span><span class="no">labels: [&quot;scscf&quot;, &quot;result&quot;]</span> <span class="w"> </span><span class="no">- name: ims_session_duration_seconds</span>
+<span class="w"> </span><span class="no">help: Duration of IMS sessions</span>
+<span class="w"> </span><span class="no">type: histogram</span>
+<span class="w"> </span><span class="no">buckets: [1, 5, 10, 30, 60, 300, 600, 1800, 3600]</span> <span class="w"> </span><span class="no">- name: ims_dns_query_duration_seconds</span>
+<span class="w"> </span><span class="no">help: DNS query response time</span>
+<span class="w"> </span><span class="no">type: histogram</span>
+<span class="w"> </span><span class="no">buckets: [0.001, 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5]</span> <span class="w"> </span><span class="no">- name: ims_database_connections_active</span>
+<span class="w"> </span><span class="no">help: Number of active database connections</span>
+<span class="w"> </span><span class="no">type: gauge</span>
+</code></pre></div> <h3>Grafana Dashboard Configuration</h3>
+<div class="codehilite"><pre><span></span><code><span class="p">{</span>
+<span class="w"> </span><span class="nt">&quot;dashboard&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w"> </span><span class="nt">&quot;title&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;IMS Infrastructure Overview&quot;</span><span class="p">,</span>
+<span class="w"> </span><span class="nt">&quot;panels&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+<span class="w"> </span><span class="p">{</span>
+<span class="w"> </span><span class="nt">&quot;title&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Subscriber Registrations per Second&quot;</span><span class="p">,</span>
+<span class="w"> </span><span class="nt">&quot;type&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;graph&quot;</span><span class="p">,</span>
+<span class="w"> </span><span class="nt">&quot;targets&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+<span class="w"> </span><span class="p">{</span>
+<span class="w"> </span><span class="nt">&quot;expr&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;rate(ims_subscriber_registrations_total[5m])&quot;</span><span class="p">,</span>
+<span class="w"> </span><span class="nt">&quot;legendFormat&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;{{scscf}} - {{result}}&quot;</span>
+<span class="w"> </span><span class="p">}</span>
+<span class="w"> </span><span class="p">]</span>
+<span class="w"> </span><span class="p">},</span>
+<span class="w"> </span><span class="p">{</span>
+<span class="w"> </span><span class="nt">&quot;title&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;DNS Query Performance&quot;</span><span class="p">,</span>
+<span class="w"> </span><span class="nt">&quot;type&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;heatmap&quot;</span><span class="p">,</span>
+<span class="w"> </span><span class="nt">&quot;targets&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+<span class="w"> </span><span class="p">{</span>
+<span class="w"> </span><span class="nt">&quot;expr&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;rate(ims_dns_query_duration_seconds_bucket[5m])&quot;</span><span class="p">,</span>
+<span class="w"> </span><span class="nt">&quot;legendFormat&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;{{le}}&quot;</span>
+<span class="w"> </span><span class="p">}</span>
+<span class="w"> </span><span class="p">]</span>
+<span class="w"> </span><span class="p">},</span>
+<span class="w"> </span><span class="p">{</span>
+<span class="w"> </span><span class="nt">&quot;title&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Database Performance&quot;</span><span class="p">,</span>
+<span class="w"> </span><span class="nt">&quot;type&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;stat&quot;</span><span class="p">,</span>
+<span class="w"> </span><span class="nt">&quot;targets&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+<span class="w"> </span><span class="p">{</span>
+<span class="w"> </span><span class="nt">&quot;expr&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;mysql_global_status_queries&quot;</span><span class="p">,</span>
+<span class="w"> </span><span class="nt">&quot;legendFormat&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Queries/sec&quot;</span>
+<span class="w"> </span><span class="p">},</span>
+<span class="w"> </span><span class="p">{</span>
+<span class="w"> </span><span class="nt">&quot;expr&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;mysql_global_status_threads_connected&quot;</span><span class="p">,</span>
+<span class="w"> </span><span class="nt">&quot;legendFormat&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Connections&quot;</span>
+<span class="w"> </span><span class="p">}</span>
+<span class="w"> </span><span class="p">]</span>
+<span class="w"> </span><span class="p">}</span>
+<span class="w"> </span><span class="p">]</span>
+<span class="w"> </span><span class="p">}</span>
+<span class="p">}</span>
+</code></pre></div> <h2>Security and Compliance</h2>
+<h3>Network Security Implementation</h3>
+<div class="codehilite"><pre><span></span><code><span class="c1"># Network policies for IMS services</span>
+<span class="nt">apiVersion</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">networking.k8s.io/v1</span>
+<span class="nt">kind</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">NetworkPolicy</span>
+<span class="nt">metadata</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">ims-network-policy</span>
+<span class="nt">spec</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">podSelector</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">matchLabels</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">app.kubernetes.io/part-of</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">ims-infrastructure</span>
+<span class="w"> </span><span class="nt">policyTypes</span><span class="p">:</span>
+<span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Ingress</span>
+<span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Egress</span>
+<span class="w"> </span><span class="nt">ingress</span><span class="p">:</span>
+<span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">from</span><span class="p">:</span>
+<span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">namespaceSelector</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">matchLabels</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">cscf-services</span>
+<span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">namespaceSelector</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">matchLabels</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">hss-services</span>
+<span class="w"> </span><span class="nt">ports</span><span class="p">:</span>
+<span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">protocol</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">TCP</span>
+<span class="w"> </span><span class="nt">port</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">53</span>
+<span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">protocol</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">UDP</span>
+<span class="w"> </span><span class="nt">port</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">53</span>
+<span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">protocol</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">TCP</span>
+<span class="w"> </span><span class="nt">port</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">3306</span>
+<span class="w"> </span><span class="nt">egress</span><span class="p">:</span>
+<span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">to</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[]</span>
+<span class="w"> </span><span class="nt">ports</span><span class="p">:</span>
+<span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">protocol</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">TCP</span>
+<span class="w"> </span><span class="nt">port</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">443</span><span class="w"> </span><span class="c1"># HTTPS outbound</span>
+<span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">protocol</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">UDP</span>
+<span class="w"> </span><span class="nt">port</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">53</span><span class="w"> </span><span class="c1"># DNS outbound</span>
+</code></pre></div> <h3>Data Encryption and Secrets Management</h3>
+<div class="codehilite"><pre><span></span><code><span class="c1"># TLS certificates for IMS services</span>
+<span class="nt">apiVersion</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">cert-manager.io/v1</span>
+<span class="nt">kind</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Certificate</span>
+<span class="nt">metadata</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">ims-services-tls</span>
+<span class="nt">spec</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">secretName</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">ims-services-tls-secret</span>
+<span class="w"> </span><span class="nt">issuerRef</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">internal-ca-issuer</span>
+<span class="w"> </span><span class="nt">kind</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">ClusterIssuer</span>
+<span class="w"> </span><span class="nt">dnsNames</span><span class="p">:</span>
+<span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">ims-dns.ims-infrastructure.svc.cluster.local</span>
+<span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">ims-mysql.ims-infrastructure.svc.cluster.local</span>
+<span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="s">&quot;*.ims.example.com&quot;</span> <span class="c1"># HashiCorp Vault integration for database credentials</span>
+<span class="nt">apiVersion</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">v1</span>
+<span class="nt">kind</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Secret</span>
+<span class="nt">metadata</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">ims-mysql-secret</span>
+<span class="w"> </span><span class="nt">annotations</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">vault.hashicorp.com/agent-inject</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;true&quot;</span>
+<span class="w"> </span><span class="nt">vault.hashicorp.com/role</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;ims-database&quot;</span>
+<span class="w"> </span><span class="nt">vault.hashicorp.com/agent-inject-secret-root-password</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;database/creds/ims-admin&quot;</span>
+<span class="w"> </span><span class="nt">vault.hashicorp.com/agent-inject-secret-replication-password</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;database/creds/ims-replication&quot;</span>
+<span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Opaque</span>
+</code></pre></div> <h2>Results and Impact</h2>
+<h3>Performance Achievements</h3>
+<p><strong>Scalability Improvements:</strong>
+- <strong>Registration capacity</strong>: Increased from 10,000 to 100,000 simultaneous registrations
+- <strong>DNS query performance</strong>: Sub-5ms average response time
+- <strong>Database throughput</strong>: 50,000 queries per second sustained performance</p>
+<p><strong>Availability Enhancements:</strong>
+- <strong>Service uptime</strong>: Achieved 99.99% availability (4.32 minutes downtime per month)
+- <strong>Recovery time</strong>: Reduced from 15 minutes to under 2 minutes
+- <strong>Zero-downtime deployments</strong>: 100% successful rolling updates</p>
+<h3>Operational Benefits</h3>
+<p><strong>Deployment Efficiency:</strong>
+- <strong>Deployment time</strong>: Reduced from 4 hours to 15 minutes
+- <strong>Environment consistency</strong>: 100% configuration drift elimination
+- <strong>Rollback capability</strong>: Under 30 seconds for service rollback</p>
+<p><strong>Monitoring and Visibility:</strong>
+- <strong>Mean time to detection</strong>: Reduced from 10 minutes to 30 seconds
+- <strong>Alert accuracy</strong>: Improved from 60% to 95%
+- <strong>Capacity planning</strong>: Predictive scaling based on historical patterns</p>
+<h3>Cost Optimization</h3>
+<p><strong>Infrastructure Costs:</strong>
+- <strong>Hardware utilization</strong>: Improved from 40% to 85%
+- <strong>Cloud costs</strong>: 30% reduction through right-sizing and automation
+- <strong>Operational overhead</strong>: 60% reduction in manual administrative tasks</p>
+<p><strong>Development Velocity:</strong>
+- <strong>Feature deployment</strong>: Reduced from weeks to days
+- <strong>Testing cycles</strong>: Automated testing reducing cycle time by 70%
+- <strong>Developer productivity</strong>: Self-service deployment capabilities</p>
+<h2>Lessons Learned and Best Practices</h2>
+<h3>1. Database Migration Strategy</h3>
+<p><strong>Key Learning:</strong> Incremental migration with continuous validation is essential
+<strong>Best Practice:</strong> Always maintain real-time replication during migration phases
+<strong>Implementation:</strong> Use MySQL binlog replication with automated consistency checking</p>
+<h3>2. DNS Service Design</h3>
+<p><strong>Key Learning:</strong> DNS caching strategies significantly impact overall system performance<br />
+<strong>Best Practice:</strong> Implement intelligent TTL management based on record type and importance
+<strong>Implementation:</strong> Critical service records with 30-second TTL, static records with 5-minute TTL</p>
+<h3>3. Monitoring Integration</h3>
+<p><strong>Key Learning:</strong> IMS-specific metrics are crucial for operational success
+<strong>Best Practice:</strong> Implement protocol-aware monitoring from day one
+<strong>Implementation:</strong> Custom Prometheus exporters for SIP, Diameter, and MySQL metrics</p>
+<h3>4. Security First Approach</h3>
+<p><strong>Key Learning:</strong> Telecommunications infrastructure requires defense-in-depth security
+<strong>Best Practice:</strong> Implement network segmentation, encryption, and access controls from the start
+<strong>Implementation:</strong> Zero-trust network model with mutual TLS for all service communication</p>
+<h3>5. Gradual Rollout Strategy</h3>
+<p><strong>Key Learning:</strong> Big-bang migrations create unnecessary risk in telecommunications
+<strong>Best Practice:</strong> Implement canary deployments with automated rollback triggers
+<strong>Implementation:</strong> 5% -&gt; 25% -&gt; 50% -&gt; 100% traffic shifting with health validation at each stage</p>
+<h2>Future Roadmap</h2>
+<h3>Cloud-Native IMS Evolution</h3>
+<p><strong>Service Mesh Integration:</strong>
+- Implementing Istio for advanced traffic management
+- mTLS encryption for all inter-service communication
+- Circuit breaker patterns for resilient service interactions</p>
+<p><strong>5G Integration Readiness:</strong>
+- Network slicing support for differentiated services
+- Ultra-low latency optimizations for 5G applications
+- Edge deployment capabilities for MEC (Mobile Edge Computing)</p>
+<p><strong>AI/ML Enhancement:</strong>
+- Predictive scaling based on usage patterns
+- Anomaly detection for fraud prevention
+- Intelligent routing based on subscriber behavior</p>
+<h3>Multi-Cloud Strategy</h3>
+<p><strong>Geographic Expansion:</strong>
+- Additional region deployments for global coverage
+- Cross-region disaster recovery implementation
+- Data sovereignty compliance for international operations</p>
+<p><strong>Hybrid Cloud Integration:</strong>
+- On-premises integration for regulatory requirements
+- Cloud bursting for peak traffic handling
+- Consistent management across hybrid environments</p>
+<h2>Conclusion</h2>
+<p>The modernization of IMS infrastructure from legacy monolithic systems to cloud-native, containerized services represents a fundamental shift in how telecommunications providers approach service delivery. Through careful planning, phased implementation, and continuous optimization, we successfully transformed critical communications infrastructure while maintaining the strict availability and performance requirements demanded by millions of subscribers.</p>
+<p>Key takeaways from this transformation:</p>
+<ol>
+<li><strong>Incremental modernization works</strong>: Phased migrations reduce risk and ensure service continuity</li>
+<li><strong>Observability is critical</strong>: Comprehensive monitoring enables proactive operations</li>
+<li><strong>Security must be built-in</strong>: Defense-in-depth approaches are essential for telecommunications</li>
+<li><strong>Automation drives efficiency</strong>: Manual processes don't scale with modern service demands</li>
+<li><strong>Performance optimization is ongoing</strong>: Continuous improvement is essential for competitive advantage</li>
+</ol>
+<p>The foundation established through this IMS modernization project provides a solid platform for future innovations, including 5G services, edge computing, and advanced communication features. As the telecommunications industry continues to evolve, the principles and practices demonstrated in this implementation will serve as a blueprint for continued technological advancement.</p>
+<p>The investment in modern IMS infrastructure pays dividends not just in improved service reliability and performance, but in operational efficiency, development velocity, and the ability to rapidly respond to changing market demands. For telecommunications providers embarking on similar modernization journeys, the lessons learned from this implementation provide a roadmap to success.</p>
+<hr />
+<p><em>This blog post details the real-world implementation of production IMS infrastructure serving millions of subscribers across multiple geographic regions.</em></p>
+<p><strong>Key Technologies:</strong> Kubernetes, MySQL 8.0, BIND DNS, Prometheus, Grafana, HashiCorp Vault<br />
+<strong>Scope:</strong> 15+ commits, Multi-region deployment, Production-grade implementation<br />
+<strong>Impact:</strong> 99.99% availability, 10x capacity increase, 70% operational efficiency improvement</p></div> <footer><ul class="stats"><li><a href="../index.html">Back to posts</a></li></ul></footer> </article> </div> <section id="sidebar"> <section> <div class="mini-posts"> <header><h3>Recent</h3></header> <ul>
+<li><a href="../posts/project--devops-automation-blog.html">Infrastructure as Code in Telecommunications: Scaling DevOps for Mission-Critical Networks</a> <span class=\"published\">DevOps</span></li>
+<li><a href="../posts/project--dra-infrastructure-blog.html">Modernizing Diameter Routing Agent (DRA) Infrastructure: A Journey from Monolith to Microservices</a> <span class=\"published\">Infra</span></li>
+<li><a href="../posts/project--ims-modernization-blog.html">IMS Service Modernization: Transforming IP Multimedia Subsystem for Cloud-Native Networks</a> <span class=\"published\">Telecom</span></li>
+<li><a href="../posts/project--telecommunications-architecture-blog.html">Building Cloud-Native Telecommunications Architecture: From Legacy Networks to 5G-Ready Infrastructure</a> <span class=\"published\">Telecom</span></li>
+<li><a href="../posts/project--devops-automation-blog.html">DevOps Automation in Telecommunications: Building Self-Healing Infrastructure at Scale</a> <span class=\"published\">DevOps</span></li> </ul> </div> </section> <section> <header><h3>About</h3></header> <p>Notes on telecom, infra, and automation.</p> </section> </section> <section id="footer"><p class="copyright">&copy; 2025</p></section> </div> <script src="../assets/js/jquery.min.js"></script> <script src="../assets/js/browser.min.js"></script> <script src="../assets/js/breakpoints.min.js"></script> <script src="../assets/js/util.js"></script> <script src="../assets/js/main.js"></script> </body>
+</html>

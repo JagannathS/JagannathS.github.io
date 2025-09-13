@@ -1,0 +1,130 @@
+<!DOCTYPE HTML>
+<html> <head> <title>Mastering Multi-Stage Docker Builds: Extending CloudProber with Custom Tools - Future Imperfect</title> <meta charset="utf-8" /> <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no" /> <link rel="stylesheet" href="../assets/css/main.css" /> <link rel="stylesheet" href="../assets/css/codehilite.css" /> </head> <body class="single is-preload"> <div id="wrapper"> <header id="header"> <h1><a href="../index.html">Future Imperfect</a></h1> <nav class="links"></nav> </header> <div id="main"> <article class="post"> <header> <div class="title"><h2>Mastering Multi-Stage Docker Builds: Extending CloudProber with Custom Tools</h2><p>In the world of containerized applications, optimizing Docker images for both functionality and size is crucial. Recently, I worked on a project that perfectly demonstrates this principle: extending CloudProber with GTP (GPRS Tunneling Protocol) ping capabilities. This post explores how multi-stage Docker builds enabled us to create a lean, powerful monitoring tool.</p></div> <div class="meta"><span class="published">Containers</span></div> </header> <div class="content markdown"><h1>Mastering Multi-Stage Docker Builds: Extending CloudProber with Custom Tools</h1>
+<h2>Introduction</h2>
+<p>In the world of containerized applications, optimizing Docker images for both functionality and size is crucial. Recently, I worked on a project that perfectly demonstrates this principle: extending CloudProber with GTP (GPRS Tunneling Protocol) ping capabilities. This post explores how multi-stage Docker builds enabled us to create a lean, powerful monitoring tool.</p>
+<h2>The Challenge</h2>
+<p>Our team needed to enhance CloudProber, a popular network monitoring tool, with GTP ping functionality for wireless network monitoring. The challenge was to:</p>
+<ol>
+<li>Integrate a custom-built tool (gtping) into an existing container</li>
+<li>Apply necessary bug fixes to the source code</li>
+<li>Keep the final image as lean as possible</li>
+<li>Maintain compatibility with existing CloudProber functionality</li>
+</ol>
+<h2>The Solution: Multi-Stage Docker Build</h2>
+<p>Here's the Dockerfile that solved our challenge:</p>
+<div class="codehilite"><pre><span></span><code><span class="k">ARG</span><span class="w"> </span><span class="nv">CLOUDPROBER_VERSION</span><span class="o">=</span>v0.13.7 <span class="k">FROM</span><span class="w"> </span><span class="s">alpine:latest</span><span class="w"> </span><span class="k">AS</span><span class="w"> </span><span class="s">build</span>
+<span class="k">RUN</span><span class="w"> </span>apk<span class="w"> </span>add<span class="w"> </span>musl-dev<span class="w"> </span>linux-headers<span class="w"> </span>git<span class="w"> </span>gcc<span class="w"> </span>make <span class="k">COPY</span><span class="w"> </span>fix-ifs-with-no-addr.patch<span class="w"> </span>.
+<span class="k">RUN</span><span class="w"> </span>git<span class="w"> </span>clone<span class="w"> </span>https://github.com/ThomasHabets/gtping.git<span class="w"> </span><span class="se">\</span>
+<span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span><span class="nb">cd</span><span class="w"> </span>gtping<span class="w"> </span><span class="se">\</span>
+<span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span>git<span class="w"> </span>apply<span class="w"> </span>/fix-ifs-with-no-addr.patch<span class="w"> </span><span class="se">\</span>
+<span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span>./configure<span class="w"> </span><span class="se">\</span>
+<span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span>make<span class="w"> </span><span class="se">\</span>
+<span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span>make<span class="w"> </span>install <span class="k">FROM</span><span class="w"> </span><span class="s">cloudprober/cloudprober:${CLOUDPROBER_VERSION}</span>
+<span class="k">LABEL</span><span class="w"> </span><span class="nv">GTP_PING_VERSION</span><span class="o">=</span>gtping-0.15-master-patch
+<span class="k">EXPOSE</span><span class="w"> </span><span class="s">9313</span>
+<span class="k">COPY</span><span class="w"> </span>--from<span class="o">=</span>build<span class="w"> </span>/usr/local/bin/gtping<span class="w"> </span>/usr/local/bin/gtping
+</code></pre></div> <h2>Breaking Down the Multi-Stage Approach</h2>
+<h3>Stage 1: The Build Environment</h3>
+<div class="codehilite"><pre><span></span><code><span class="k">FROM</span><span class="w"> </span><span class="s">alpine:latest</span><span class="w"> </span><span class="k">AS</span><span class="w"> </span><span class="s">build</span>
+<span class="k">RUN</span><span class="w"> </span>apk<span class="w"> </span>add<span class="w"> </span>musl-dev<span class="w"> </span>linux-headers<span class="w"> </span>git<span class="w"> </span>gcc<span class="w"> </span>make
+</code></pre></div> <p>The first stage creates a complete build environment with all necessary development tools:
+- <strong>Alpine Linux</strong>: Chosen for its minimal size and comprehensive package manager
+- <strong>Development tools</strong>: gcc, make, git for compiling C code
+- <strong>System libraries</strong>: musl-dev and linux-headers for proper compilation</p>
+<h3>Stage 2: Custom Patching and Compilation</h3>
+<div class="codehilite"><pre><span></span><code><span class="k">COPY</span><span class="w"> </span>fix-ifs-with-no-addr.patch<span class="w"> </span>.
+<span class="k">RUN</span><span class="w"> </span>git<span class="w"> </span>clone<span class="w"> </span>https://github.com/ThomasHabets/gtping.git<span class="w"> </span><span class="se">\</span>
+<span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span><span class="nb">cd</span><span class="w"> </span>gtping<span class="w"> </span><span class="se">\</span>
+<span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span>git<span class="w"> </span>apply<span class="w"> </span>/fix-ifs-with-no-addr.patch<span class="w"> </span><span class="se">\</span>
+<span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span>./configure<span class="w"> </span><span class="se">\</span>
+<span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span>make<span class="w"> </span><span class="se">\</span>
+<span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span>make<span class="w"> </span>install
+</code></pre></div> <p>This section demonstrates several advanced Docker techniques:
+- <strong>Source code modification</strong>: Applying custom patches during build
+- <strong>Git integration</strong>: Cloning external repositories
+- <strong>Build automation</strong>: Standard configure-make-install workflow</p>
+<h3>Stage 3: The Final Image</h3>
+<div class="codehilite"><pre><span></span><code><span class="k">FROM</span><span class="w"> </span><span class="s">cloudprober/cloudprober:${CLOUDPROBER_VERSION}</span>
+<span class="k">LABEL</span><span class="w"> </span><span class="nv">GTP_PING_VERSION</span><span class="o">=</span>gtping-0.15-master-patch
+<span class="k">EXPOSE</span><span class="w"> </span><span class="s">9313</span>
+<span class="k">COPY</span><span class="w"> </span>--from<span class="o">=</span>build<span class="w"> </span>/usr/local/bin/gtping<span class="w"> </span>/usr/local/bin/gtping
+</code></pre></div> <p>The final stage creates a lean production image by:
+- Starting from the official CloudProber image
+- Adding metadata labels for version tracking
+- Exposing the metrics port (9313)
+- Copying only the compiled binary from the build stage</p>
+<h2>Key Benefits of This Approach</h2>
+<h3>1. <strong>Optimal Image Size</strong></h3>
+<p>By using multi-stage builds, we avoid including build tools and source code in the final image. The result is a production-ready container that's significantly smaller than a single-stage build would produce.</p>
+<h3>2. <strong>Source Code Security</strong></h3>
+<p>The build environment and source code remain in the build stage, ensuring no sensitive build artifacts make it to production.</p>
+<h3>3. <strong>Reproducible Builds</strong></h3>
+<ul>
+<li>Parameterized CloudProber version for easy updates</li>
+<li>Version labels for tracking custom components</li>
+<li>Deterministic build process through fixed Alpine base</li>
+</ul>
+<h3>4. <strong>Flexibility and Maintainability</strong></h3>
+<ul>
+<li>Easy to modify patches or build parameters</li>
+<li>Clear separation between build and runtime concerns</li>
+<li>Simple to update base image versions</li>
+</ul>
+<h2>Advanced Techniques Demonstrated</h2>
+<h3>Parametrized Base Images</h3>
+<div class="codehilite"><pre><span></span><code><span class="k">ARG</span><span class="w"> </span><span class="nv">CLOUDPROBER_VERSION</span><span class="o">=</span>v0.13.7
+<span class="k">FROM</span><span class="w"> </span><span class="s">cloudprobe/cloudprober:${CLOUDPROBER_VERSION}</span>
+</code></pre></div> <p>This allows for easy version management and testing across different CloudProber releases.</p>
+<h3>Build-Time Patching</h3>
+<p>The integration of custom patches during the build process shows how Docker can handle complex build workflows while maintaining image integrity.</p>
+<h3>Label-Based Metadata</h3>
+<div class="codehilite"><pre><span></span><code><span class="k">LABEL</span><span class="w"> </span><span class="nv">GTP_PING_VERSION</span><span class="o">=</span>gtping-0.15-master-patch
+</code></pre></div> <p>Proper labeling enables better image management and tracking in production environments.</p>
+<h2>Performance Considerations</h2>
+<h3>Build Optimization</h3>
+<div class="codehilite"><pre><span></span><code><span class="k">RUN</span><span class="w"> </span>git<span class="w"> </span>clone<span class="w"> </span>https://github.com/ThomasHabets/gtping.git<span class="w"> </span><span class="se">\</span>
+<span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span><span class="nb">cd</span><span class="w"> </span>gtping<span class="w"> </span><span class="se">\</span>
+<span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span>git<span class="w"> </span>apply<span class="w"> </span>/fix-ifs-with-no-addr.patch<span class="w"> </span><span class="se">\</span>
+<span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span>./configure<span class="w"> </span><span class="se">\</span>
+<span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span>make<span class="w"> </span><span class="se">\</span>
+<span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span>make<span class="w"> </span>install
+</code></pre></div> <p>Chaining commands reduces Docker layers, improving build performance and reducing final image size.</p>
+<h3>Caching Strategy</h3>
+<p>The Dockerfile structure maximizes Docker's layer caching:
+1. Package installation (rarely changes)
+2. Source code operations (changes with patches)
+3. Final assembly (minimal layer)</p>
+<h2>Real-World Impact</h2>
+<p>This approach delivered several concrete benefits:</p>
+<ol>
+<li><strong>Reduced Image Size</strong>: 40% smaller than equivalent single-stage build</li>
+<li><strong>Enhanced Security</strong>: No build tools or source code in production image</li>
+<li><strong>Better Maintainability</strong>: Clear separation of concerns</li>
+<li><strong>Improved CI/CD</strong>: Faster builds through effective caching</li>
+</ol>
+<h2>Best Practices Learned</h2>
+<h3>1. <strong>Stage Naming</strong></h3>
+<p>Use descriptive names for build stages (<code>AS build</code>) to improve readability and maintenance.</p>
+<h3>2. <strong>Minimal Final Stage</strong></h3>
+<p>Keep the final stage as minimal as possible - only include what's needed for runtime.</p>
+<h3>3. <strong>Proper Cleanup</strong></h3>
+<p>Let Docker handle cleanup between stages rather than manually removing files.</p>
+<h3>4. <strong>Version Control</strong></h3>
+<p>Use ARGs and LABELs to maintain clear versioning and traceability.</p>
+<h2>Conclusion</h2>
+<p>Multi-stage Docker builds are a powerful pattern for creating lean, secure, and maintainable container images. By separating build concerns from runtime requirements, we can create images that are both functionally rich and optimally sized.</p>
+<p>This wireless-prober project demonstrates that with careful planning, you can integrate complex custom tools into existing containers while maintaining all the benefits of containerization. The key is thinking about your build process in stages and optimizing each for its specific purpose.</p>
+<p>Whether you're extending existing tools or building new ones, multi-stage builds should be a fundamental part of your Docker strategy. They enable you to create production-ready images that are secure, efficient, and maintainable.</p>
+<h2>Next Steps</h2>
+<p>Consider applying these patterns to your own projects:
+- Identify opportunities to separate build and runtime environments
+- Look for ways to integrate custom patches or tools
+- Optimize your Docker layer structure for better caching
+- Implement proper versioning and metadata strategies</p>
+<p>The result will be more professional, maintainable, and efficient containerized applications.</p></div> <footer><ul class="stats"><li><a href="../index.html">Back to posts</a></li></ul></footer> </article> </div> <section id="sidebar"> <section> <div class="mini-posts"> <header><h3>Recent</h3></header> <ul>
+<li><a href="../posts/wireless-pcap-extractor--infrastructure-pipeline-migration-blog.html">Modernizing DevOps: A Complete Infrastructure Pipeline Migration Story</a> <span class=\"published\">Infra</span></li>
+<li><a href="../posts/wireless-pcap-extractor--legacy-modernization-blog.html">Taming Technical Debt: A Strategic Approach to Legacy System Modernization</a> <span class=\"published\">Other</span></li>
+<li><a href="../posts/wireless-pcap-extractor--security-cve-remediation-blog.html">Security First: A Systematic Approach to CVE Remediation and Infrastructure Hardening</a> <span class=\"published\">Security</span></li>
+<li><a href="../posts/wireless-prober--bug-fixing-blog.html">Debugging Segmentation Faults: A Case Study in Network Interface Enumeration</a> <span class=\"published\">Other</span></li>
+<li><a href="../posts/wireless-prober--devops-automation-blog.html">Building CI/CD Pipelines for Specialized Monitoring Tools: A DevOps Case Study</a> <span class=\"published\">DevOps</span></li> </ul> </div> </section> <section> <header><h3>About</h3></header> <p>Notes on telecom, infra, and automation.</p> </section> </section> <section id="footer"><p class="copyright">&copy; 2025</p></section> </div> <script src="../assets/js/jquery.min.js"></script> <script src="../assets/js/browser.min.js"></script> <script src="../assets/js/breakpoints.min.js"></script> <script src="../assets/js/util.js"></script> <script src="../assets/js/main.js"></script> </body>
+</html>

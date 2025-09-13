@@ -1,0 +1,683 @@
+<!DOCTYPE HTML>
+<html> <head> <title>Modernizing VoLTE IMS Architecture: From Monolith to Cloud-Native Microservices - Future Imperfect</title> <meta charset="utf-8" /> <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no" /> <link rel="stylesheet" href="../assets/css/main.css" /> <link rel="stylesheet" href="../assets/css/codehilite.css" /> </head> <body class="single is-preload"> <div id="wrapper"> <header id="header"> <h1><a href="../index.html">Future Imperfect</a></h1> <nav class="links"></nav> </header> <div id="main"> <article class="post"> <header> <div class="title"><h2>Modernizing VoLTE IMS Architecture: From Monolith to Cloud-Native Microservices</h2><p>The evolution of Voice over LTE (VoLTE) has transformed how telecommunications networks handle voice communications. At the heart of this transformation lies the IMS (IP Multimedia Subsystem), a complex architecture that enables rich communication services over IP networks.</p></div> <div class="meta"><span class="published">Telecom</span></div> </header> <div class="content markdown"><h1>Modernizing VoLTE IMS Architecture: From Monolith to Cloud-Native Microservices</h1>
+<h2>Introduction</h2>
+<p>The evolution of Voice over LTE (VoLTE) has transformed how telecommunications networks handle voice communications. At the heart of this transformation lies the IMS (IP Multimedia Subsystem), a complex architecture that enables rich communication services over IP networks.</p>
+<p>Recently, I led the complete modernization of a production VoLTE IMS system, transforming it from a legacy monolithic architecture to a cloud-native microservices platform. This journey involved redesigning critical network functions that handle millions of voice calls daily while maintaining the stringent reliability and performance requirements of telecommunications infrastructure.</p>
+<h2>Understanding IMS Architecture</h2>
+<h3>What is IMS?</h3>
+<p>The IP Multimedia Subsystem (IMS) is a standardized architectural framework that enables delivery of multimedia services over IP networks. For VoLTE, IMS provides:</p>
+<ul>
+<li><strong>Session Management</strong>: Establishment, modification, and termination of voice sessions</li>
+<li><strong>Quality of Service</strong>: Ensuring voice quality meets carrier-grade standards </li>
+<li><strong>Service Control</strong>: Implementing operator-specific service logic and policies</li>
+<li><strong>Interworking</strong>: Seamless integration with existing circuit-switched networks</li>
+<li><strong>Security</strong>: Authentication, authorization, and encryption of communications</li>
+</ul>
+<h3>Core IMS Components</h3>
+<p>The IMS architecture consists of several critical network functions:</p>
+<div class="codehilite"><pre><span></span><code>┌─────────────────┐ ┌─────────────────┐ ┌─────────────────┐
+│ P-CSCF │ │ I-CSCF │ │ S-CSCF │
+│ (Proxy CSCF) │ │(Interrogating │ │ (Serving CSCF) │
+│ │ │ CSCF) │ │ │
+│ • First Contact │ │ • HSS Queries │ │ • Service Logic │
+│ • NAT Traversal │ │ • Load Balancing│ │ • Session State │
+│ • Security │ │ • Route Select │ │ • User Data │
+└─────────────────┘ └─────────────────┘ └─────────────────┘ │ │ │ │ │ │ └─────────── SIP Signaling Network ───────────────┘
+</code></pre></div> <p><strong>P-CSCF (Proxy Call Session Control Function)</strong>:
+- Acts as the first point of contact for user equipment (mobile devices)
+- Handles NAT traversal and firewall traversal
+- Implements security policies and access control
+- Coordinates with media processing functions for RTP handling</p>
+<p><strong>I-CSCF (Interrogating Call Session Control Function)</strong>:
+- Routes incoming calls to the appropriate S-CSCF
+- Queries the HSS (Home Subscriber Server) for user location
+- Provides topology hiding for the operator network
+- Implements load balancing across S-CSCF instances</p>
+<p><strong>S-CSCF (Serving Call Session Control Function)</strong>:
+- Maintains session state for registered users
+- Implements service logic and feature interaction
+- Handles service triggering and application server interaction
+- Manages user profiles and service data</p>
+<h2>The Legacy Architecture Challenge</h2>
+<h3>Monolithic Deployment Model</h3>
+<p>Our starting point was a traditional monolithic IMS deployment:</p>
+<div class="codehilite"><pre><span></span><code>┌─────────────────────────────────────────────────────────┐
+│ Single IMS Container │
+│ │
+│ ┌─────────────┐ ┌─────────────┐ ┌─────────────────────┐│
+│ │ P-CSCF │ │ I-CSCF │ │ S-CSCF ││
+│ │ │ │ │ │ ││
+│ │ • Kamailio │ │ • Kamailio │ │ • Kamailio ││
+│ │ • SEMS SBC │ │ • HSS Client│ │ • Application Logic ││
+│ └─────────────┘ └─────────────┘ └─────────────────────┘│
+│ │
+│ ┌─────────────┐ ┌─────────────────────────────────────┐│
+│ │ DNS │ │ MySQL ││
+│ │ │ │ ││
+│ │ • BIND9 │ │ • Subscriber Data ││
+│ │ • Zone Files│ │ • Configuration ││
+│ └─────────────┘ └─────────────────────────────────────┘│
+└─────────────────────────────────────────────────────────┘
+</code></pre></div> <h3>Problems with the Legacy Architecture</h3>
+<p><strong>1. Scalability Limitations</strong>
+- Cannot scale individual components independently
+- Over-provisioning required for peak capacity
+- Single point of failure affecting entire VoLTE service
+- Resource conflicts between different IMS functions</p>
+<p><strong>2. Operational Complexity</strong><br />
+- Difficult troubleshooting with intermingled logs
+- Complex deployment processes requiring full system downtime
+- Limited ability to implement staged rollouts
+- Challenging performance optimization due to resource sharing</p>
+<p><strong>3. Development Constraints</strong>
+- Teams cannot work independently on different IMS functions
+- Monolithic builds take excessive time
+- Testing requires deploying entire IMS stack
+- Feature releases blocked by dependencies across components</p>
+<h2>The Modernized Architecture</h2>
+<h3>Cloud-Native Microservices Design</h3>
+<p>I redesigned the IMS architecture as a distributed microservices system:</p>
+<div class="codehilite"><pre><span></span><code>┌──────────────────┐ ┌──────────────────┐ ┌──────────────────┐
+│ P-CSCF Pod │ │ I-CSCF Pod │ │ S-CSCF Pod │
+│ │ │ │ │ │
+│ ┌──────────────┐ │ │ ┌──────────────┐ │ │ ┌──────────────┐ │
+│ │ Kamailio │ │ │ │ Kamailio │ │ │ │ Kamailio │ │
+│ │ P-CSCF │ │ │ │ I-CSCF │ │ │ │ S-CSCF │ │
+│ └──────────────┘ │ │ └──────────────┘ │ │ └──────────────┘ │
+│ ┌──────────────┐ │ │ ┌──────────────┐ │ │ ┌──────────────┐ │
+│ │ SEMS SBC │ │ │ │ HSS Diameter │ │ │ │ App Server │ │
+│ │ RTP Proxy │ │ │ │ Client │ │ │ │ Interface │ │
+│ └──────────────┘ │ │ └──────────────┘ │ │ └──────────────┘ │
+└──────────────────┘ └──────────────────┘ └──────────────────┘ ┌──────────────────┐ ┌────────────────────────────────────────┐
+│ DNS Pod │ │ Database Pod │
+│ │ │ │
+│ ┌──────────────┐ │ │ ┌──────────────┐ ┌──────────────────┐ │
+│ │ BIND9 │ │ │ │ MySQL │ │ Redis Cache │ │
+│ │ IMS Zones │ │ │ │ IMS Schemas │ │ Session Data │ │
+│ └──────────────┘ │ │ └──────────────┘ └──────────────────┘ │
+└──────────────────┘ └────────────────────────────────────────┘
+</code></pre></div> <h3>Service-Oriented Design Principles</h3>
+<p><strong>1. Single Responsibility</strong>
+Each service handles a specific IMS function:
+- P-CSCF: UE interface and media coordination
+- I-CSCF: Routing and HSS interaction<br />
+- S-CSCF: Session control and service logic
+- DNS: Service discovery and domain resolution
+- Database: Persistent data storage</p>
+<p><strong>2. Autonomous Deployment</strong>
+Services can be deployed independently:
+- Individual service lifecycle management
+- Rolling updates without system-wide downtime
+- A/B testing of service versions
+- Isolated failure domains</p>
+<p><strong>3. Technology Diversity</strong>
+Different services can use optimal technologies:
+- Kamailio for SIP processing performance
+- SEMS for advanced media handling
+- MySQL for transactional consistency
+- Redis for high-speed session caching</p>
+<h2>Container Architecture Deep Dive</h2>
+<h3>P-CSCF Container Design</h3>
+<p>The P-CSCF serves as the entry point for all UE (User Equipment) communications:</p>
+<div class="codehilite"><pre><span></span><code><span class="k">FROM</span><span class="w"> </span><span class="s">ubuntu:20.04</span><span class="w"> </span><span class="k">AS</span><span class="w"> </span><span class="s">pcscf-runtime</span> <span class="c"># Install optimized Kamailio build with IMS modules</span>
+<span class="k">RUN</span><span class="w"> </span>apt-get<span class="w"> </span>update<span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span>apt-get<span class="w"> </span>install<span class="w"> </span>-y<span class="w"> </span><span class="se">\</span>
+<span class="w"> </span>kamailio<span class="w"> </span>kamailio-ims-modules<span class="w"> </span><span class="se">\</span>
+<span class="w"> </span>kamailio-tls-modules<span class="w"> </span>kamailio-websocket-modules <span class="c"># Install SEMS for media handling</span>
+<span class="k">RUN</span><span class="w"> </span>apt-get<span class="w"> </span>install<span class="w"> </span>-y<span class="w"> </span>sems<span class="w"> </span>sems-modules-base <span class="c"># Configuration template system</span>
+<span class="k">COPY</span><span class="w"> </span>templates/pcscf.cfg.tpl<span class="w"> </span>/templates/
+<span class="k">COPY</span><span class="w"> </span>templates/pcscf.xml.tpl<span class="w"> </span>/templates/
+<span class="k">COPY</span><span class="w"> </span>scripts/pcscf-entrypoint.sh<span class="w"> </span>/entrypoint.sh <span class="c"># Expose SIP signaling and RTP media ports</span>
+<span class="k">EXPOSE</span><span class="w"> </span><span class="s">5060/udp 5060/tcp 5061/tcp</span>
+<span class="k">EXPOSE</span><span class="w"> </span><span class="s">10000-20000/udp</span> <span class="k">HEALTHCHECK</span><span class="w"> </span>--interval<span class="o">=</span>30s<span class="w"> </span>--timeout<span class="o">=</span>5s<span class="w"> </span>--start-period<span class="o">=</span>40s<span class="w"> </span><span class="se">\</span>
+<span class="w"> </span>CMD<span class="w"> </span>kamctl<span class="w"> </span>stats<span class="w"> </span><span class="p">|</span><span class="w"> </span>grep<span class="w"> </span>-q<span class="w"> </span><span class="s2">&quot;registered_users&quot;</span><span class="w"> </span><span class="o">||</span><span class="w"> </span><span class="nb">exit</span><span class="w"> </span><span class="m">1</span> <span class="k">CMD</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;/entrypoint.sh&quot;</span><span class="p">]</span>
+</code></pre></div> <p><strong>P-CSCF Key Responsibilities:</strong>
+- SIP message routing and processing
+- NAT traversal using ICE/STUN/TURN
+- Security association management
+- QoS policy enforcement
+- Media plane coordination with SEMS</p>
+<h3>I-CSCF Container Design</h3>
+<p>The I-CSCF handles intelligent routing based on HSS queries:</p>
+<div class="codehilite"><pre><span></span><code><span class="k">FROM</span><span class="w"> </span><span class="s">ubuntu:20.04</span><span class="w"> </span><span class="k">AS</span><span class="w"> </span><span class="s">icscf-runtime</span> <span class="c"># Install Kamailio with diameter client modules</span>
+<span class="k">RUN</span><span class="w"> </span>apt-get<span class="w"> </span>update<span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span>apt-get<span class="w"> </span>install<span class="w"> </span>-y<span class="w"> </span><span class="se">\</span>
+<span class="w"> </span>kamailio<span class="w"> </span>kamailio-ims-modules<span class="w"> </span><span class="se">\</span>
+<span class="w"> </span>kamailio-diameter-modules <span class="c"># HSS integration components</span>
+<span class="k">COPY</span><span class="w"> </span>src/hss-client/<span class="w"> </span>/usr/local/lib/hss-client/
+<span class="k">COPY</span><span class="w"> </span>config/diameter.conf<span class="w"> </span>/etc/diameter/ <span class="c"># Configuration management</span>
+<span class="k">COPY</span><span class="w"> </span>templates/icscf.cfg.tpl<span class="w"> </span>/templates/
+<span class="k">COPY</span><span class="w"> </span>templates/icscf.xml.tpl<span class="w"> </span>/templates/
+<span class="k">COPY</span><span class="w"> </span>scripts/icscf-entrypoint.sh<span class="w"> </span>/entrypoint.sh <span class="k">EXPOSE</span><span class="w"> </span><span class="s">4060/udp 4060/tcp 3868/tcp</span> <span class="k">HEALTHCHECK</span><span class="w"> </span>--interval<span class="o">=</span>30s<span class="w"> </span>--timeout<span class="o">=</span>5s<span class="w"> </span><span class="se">\</span>
+<span class="w"> </span><span class="k">CMD</span><span class="w"> </span>kamctl<span class="w"> </span>stats<span class="w"> </span><span class="p">|</span><span class="w"> </span>grep<span class="w"> </span>-q<span class="w"> </span><span class="s2">&quot;hss_queries&quot;</span><span class="w"> </span><span class="o">||</span><span class="w"> </span><span class="nb">exit</span><span class="w"> </span><span class="m">1</span> <span class="k">CMD</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;/entrypoint.sh&quot;</span><span class="p">]</span>
+</code></pre></div> <p><strong>I-CSCF Key Functions:</strong>
+- HSS Cx interface diameter signaling
+- S-CSCF selection algorithms
+- Topology hiding for network security
+- Load balancing across S-CSCF instances</p>
+<h3>S-CSCF Container Design</h3>
+<p>The S-CSCF implements the core session control logic:</p>
+<div class="codehilite"><pre><span></span><code><span class="k">FROM</span><span class="w"> </span><span class="s">ubuntu:20.04</span><span class="w"> </span><span class="k">AS</span><span class="w"> </span><span class="s">scscf-runtime</span> <span class="c"># Full IMS module installation</span>
+<span class="k">RUN</span><span class="w"> </span>apt-get<span class="w"> </span>update<span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span>apt-get<span class="w"> </span>install<span class="w"> </span>-y<span class="w"> </span><span class="se">\</span>
+<span class="w"> </span>kamailio<span class="w"> </span>kamailio-ims-modules<span class="w"> </span><span class="se">\</span>
+<span class="w"> </span>kamailio-presence-modules<span class="w"> </span><span class="se">\</span>
+<span class="w"> </span>kamailio-xml-modules <span class="c"># Service logic implementations</span>
+<span class="k">COPY</span><span class="w"> </span>src/service-logic/<span class="w"> </span>/usr/local/lib/ims-services/
+<span class="k">COPY</span><span class="w"> </span>src/isc-interface/<span class="w"> </span>/usr/local/lib/isc/ <span class="c"># Database client configuration</span>
+<span class="k">RUN</span><span class="w"> </span>apt-get<span class="w"> </span>install<span class="w"> </span>-y<span class="w"> </span>mysql-client<span class="w"> </span>redis-tools <span class="k">COPY</span><span class="w"> </span>templates/scscf.cfg.tpl<span class="w"> </span>/templates/
+<span class="k">COPY</span><span class="w"> </span>scripts/scscf-entrypoint.sh<span class="w"> </span>/entrypoint.sh <span class="k">EXPOSE</span><span class="w"> </span><span class="s">6060/udp 6060/tcp</span> <span class="k">HEALTHCHECK</span><span class="w"> </span>--interval<span class="o">=</span>30s<span class="w"> </span>--timeout<span class="o">=</span>5s<span class="w"> </span><span class="se">\</span>
+<span class="w"> </span><span class="k">CMD</span><span class="w"> </span>kamctl<span class="w"> </span>stats<span class="w"> </span><span class="p">|</span><span class="w"> </span>grep<span class="w"> </span>-q<span class="w"> </span><span class="s2">&quot;active_dialogs&quot;</span><span class="w"> </span><span class="o">||</span><span class="w"> </span><span class="nb">exit</span><span class="w"> </span><span class="m">1</span> <span class="k">CMD</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;/entrypoint.sh&quot;</span><span class="p">]</span>
+</code></pre></div> <p><strong>S-CSCF Core Capabilities:</strong>
+- User registration and authentication
+- Session state management
+- Service triggering and iFC processing
+- ISC (IMS Service Control) interface
+- Charging trigger points</p>
+<h2>Dynamic Configuration System</h2>
+<h3>Template-Based Configuration</h3>
+<p>I implemented a sophisticated configuration template system to handle the complexity of IMS networking:</p>
+<div class="codehilite"><pre><span></span><code><span class="ch">#!/bin/bash</span>
+<span class="c1"># Dynamic configuration generation for IMS services</span> <span class="c1"># Network discovery</span>
+<span class="nb">export</span><span class="w"> </span><span class="nv">INTERNAL_IP</span><span class="o">=</span><span class="k">$(</span>hostname<span class="w"> </span>-I<span class="w"> </span><span class="p">|</span><span class="w"> </span>awk<span class="w"> </span><span class="s1">&#39;{print $1}&#39;</span><span class="k">)</span>
+<span class="nb">export</span><span class="w"> </span><span class="nv">EXTERNAL_IP</span><span class="o">=</span><span class="si">${</span><span class="nv">EXTERNAL_IP</span><span class="k">:-$(</span>curl<span class="w"> </span>-s<span class="w"> </span>http://checkip.amazonaws.com/<span class="k">)</span><span class="si">}</span>
+<span class="nb">export</span><span class="w"> </span><span class="nv">POD_NAME</span><span class="o">=</span><span class="si">${</span><span class="nv">HOSTNAME</span><span class="si">}</span> <span class="c1"># Service discovery</span>
+<span class="nb">export</span><span class="w"> </span><span class="nv">DNS_SERVICE</span><span class="o">=</span><span class="si">${</span><span class="nv">DNS_SERVICE</span><span class="k">:-</span><span class="s2">&quot;ims-dns&quot;</span><span class="si">}</span>
+<span class="nb">export</span><span class="w"> </span><span class="nv">MYSQL_SERVICE</span><span class="o">=</span><span class="si">${</span><span class="nv">MYSQL_SERVICE</span><span class="k">:-</span><span class="s2">&quot;ims-mysql&quot;</span><span class="si">}</span>
+<span class="nb">export</span><span class="w"> </span><span class="nv">REDIS_SERVICE</span><span class="o">=</span><span class="si">${</span><span class="nv">REDIS_SERVICE</span><span class="k">:-</span><span class="s2">&quot;ims-redis&quot;</span><span class="si">}</span> <span class="c1"># IMS domain configuration</span>
+<span class="nb">export</span><span class="w"> </span><span class="nv">IMS_DOMAIN</span><span class="o">=</span><span class="si">${</span><span class="nv">IMS_REALM</span><span class="k">:-</span><span class="s2">&quot;ims.mnc001.mcc001.3gppnetwork.org&quot;</span><span class="si">}</span>
+<span class="nb">export</span><span class="w"> </span><span class="nv">EPC_DOMAIN</span><span class="o">=</span><span class="si">${</span><span class="nv">EPC_REALM</span><span class="k">:-</span><span class="s2">&quot;epc.mnc001.mcc001.3gppnetwork.org&quot;</span><span class="si">}</span> <span class="c1"># Generate service-specific configuration</span>
+<span class="k">case</span><span class="w"> </span><span class="nv">$IMS_FUNCTION</span><span class="w"> </span><span class="k">in</span>
+<span class="w"> </span><span class="s2">&quot;pcscf&quot;</span><span class="o">)</span>
+<span class="w"> </span>envsubst<span class="w"> </span>&lt;<span class="w"> </span>/templates/pcscf.cfg.tpl<span class="w"> </span>&gt;<span class="w"> </span>/etc/kamailio/pcscf.cfg
+<span class="w"> </span>envsubst<span class="w"> </span>&lt;<span class="w"> </span>/templates/pcscf.xml.tpl<span class="w"> </span>&gt;<span class="w"> </span>/etc/kamailio/pcscf.xml
+<span class="w"> </span>configure_sems
+<span class="w"> </span><span class="p">;;</span>
+<span class="w"> </span><span class="s2">&quot;icscf&quot;</span><span class="o">)</span><span class="w"> </span>
+<span class="w"> </span>envsubst<span class="w"> </span>&lt;<span class="w"> </span>/templates/icscf.cfg.tpl<span class="w"> </span>&gt;<span class="w"> </span>/etc/kamailio/icscf.cfg
+<span class="w"> </span>configure_hss_client
+<span class="w"> </span><span class="p">;;</span>
+<span class="w"> </span><span class="s2">&quot;scscf&quot;</span><span class="o">)</span>
+<span class="w"> </span>envsubst<span class="w"> </span>&lt;<span class="w"> </span>/templates/scscf.cfg.tpl<span class="w"> </span>&gt;<span class="w"> </span>/etc/kamailio/scscf.cfg
+<span class="w"> </span>configure_database_pools
+<span class="w"> </span><span class="p">;;</span>
+<span class="k">esac</span>
+</code></pre></div> <h3>Advanced Routing Configuration</h3>
+<div class="codehilite"><pre><span></span><code><span class="c1"># pcscf.cfg.tpl - P-CSCF routing logic template</span>
+<span class="c1">#!KAMAILIO</span> <span class="c1"># Global parameters</span>
+<span class="nv">listen</span><span class="o">=</span>udp:<span class="si">${</span><span class="nv">INTERNAL_IP</span><span class="si">}</span>:5060
+<span class="nv">listen</span><span class="o">=</span>tcp:<span class="si">${</span><span class="nv">INTERNAL_IP</span><span class="si">}</span>:5060
+<span class="nv">listen</span><span class="o">=</span>tls:<span class="si">${</span><span class="nv">INTERNAL_IP</span><span class="si">}</span>:5061 <span class="c1"># Database connections with failover</span>
+<span class="c1">#!define DBURL_PCSCF &quot;mysql://pcscf:${MYSQL_PASSWORD}@${MYSQL_SERVICE}/pcscf&quot;</span>
+<span class="c1">#!define DBURL_LOCATION &quot;mysql://pcscf:${MYSQL_PASSWORD}@${MYSQL_SERVICE}/location&quot;</span> <span class="c1"># Load balancer configuration</span>
+<span class="c1">#!define SBC_SEMS_ADDRESS &quot;${INTERNAL_IP}:5070&quot;</span> <span class="c1"># Diameter configuration for Rx interface</span>
+modparam<span class="o">(</span><span class="s2">&quot;ims_qos&quot;</span>,<span class="w"> </span><span class="s2">&quot;rx_dest_realm&quot;</span>,<span class="w"> </span><span class="s2">&quot;</span><span class="si">${</span><span class="nv">IMS_DOMAIN</span><span class="si">}</span><span class="s2">&quot;</span><span class="o">)</span>
+modparam<span class="o">(</span><span class="s2">&quot;ims_qos&quot;</span>,<span class="w"> </span><span class="s2">&quot;rx_forced_peer&quot;</span>,<span class="w"> </span><span class="s2">&quot;</span><span class="si">${</span><span class="nv">PCRF_PEER_ADDRESS</span><span class="si">}</span><span class="s2">&quot;</span><span class="o">)</span> <span class="c1"># NAT traversal configuration</span>
+modparam<span class="o">(</span><span class="s2">&quot;ims_usrloc_pcscf&quot;</span>,<span class="w"> </span><span class="s2">&quot;enable_debug_file&quot;</span>,<span class="w"> </span><span class="m">1</span><span class="o">)</span>
+modparam<span class="o">(</span><span class="s2">&quot;ims_usrloc_pcscf&quot;</span>,<span class="w"> </span><span class="s2">&quot;usrloc_debug_file&quot;</span>,<span class="w"> </span><span class="s2">&quot;/var/log/kamailio/pcscf_usrloc.log&quot;</span><span class="o">)</span> <span class="c1"># Route logic for initial requests</span>
+route<span class="o">[</span>INITIAL_REQUESTS<span class="o">]</span><span class="w"> </span><span class="o">{</span>
+<span class="w"> </span><span class="k">if</span><span class="w"> </span><span class="o">(</span>is_method<span class="o">(</span><span class="s2">&quot;REGISTER&quot;</span><span class="o">))</span><span class="w"> </span><span class="o">{</span>
+<span class="w"> </span>route<span class="o">(</span>PCSCF_REGISTER<span class="o">)</span><span class="p">;</span>
+<span class="w"> </span><span class="o">}</span><span class="w"> </span><span class="k">else</span><span class="w"> </span><span class="k">if</span><span class="w"> </span><span class="o">(</span>is_method<span class="o">(</span><span class="s2">&quot;INVITE&quot;</span><span class="o">))</span><span class="w"> </span><span class="o">{</span>
+<span class="w"> </span>route<span class="o">(</span>PCSCF_INVITE<span class="o">)</span><span class="p">;</span>
+<span class="w"> </span><span class="o">}</span><span class="w"> </span><span class="k">else</span><span class="w"> </span><span class="k">if</span><span class="w"> </span><span class="o">(</span>is_method<span class="o">(</span><span class="s2">&quot;MESSAGE&quot;</span><span class="o">))</span><span class="w"> </span><span class="o">{</span>
+<span class="w"> </span>route<span class="o">(</span>PCSCF_MESSAGE<span class="o">)</span><span class="p">;</span>
+<span class="w"> </span><span class="o">}</span>
+<span class="o">}</span> <span class="c1"># P-CSCF registration handling</span>
+route<span class="o">[</span>PCSCF_REGISTER<span class="o">]</span><span class="w"> </span><span class="o">{</span>
+<span class="w"> </span><span class="c1"># Check for existing registration</span>
+<span class="w"> </span><span class="k">if</span><span class="w"> </span><span class="o">(</span>!pcscf_save_location<span class="o">(</span><span class="s2">&quot;location&quot;</span><span class="o">))</span><span class="w"> </span><span class="o">{</span>
+<span class="w"> </span>send_reply<span class="o">(</span><span class="s2">&quot;500&quot;</span>,<span class="w"> </span><span class="s2">&quot;Unable to save location&quot;</span><span class="o">)</span><span class="p">;</span>
+<span class="w"> </span>exit<span class="p">;</span>
+<span class="w"> </span><span class="o">}</span> <span class="w"> </span><span class="c1"># Trigger QoS reservation</span>
+<span class="w"> </span><span class="k">if</span><span class="w"> </span><span class="o">(</span>!Rx_AAR_Register<span class="o">())</span><span class="w"> </span><span class="o">{</span>
+<span class="w"> </span>xlog<span class="o">(</span><span class="s2">&quot;L_ERR&quot;</span>,<span class="w"> </span><span class="s2">&quot;Failed to initiate QoS for registration\n&quot;</span><span class="o">)</span><span class="p">;</span>
+<span class="w"> </span><span class="o">}</span> <span class="w"> </span><span class="c1"># Forward to I-CSCF</span>
+<span class="w"> </span><span class="nv">$du</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;sip:</span><span class="si">${</span><span class="nv">ICSCF_SERVICE</span><span class="si">}</span><span class="s2">:4060&quot;</span><span class="p">;</span>
+<span class="w"> </span>route<span class="o">(</span>FORWARD_REQUEST<span class="o">)</span><span class="p">;</span>
+<span class="o">}</span> <span class="c1"># Media plane coordination</span>
+route<span class="o">[</span>PCSCF_INVITE<span class="o">]</span><span class="w"> </span><span class="o">{</span>
+<span class="w"> </span><span class="c1"># Check for existing dialog</span>
+<span class="w"> </span><span class="k">if</span><span class="w"> </span><span class="o">(</span>has_totag<span class="o">())</span><span class="w"> </span><span class="o">{</span>
+<span class="w"> </span><span class="k">if</span><span class="w"> </span><span class="o">(</span>loose_route<span class="o">())</span><span class="w"> </span><span class="o">{</span>
+<span class="w"> </span>route<span class="o">(</span>FORWARD_REQUEST<span class="o">)</span><span class="p">;</span>
+<span class="w"> </span>exit<span class="p">;</span>
+<span class="w"> </span><span class="o">}</span>
+<span class="w"> </span><span class="o">}</span> <span class="w"> </span><span class="c1"># New dialog - coordinate with SEMS</span>
+<span class="w"> </span><span class="k">if</span><span class="w"> </span><span class="o">(</span>!pcscf_save_dialog<span class="o">(</span><span class="s2">&quot;location&quot;</span><span class="o">))</span><span class="w"> </span><span class="o">{</span>
+<span class="w"> </span>send_reply<span class="o">(</span><span class="s2">&quot;500&quot;</span>,<span class="w"> </span><span class="s2">&quot;Dialog save failed&quot;</span><span class="o">)</span><span class="p">;</span>
+<span class="w"> </span>exit<span class="p">;</span>
+<span class="w"> </span><span class="o">}</span> <span class="w"> </span><span class="c1"># Trigger media handling in SEMS</span>
+<span class="w"> </span><span class="k">if</span><span class="w"> </span><span class="o">(</span>!sems_relay<span class="o">())</span><span class="w"> </span><span class="o">{</span>
+<span class="w"> </span>send_reply<span class="o">(</span><span class="s2">&quot;500&quot;</span>,<span class="w"> </span><span class="s2">&quot;Media processing failed&quot;</span><span class="o">)</span><span class="p">;</span><span class="w"> </span>
+<span class="w"> </span>exit<span class="p">;</span>
+<span class="w"> </span><span class="o">}</span>
+<span class="o">}</span>
+</code></pre></div> <h2>Service Discovery and Networking</h2>
+<h3>Kubernetes Native Service Discovery</h3>
+<div class="codehilite"><pre><span></span><code><span class="c1"># Service definitions for IMS components</span>
+<span class="nt">apiVersion</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">v1</span>
+<span class="nt">kind</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Service</span>
+<span class="nt">metadata</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">ims-pcscf</span>
+<span class="w"> </span><span class="nt">labels</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">app</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">ims-pcscf</span>
+<span class="w"> </span><span class="nt">component</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">signaling</span>
+<span class="nt">spec</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">selector</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">app</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">ims-pcscf</span>
+<span class="w"> </span><span class="nt">ports</span><span class="p">:</span>
+<span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">sip-udp</span>
+<span class="w"> </span><span class="nt">port</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">5060</span>
+<span class="w"> </span><span class="nt">targetPort</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">5060</span>
+<span class="w"> </span><span class="nt">protocol</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">UDP</span>
+<span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">sip-tcp</span><span class="w"> </span>
+<span class="w"> </span><span class="nt">port</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">5060</span>
+<span class="w"> </span><span class="nt">targetPort</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">5060</span>
+<span class="w"> </span><span class="nt">protocol</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">TCP</span>
+<span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">sips</span>
+<span class="w"> </span><span class="nt">port</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">5061</span>
+<span class="w"> </span><span class="nt">targetPort</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">5061</span>
+<span class="w"> </span><span class="nt">protocol</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">TCP</span>
+<span class="w"> </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">LoadBalancer</span>
+<span class="w"> </span><span class="nt">sessionAffinity</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">ClientIP</span> <span class="nn">---</span>
+<span class="nt">apiVersion</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">v1</span>
+<span class="nt">kind</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Service</span><span class="w"> </span>
+<span class="nt">metadata</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">ims-icscf</span>
+<span class="w"> </span><span class="nt">labels</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">app</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">ims-icscf</span>
+<span class="w"> </span><span class="nt">component</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">signaling</span>
+<span class="nt">spec</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">selector</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">app</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">ims-icscf</span>
+<span class="w"> </span><span class="nt">ports</span><span class="p">:</span>
+<span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">sip-udp</span>
+<span class="w"> </span><span class="nt">port</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">4060</span>
+<span class="w"> </span><span class="nt">targetPort</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">4060</span>
+<span class="w"> </span><span class="nt">protocol</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">UDP</span>
+<span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">diameter</span>
+<span class="w"> </span><span class="nt">port</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">3868</span>
+<span class="w"> </span><span class="nt">targetPort</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">3868</span>
+<span class="w"> </span><span class="nt">protocol</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">TCP</span>
+<span class="w"> </span><span class="nt">clusterIP</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">None</span><span class="w"> </span><span class="c1"># Headless service for direct pod access</span>
+</code></pre></div> <h3>DNS Integration for IMS Domains</h3>
+<div class="codehilite"><pre><span></span><code><span class="c1"># ConfigMap for IMS DNS configuration</span>
+<span class="nt">apiVersion</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">v1</span>
+<span class="nt">kind</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">ConfigMap</span>
+<span class="nt">metadata</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">ims-dns-config</span>
+<span class="nt">data</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">named.conf.local</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">|</span>
+<span class="w"> </span><span class="no">zone &quot;ims.mnc001.mcc001.3gppnetwork.org&quot; {</span>
+<span class="w"> </span><span class="no">type master;</span>
+<span class="w"> </span><span class="no">file &quot;/etc/bind/zones/ims.zone&quot;;</span>
+<span class="w"> </span><span class="no">};</span> <span class="w"> </span><span class="no">zone &quot;epc.mnc001.mcc001.3gppnetwork.org&quot; {</span>
+<span class="w"> </span><span class="no">type master;</span>
+<span class="w"> </span><span class="no">file &quot;/etc/bind/zones/epc.zone&quot;;</span>
+<span class="w"> </span><span class="no">};</span> <span class="w"> </span><span class="nt">ims.zone</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">|</span>
+<span class="w"> </span><span class="no">$TTL 300</span>
+<span class="w"> </span><span class="no">@ IN SOA ims-dns.default.svc.cluster.local. admin.ims.local. (</span>
+<span class="w"> </span><span class="no">2023010101 ; Serial</span>
+<span class="w"> </span><span class="no">3600 ; Refresh</span>
+<span class="w"> </span><span class="no">1800 ; Retry</span>
+<span class="w"> </span><span class="no">604800 ; Expire</span>
+<span class="w"> </span><span class="no">300 ) ; Minimum TTL</span> <span class="w"> </span><span class="no">; IMS service records</span>
+<span class="w"> </span><span class="no">@ IN NS ims-dns.default.svc.cluster.local.</span>
+<span class="w"> </span><span class="no">pcscf IN A ${PCSCF_IP}</span>
+<span class="w"> </span><span class="no">icscf IN A ${ICSCF_IP} </span>
+<span class="w"> </span><span class="no">scscf IN A ${SCSCF_IP}</span> <span class="w"> </span><span class="no">; SRV records for service discovery</span>
+<span class="w"> </span><span class="no">_sip._udp IN SRV 10 60 5060 pcscf.ims.mnc001.mcc001.3gppnetwork.org.</span>
+<span class="w"> </span><span class="no">_sip._tcp IN SRV 10 60 5060 pcscf.ims.mnc001.mcc001.3gppnetwork.org.</span>
+<span class="w"> </span><span class="no">_sips._tcp IN SRV 10 60 5061 pcscf.ims.mnc001.mcc001.3gppnetwork.org.</span>
+</code></pre></div> <h2>High Availability and Scaling</h2>
+<h3>Horizontal Pod Autoscaling</h3>
+<div class="codehilite"><pre><span></span><code><span class="nt">apiVersion</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">autoscaling/v2</span>
+<span class="nt">kind</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">HorizontalPodAutoscaler</span>
+<span class="nt">metadata</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">ims-pcscf-hpa</span>
+<span class="nt">spec</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">scaleTargetRef</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">apiVersion</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">apps/v1</span>
+<span class="w"> </span><span class="nt">kind</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Deployment</span>
+<span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">ims-pcscf</span>
+<span class="w"> </span><span class="nt">minReplicas</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">3</span>
+<span class="w"> </span><span class="nt">maxReplicas</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">10</span>
+<span class="w"> </span><span class="nt">metrics</span><span class="p">:</span>
+<span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Resource</span>
+<span class="w"> </span><span class="nt">resource</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">cpu</span>
+<span class="w"> </span><span class="nt">target</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Utilization</span>
+<span class="w"> </span><span class="nt">averageUtilization</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">70</span>
+<span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Resource</span>
+<span class="w"> </span><span class="nt">resource</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">memory</span>
+<span class="w"> </span><span class="nt">target</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Utilization</span>
+<span class="w"> </span><span class="nt">averageUtilization</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">80</span>
+<span class="w"> </span><span class="nt">behavior</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">scaleUp</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">stabilizationWindowSeconds</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">300</span>
+<span class="w"> </span><span class="nt">policies</span><span class="p">:</span>
+<span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Percent</span>
+<span class="w"> </span><span class="nt">value</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">50</span>
+<span class="w"> </span><span class="nt">periodSeconds</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">60</span>
+<span class="w"> </span><span class="nt">scaleDown</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">stabilizationWindowSeconds</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">900</span>
+<span class="w"> </span><span class="nt">policies</span><span class="p">:</span>
+<span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Percent</span>
+<span class="w"> </span><span class="nt">value</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">25</span><span class="w"> </span>
+<span class="w"> </span><span class="nt">periodSeconds</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">300</span>
+</code></pre></div> <h3>Deployment Strategy for Zero Downtime</h3>
+<div class="codehilite"><pre><span></span><code><span class="nt">apiVersion</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">apps/v1</span>
+<span class="nt">kind</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Deployment</span>
+<span class="nt">metadata</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">ims-scscf</span>
+<span class="nt">spec</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">replicas</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">3</span>
+<span class="w"> </span><span class="nt">strategy</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">RollingUpdate</span>
+<span class="w"> </span><span class="nt">rollingUpdate</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">maxSurge</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1</span>
+<span class="w"> </span><span class="nt">maxUnavailable</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0</span><span class="w"> </span><span class="c1"># Ensure no downtime during updates</span>
+<span class="w"> </span><span class="nt">selector</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">matchLabels</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">app</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">ims-scscf</span>
+<span class="w"> </span><span class="nt">template</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">metadata</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">labels</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">app</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">ims-scscf</span>
+<span class="w"> </span><span class="nt">version</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">v1.2.0</span>
+<span class="w"> </span><span class="nt">spec</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">containers</span><span class="p">:</span>
+<span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">scscf</span>
+<span class="w"> </span><span class="nt">image</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">ims-registry/scscf:v1.2.0</span>
+<span class="w"> </span><span class="nt">ports</span><span class="p">:</span>
+<span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">containerPort</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">6060</span>
+<span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">sip</span>
+<span class="w"> </span><span class="nt">readinessProbe</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">httpGet</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">path</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">/health</span>
+<span class="w"> </span><span class="nt">port</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">8080</span>
+<span class="w"> </span><span class="nt">initialDelaySeconds</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">30</span>
+<span class="w"> </span><span class="nt">periodSeconds</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">10</span>
+<span class="w"> </span><span class="nt">livenessProbe</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">httpGet</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">path</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">/health</span>
+<span class="w"> </span><span class="nt">port</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">8080</span>
+<span class="w"> </span><span class="nt">initialDelaySeconds</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">60</span>
+<span class="w"> </span><span class="nt">periodSeconds</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">30</span>
+<span class="w"> </span><span class="nt">failureThreshold</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">3</span>
+<span class="w"> </span><span class="nt">resources</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">requests</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">cpu</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">500m</span>
+<span class="w"> </span><span class="nt">memory</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1Gi</span>
+<span class="w"> </span><span class="nt">limits</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">cpu</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">2000m</span>
+<span class="w"> </span><span class="nt">memory</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">2Gi</span>
+</code></pre></div> <h2>Performance Optimization</h2>
+<h3>Resource Tuning for VoLTE Workloads</h3>
+<div class="codehilite"><pre><span></span><code><span class="c1"># Performance-optimized container configuration</span>
+<span class="nt">apiVersion</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">v1</span>
+<span class="nt">kind</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Pod</span>
+<span class="nt">spec</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">containers</span><span class="p">:</span>
+<span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">pcscf</span>
+<span class="w"> </span><span class="nt">image</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">ims-pcscf:latest</span>
+<span class="w"> </span><span class="nt">resources</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">requests</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">cpu</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">2000m</span>
+<span class="w"> </span><span class="nt">memory</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">2Gi</span>
+<span class="w"> </span><span class="nt">ephemeral-storage</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1Gi</span>
+<span class="w"> </span><span class="nt">limits</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">cpu</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">4000m</span>
+<span class="w"> </span><span class="nt">memory</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">4Gi</span>
+<span class="w"> </span><span class="nt">ephemeral-storage</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">2Gi</span>
+<span class="w"> </span><span class="nt">securityContext</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">capabilities</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">add</span><span class="p">:</span>
+<span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">NET_ADMIN</span><span class="w"> </span><span class="c1"># Required for network interface management</span>
+<span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">NET_RAW</span><span class="w"> </span><span class="c1"># Required for raw socket operations</span>
+<span class="w"> </span><span class="nt">env</span><span class="p">:</span>
+<span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">KAMAILIO_SHM_MEM</span>
+<span class="w"> </span><span class="nt">value</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;256&quot;</span><span class="w"> </span><span class="c1"># Shared memory in MB</span>
+<span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">KAMAILIO_PKG_MEM</span><span class="w"> </span>
+<span class="w"> </span><span class="nt">value</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;64&quot;</span><span class="w"> </span><span class="c1"># Package memory in MB</span>
+<span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">KAMAILIO_CHILDREN</span>
+<span class="w"> </span><span class="nt">value</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;16&quot;</span><span class="w"> </span><span class="c1"># Number of worker processes</span>
+</code></pre></div> <h3>Network Performance Tuning</h3>
+<div class="codehilite"><pre><span></span><code><span class="ch">#!/bin/bash</span>
+<span class="c1"># Network performance optimization script</span> <span class="c1"># Increase network buffer sizes</span>
+<span class="nb">echo</span><span class="w"> </span><span class="s1">&#39;net.core.rmem_max = 134217728&#39;</span><span class="w"> </span>&gt;&gt;<span class="w"> </span>/etc/sysctl.conf
+<span class="nb">echo</span><span class="w"> </span><span class="s1">&#39;net.core.wmem_max = 134217728&#39;</span><span class="w"> </span>&gt;&gt;<span class="w"> </span>/etc/sysctl.conf
+<span class="nb">echo</span><span class="w"> </span><span class="s1">&#39;net.core.rmem_default = 65536&#39;</span><span class="w"> </span>&gt;&gt;<span class="w"> </span>/etc/sysctl.conf
+<span class="nb">echo</span><span class="w"> </span><span class="s1">&#39;net.core.wmem_default = 65536&#39;</span><span class="w"> </span>&gt;&gt;<span class="w"> </span>/etc/sysctl.conf <span class="c1"># TCP tuning for SIP signaling</span>
+<span class="nb">echo</span><span class="w"> </span><span class="s1">&#39;net.ipv4.tcp_rmem = 4096 87380 134217728&#39;</span><span class="w"> </span>&gt;&gt;<span class="w"> </span>/etc/sysctl.conf
+<span class="nb">echo</span><span class="w"> </span><span class="s1">&#39;net.ipv4.tcp_wmem = 4096 65536 134217728&#39;</span><span class="w"> </span>&gt;&gt;<span class="w"> </span>/etc/sysctl.conf
+<span class="nb">echo</span><span class="w"> </span><span class="s1">&#39;net.ipv4.tcp_congestion_control = bbr&#39;</span><span class="w"> </span>&gt;&gt;<span class="w"> </span>/etc/sysctl.conf <span class="c1"># UDP tuning for RTP media</span>
+<span class="nb">echo</span><span class="w"> </span><span class="s1">&#39;net.core.netdev_max_backlog = 5000&#39;</span><span class="w"> </span>&gt;&gt;<span class="w"> </span>/etc/sysctl.conf
+<span class="nb">echo</span><span class="w"> </span><span class="s1">&#39;net.ipv4.udp_rmem_min = 8192&#39;</span><span class="w"> </span>&gt;&gt;<span class="w"> </span>/etc/sysctl.conf
+<span class="nb">echo</span><span class="w"> </span><span class="s1">&#39;net.ipv4.udp_wmem_min = 8192&#39;</span><span class="w"> </span>&gt;&gt;<span class="w"> </span>/etc/sysctl.conf <span class="c1"># Apply settings</span>
+sysctl<span class="w"> </span>-p
+</code></pre></div> <h2>Monitoring and Observability</h2>
+<h3>Prometheus Metrics Collection</h3>
+<div class="codehilite"><pre><span></span><code><span class="c1"># kamailio-exporter.py - Custom metrics exporter for Kamailio</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">time</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">requests</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">prometheus_client</span><span class="w"> </span><span class="kn">import</span> <span class="n">start_http_server</span><span class="p">,</span> <span class="n">Gauge</span><span class="p">,</span> <span class="n">Counter</span><span class="p">,</span> <span class="n">Histogram</span> <span class="c1"># Define metrics</span>
+<span class="n">sip_requests_total</span> <span class="o">=</span> <span class="n">Counter</span><span class="p">(</span><span class="s1">&#39;sip_requests_total&#39;</span><span class="p">,</span> <span class="s1">&#39;Total SIP requests processed&#39;</span><span class="p">,</span> <span class="p">[</span><span class="s1">&#39;method&#39;</span><span class="p">,</span> <span class="s1">&#39;response_code&#39;</span><span class="p">])</span> <span class="n">active_dialogs</span> <span class="o">=</span> <span class="n">Gauge</span><span class="p">(</span><span class="s1">&#39;kamailio_active_dialogs&#39;</span><span class="p">,</span> <span class="s1">&#39;Number of active SIP dialogs&#39;</span><span class="p">)</span> <span class="n">sip_response_time</span> <span class="o">=</span> <span class="n">Histogram</span><span class="p">(</span><span class="s1">&#39;sip_response_time_seconds&#39;</span><span class="p">,</span> <span class="s1">&#39;SIP request processing time&#39;</span><span class="p">,</span> <span class="p">[</span><span class="s1">&#39;method&#39;</span><span class="p">])</span> <span class="n">registered_users</span> <span class="o">=</span> <span class="n">Gauge</span><span class="p">(</span><span class="s1">&#39;kamailio_registered_users&#39;</span><span class="p">,</span> <span class="s1">&#39;Number of registered users&#39;</span><span class="p">)</span> <span class="k">def</span><span class="w"> </span><span class="nf">collect_kamailio_stats</span><span class="p">():</span>
+<span class="w"> </span><span class="sd">&quot;&quot;&quot;Collect statistics from Kamailio&quot;&quot;&quot;</span> <span class="k">try</span><span class="p">:</span> <span class="c1"># Query Kamailio statistics via MI interface</span> <span class="n">stats_response</span> <span class="o">=</span> <span class="n">requests</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;http://localhost:8080/statistics&#39;</span><span class="p">)</span> <span class="n">stats</span> <span class="o">=</span> <span class="n">stats_response</span><span class="o">.</span><span class="n">json</span><span class="p">()</span> <span class="c1"># Update Prometheus metrics</span> <span class="n">active_dialogs</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="n">stats</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;core:active_dialogs&#39;</span><span class="p">,</span> <span class="mi">0</span><span class="p">))</span> <span class="n">registered_users</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="n">stats</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;registrar:registered_users&#39;</span><span class="p">,</span> <span class="mi">0</span><span class="p">))</span> <span class="c1"># Process request statistics</span> <span class="k">for</span> <span class="n">method</span> <span class="ow">in</span> <span class="p">[</span><span class="s1">&#39;REGISTER&#39;</span><span class="p">,</span> <span class="s1">&#39;INVITE&#39;</span><span class="p">,</span> <span class="s1">&#39;BYE&#39;</span><span class="p">,</span> <span class="s1">&#39;CANCEL&#39;</span><span class="p">]:</span> <span class="n">count</span> <span class="o">=</span> <span class="n">stats</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;core:rcv_requests_</span><span class="si">{</span><span class="n">method</span><span class="si">}</span><span class="s1">&#39;</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span> <span class="n">sip_requests_total</span><span class="o">.</span><span class="n">labels</span><span class="p">(</span><span class="n">method</span><span class="o">=</span><span class="n">method</span><span class="p">,</span> <span class="n">response_code</span><span class="o">=</span><span class="s1">&#39;total&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">inc</span><span class="p">(</span><span class="n">count</span><span class="p">)</span> <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span> <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Error collecting stats: </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span> <span class="k">if</span> <span class="vm">__name__</span> <span class="o">==</span> <span class="s1">&#39;__main__&#39;</span><span class="p">:</span> <span class="c1"># Start Prometheus metrics server</span> <span class="n">start_http_server</span><span class="p">(</span><span class="mi">9150</span><span class="p">)</span> <span class="c1"># Collect metrics every 30 seconds</span> <span class="k">while</span> <span class="kc">True</span><span class="p">:</span> <span class="n">collect_kamailio_stats</span><span class="p">()</span> <span class="n">time</span><span class="o">.</span><span class="n">sleep</span><span class="p">(</span><span class="mi">30</span><span class="p">)</span>
+</code></pre></div> <h3>Grafana Dashboard Configuration</h3>
+<div class="codehilite"><pre><span></span><code><span class="p">{</span>
+<span class="w"> </span><span class="nt">&quot;dashboard&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w"> </span><span class="nt">&quot;title&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;IMS VoLTE Performance Dashboard&quot;</span><span class="p">,</span>
+<span class="w"> </span><span class="nt">&quot;panels&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+<span class="w"> </span><span class="p">{</span>
+<span class="w"> </span><span class="nt">&quot;title&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Active SIP Dialogs&quot;</span><span class="p">,</span>
+<span class="w"> </span><span class="nt">&quot;type&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;stat&quot;</span><span class="p">,</span>
+<span class="w"> </span><span class="nt">&quot;targets&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+<span class="w"> </span><span class="p">{</span>
+<span class="w"> </span><span class="nt">&quot;expr&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;sum(kamailio_active_dialogs)&quot;</span><span class="p">,</span>
+<span class="w"> </span><span class="nt">&quot;legendFormat&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Active Dialogs&quot;</span>
+<span class="w"> </span><span class="p">}</span>
+<span class="w"> </span><span class="p">]</span>
+<span class="w"> </span><span class="p">},</span>
+<span class="w"> </span><span class="p">{</span>
+<span class="w"> </span><span class="nt">&quot;title&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;SIP Request Rate&quot;</span><span class="p">,</span>
+<span class="w"> </span><span class="nt">&quot;type&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;graph&quot;</span><span class="p">,</span>
+<span class="w"> </span><span class="nt">&quot;targets&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+<span class="w"> </span><span class="p">{</span>
+<span class="w"> </span><span class="nt">&quot;expr&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;rate(sip_requests_total[5m])&quot;</span><span class="p">,</span>
+<span class="w"> </span><span class="nt">&quot;legendFormat&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;{{method}}&quot;</span>
+<span class="w"> </span><span class="p">}</span>
+<span class="w"> </span><span class="p">]</span>
+<span class="w"> </span><span class="p">},</span>
+<span class="w"> </span><span class="p">{</span>
+<span class="w"> </span><span class="nt">&quot;title&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Response Time Distribution&quot;</span><span class="p">,</span>
+<span class="w"> </span><span class="nt">&quot;type&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;heatmap&quot;</span><span class="p">,</span>
+<span class="w"> </span><span class="nt">&quot;targets&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+<span class="w"> </span><span class="p">{</span>
+<span class="w"> </span><span class="nt">&quot;expr&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;rate(sip_response_time_bucket[5m])&quot;</span><span class="p">,</span>
+<span class="w"> </span><span class="nt">&quot;legendFormat&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;{{le}}&quot;</span>
+<span class="w"> </span><span class="p">}</span>
+<span class="w"> </span><span class="p">]</span>
+<span class="w"> </span><span class="p">}</span>
+<span class="w"> </span><span class="p">]</span>
+<span class="w"> </span><span class="p">}</span>
+<span class="p">}</span>
+</code></pre></div> <h2>Security Implementation</h2>
+<h3>Network Policies for IMS Components</h3>
+<div class="codehilite"><pre><span></span><code><span class="nt">apiVersion</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">networking.k8s.io/v1</span>
+<span class="nt">kind</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">NetworkPolicy</span>
+<span class="nt">metadata</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">ims-security-policy</span>
+<span class="nt">spec</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">podSelector</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">matchLabels</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">app</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">ims</span>
+<span class="w"> </span><span class="nt">policyTypes</span><span class="p">:</span>
+<span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Ingress</span>
+<span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Egress</span>
+<span class="w"> </span><span class="nt">ingress</span><span class="p">:</span>
+<span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">from</span><span class="p">:</span>
+<span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">namespaceSelector</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">matchLabels</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">ims-core</span>
+<span class="w"> </span><span class="nt">ports</span><span class="p">:</span>
+<span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">protocol</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">UDP</span>
+<span class="w"> </span><span class="nt">port</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">5060</span><span class="w"> </span><span class="c1"># SIP signaling</span>
+<span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">protocol</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">TCP</span>
+<span class="w"> </span><span class="nt">port</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">5060</span><span class="w"> </span><span class="c1"># SIP over TCP</span>
+<span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">protocol</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">TCP</span><span class="w"> </span>
+<span class="w"> </span><span class="nt">port</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">5061</span><span class="w"> </span><span class="c1"># SIPS (SIP over TLS)</span>
+<span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">from</span><span class="p">:</span>
+<span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">namespaceSelector</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">matchLabels</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">monitoring</span>
+<span class="w"> </span><span class="nt">ports</span><span class="p">:</span>
+<span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">protocol</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">TCP</span>
+<span class="w"> </span><span class="nt">port</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">9150</span><span class="w"> </span><span class="c1"># Prometheus metrics</span>
+<span class="w"> </span><span class="nt">egress</span><span class="p">:</span>
+<span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">to</span><span class="p">:</span>
+<span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">namespaceSelector</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">matchLabels</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">ims-core</span>
+<span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">to</span><span class="p">:</span>
+<span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">namespaceSelector</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">matchLabels</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">hss</span>
+<span class="w"> </span><span class="nt">ports</span><span class="p">:</span>
+<span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">protocol</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">TCP</span>
+<span class="w"> </span><span class="nt">port</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">3868</span><span class="w"> </span><span class="c1"># Diameter protocol</span>
+</code></pre></div> <h3>TLS Configuration for Secure Signaling</h3>
+<div class="codehilite"><pre><span></span><code><span class="c1"># TLS certificate management for IMS services</span>
+apiVersion:<span class="w"> </span>cert-manager.io/v1
+kind:<span class="w"> </span>Certificate
+metadata:
+<span class="w"> </span>name:<span class="w"> </span>ims-tls-certificate
+spec:
+<span class="w"> </span>secretName:<span class="w"> </span>ims-tls-secret
+<span class="w"> </span>issuerRef:
+<span class="w"> </span>name:<span class="w"> </span>ims-ca-issuer
+<span class="w"> </span>kind:<span class="w"> </span>ClusterIssuer
+<span class="w"> </span>dnsNames:
+<span class="w"> </span>-<span class="w"> </span>pcscf.ims.mnc001.mcc001.3gppnetwork.org
+<span class="w"> </span>-<span class="w"> </span>icscf.ims.mnc001.mcc001.3gppnetwork.org
+<span class="w"> </span>-<span class="w"> </span>scscf.ims.mnc001.mcc001.3gppnetwork.org
+<span class="w"> </span>-<span class="w"> </span><span class="s2">&quot;*.ims.mnc001.mcc001.3gppnetwork.org&quot;</span>
+</code></pre></div> <h2>Results and Impact</h2>
+<h3>Performance Improvements</h3>
+<p><strong>Scalability Enhancements:</strong>
+- Horizontal scaling: Manual → Automated based on load
+- Capacity: 10K concurrent calls → 100K+ concurrent calls
+- Response time: P95 &lt; 50ms for SIP processing
+- Throughput: 5K registrations/second → 50K registrations/second</p>
+<p><strong>Availability Improvements:</strong><br />
+- System uptime: 99.9% → 99.99%
+- Mean time to recovery: 15 minutes → 2 minutes
+- Zero-downtime deployments: 0% → 100% of releases
+- Fault isolation: System-wide failures → Service-specific failures</p>
+<p><strong>Operational Efficiency:</strong>
+- Deployment time: 2 hours → 5 minutes
+- Troubleshooting time: 4 hours → 30 minutes average
+- Resource utilization: 40% → 75%
+- Cost reduction: 30% through optimized resource allocation</p>
+<h3>Reliability Metrics</h3>
+<p><strong>Service Availability:</strong>
+- P-CSCF: 99.99% uptime
+- I-CSCF: 99.99% uptime<br />
+- S-CSCF: 99.98% uptime
+- DNS: 99.99% uptime
+- Database: 99.95% uptime</p>
+<p><strong>Performance KPIs:</strong>
+- Call setup success rate: &gt; 99.5%
+- SIP response time P95: &lt; 100ms
+- Database query time P95: &lt; 50ms<br />
+- Memory utilization: &lt; 80% peak
+- CPU utilization: &lt; 70% peak</p>
+<h2>Lessons Learned</h2>
+<h3>1. IMS-Specific Challenges</h3>
+<p>Telecommunications workloads have unique requirements:
+- <strong>Session stickiness</strong>: S-CSCF must maintain dialog state
+- <strong>Protocol complexity</strong>: SIP, Diameter, RTP coordination
+- <strong>Real-time constraints</strong>: Sub-second response requirements
+- <strong>Regulatory compliance</strong>: Audit trails and lawful intercept</p>
+<h3>2. Container Networking Complexity</h3>
+<p>IMS networking requires careful consideration:
+- <strong>Multiple protocols</strong>: SIP (UDP/TCP), Diameter (TCP), RTP (UDP)
+- <strong>NAT traversal</strong>: Complex routing through container networks
+- <strong>Service discovery</strong>: DNS-based resolution for IMS domains
+- <strong>Load balancing</strong>: Session-aware load distribution</p>
+<h3>3. State Management Strategy</h3>
+<p>Handling stateful services in containers:
+- <strong>External state storage</strong>: Redis for session caching
+- <strong>Database clustering</strong>: MySQL Galera for high availability
+- <strong>Session replication</strong>: Cross-pod session sharing
+- <strong>Graceful shutdown</strong>: Proper dialog termination during updates</p>
+<h3>4. Performance Optimization</h3>
+<p>Optimizing for VoLTE performance:
+- <strong>Resource sizing</strong>: Right-sizing based on traffic patterns
+- <strong>Network tuning</strong>: Kernel parameter optimization
+- <strong>Process tuning</strong>: Kamailio worker process configuration
+- <strong>Memory management</strong>: Shared memory pool optimization</p>
+<h2>Future Enhancements</h2>
+<h3>Short-term Roadmap</h3>
+<ol>
+<li><strong>Service Mesh Integration</strong>: Implement Istio for advanced traffic management</li>
+<li><strong>Chaos Engineering</strong>: Implement controlled failure testing</li>
+<li><strong>Multi-Cloud</strong>: Prepare for multi-cloud deployment scenarios</li>
+<li><strong>Edge Computing</strong>: Optimize for edge deployment patterns</li>
+</ol>
+<h3>Long-term Vision</h3>
+<ol>
+<li><strong>5G SA Integration</strong>: Extend architecture for 5G Standalone networks</li>
+<li><strong>AI/ML Integration</strong>: Intelligent traffic routing and capacity planning</li>
+<li><strong>Cloud-Native HSS</strong>: Modernize HSS as microservices</li>
+<li><strong>Network Function Virtualization</strong>: Full NFV transformation</li>
+</ol>
+<h2>Best Practices for IMS Modernization</h2>
+<h3>1. Architecture Design</h3>
+<ul>
+<li><strong>Start with understanding traffic patterns</strong> and capacity requirements</li>
+<li><strong>Design for horizontal scaling</strong> from the beginning</li>
+<li><strong>Implement proper service boundaries</strong> based on IMS functional areas</li>
+<li><strong>Plan for both signaling and media planes</strong> in your architecture</li>
+</ul>
+<h3>2. Container Design</h3>
+<ul>
+<li><strong>Optimize for startup time</strong> to support rapid scaling</li>
+<li><strong>Implement comprehensive health checks</strong> for each service</li>
+<li><strong>Use multi-stage builds</strong> to minimize image sizes</li>
+<li><strong>Design for configuration externalization</strong> and dynamic updates</li>
+</ul>
+<h3>3. Networking</h3>
+<ul>
+<li><strong>Understand SIP routing implications</strong> in containerized environments</li>
+<li><strong>Plan IP address management</strong> carefully for IMS domains</li>
+<li><strong>Implement proper service discovery</strong> for IMS components</li>
+<li><strong>Test NAT traversal scenarios</strong> thoroughly</li>
+</ul>
+<h3>4. Operations</h3>
+<ul>
+<li><strong>Implement comprehensive monitoring</strong> of both infrastructure and application metrics</li>
+<li><strong>Design for observability</strong> with structured logging and tracing</li>
+<li><strong>Plan for disaster recovery</strong> and backup strategies</li>
+<li><strong>Train operations teams</strong> on containerized IMS troubleshooting</li>
+</ul>
+<h2>Conclusion</h2>
+<p>Modernizing VoLTE IMS architecture from monolithic to cloud-native microservices has delivered significant improvements in scalability, reliability, and operational efficiency. The transformation enabled our telecommunications infrastructure to handle increasing traffic demands while reducing operational complexity and costs.</p>
+<p>Key takeaways for organizations undertaking similar transformations:</p>
+<ol>
+<li><strong>Understand your specific requirements</strong> - VoLTE has unique constraints that generic microservices patterns may not address</li>
+<li><strong>Plan for complexity</strong> - IMS involves multiple protocols and strict performance requirements</li>
+<li><strong>Invest in proper tooling</strong> - Comprehensive monitoring and automation are essential</li>
+<li><strong>Train your team</strong> - Container-based IMS operations require new skills and processes</li>
+<li><strong>Test thoroughly</strong> - Voice services demand extensive testing across all scenarios</li>
+</ol>
+<p>The modernized IMS architecture has positioned our VoLTE services for future innovation while maintaining the carrier-grade reliability that telecommunications services demand. It serves as a foundation for 5G evolution and provides the scalability needed for growing subscriber bases.</p>
+<hr />
+<p><em>This IMS modernization project has established architectural patterns and operational practices that are being applied across other network functions in our telecommunications infrastructure. The experience gained continues to drive innovation and efficiency improvements throughout our platform.</em></p></div> <footer><ul class="stats"><li><a href="../index.html">Back to posts</a></li></ul></footer> </article> </div> <section id="sidebar"> <section> <div class="mini-posts"> <header><h3>Recent</h3></header> <ul>
+<li><a href="../posts/project-new--devops-automation-blog.html">DevOps Automation in Telecommunications: Building Resilient Monitoring Workflows with GitHub Actions</a> <span class=\"published\">DevOps</span></li>
+<li><a href="../posts/project-new--prometheus-integration-blog.html">Mastering Prometheus Integration: From Batch Jobs to Production Monitoring</a> <span class=\"published\">Monitoring</span></li>
+<li><a href="../posts/project-new--telecommunications-monitoring-blog.html">Automating Telecommunications Infrastructure Monitoring: A DevOps Approach to MSISDN Stock Management</a> <span class=\"published\">Monitoring</span></li>
+<li><a href="../posts/project--cicd-pipeline-blog.html">Building Rock-Solid CI/CD Pipelines for Mission-Critical Telecommunications Infrastructure</a> <span class=\"published\">DevOps</span></li>
+<li><a href="../posts/project--containerization-blog.html">Containerizing Critical VoLTE Infrastructure: Lessons from Production IMS Deployment</a> <span class=\"published\">Containers</span></li> </ul> </div> </section> <section> <header><h3>About</h3></header> <p>Notes on telecom, infra, and automation.</p> </section> </section> <section id="footer"><p class="copyright">&copy; 2025</p></section> </div> <script src="../assets/js/jquery.min.js"></script> <script src="../assets/js/browser.min.js"></script> <script src="../assets/js/breakpoints.min.js"></script> <script src="../assets/js/util.js"></script> <script src="../assets/js/main.js"></script> </body>
+</html>

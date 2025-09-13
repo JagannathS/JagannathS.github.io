@@ -1,0 +1,1053 @@
+<!DOCTYPE HTML>
+<html> <head> <title>Securing Critical Telecommunications Infrastructure: A Defense-in-Depth Approach - Future Imperfect</title> <meta charset="utf-8" /> <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no" /> <link rel="stylesheet" href="../assets/css/main.css" /> <link rel="stylesheet" href="../assets/css/codehilite.css" /> </head> <body class="single is-preload"> <div id="wrapper"> <header id="header"> <h1><a href="../index.html">Future Imperfect</a></h1> <nav class="links"></nav> </header> <div id="main"> <article class="post"> <header> <div class="title"><h2>Securing Critical Telecommunications Infrastructure: A Defense-in-Depth Approach</h2><p>In the telecommunications industry, security isn&#x27;t just about protecting data—it&#x27;s about safeguarding critical national infrastructure, ensuring emergency service availability, and maintaining the trust of millions of subscribers. Over the past two years, I&#x27;ve been implementing comprehensive security measures across wireless telecommunications infrastructure, establishing defense-in-depth strategies that protect services handling billions of transactions and supporting critical communications for millions of users.</p></div> <div class="meta"><span class="published">Telecom</span></div> </header> <div class="content markdown"><h1>Securing Critical Telecommunications Infrastructure: A Defense-in-Depth Approach</h1>
+<h2>Introduction</h2>
+<p>In the telecommunications industry, security isn't just about protecting data—it's about safeguarding critical national infrastructure, ensuring emergency service availability, and maintaining the trust of millions of subscribers. Over the past two years, I've been implementing comprehensive security measures across wireless telecommunications infrastructure, establishing defense-in-depth strategies that protect services handling billions of transactions and supporting critical communications for millions of users.</p>
+<p>This blog post explores the security architecture, implementation strategies, and operational practices that ensure robust protection for telecommunications infrastructure while maintaining the high availability and performance requirements essential to network operations.</p>
+<h2>The Unique Security Landscape of Telecommunications</h2>
+<h3>Critical Infrastructure Requirements</h3>
+<p>Telecommunications networks are designated as critical infrastructure in most countries, bringing unique security obligations:</p>
+<p><strong>Regulatory Compliance:</strong>
+- FCC regulations for network reliability and security (United States)
+- GDPR and NIS2 Directive compliance (European Union)<br />
+- Telecommunications security requirements across multiple jurisdictions
+- Emergency services (911/112) availability mandates</p>
+<p><strong>National Security Considerations:</strong>
+- Protection against nation-state attacks
+- Supply chain security for network equipment
+- Data sovereignty and cross-border data protection
+- Counter-intelligence measures for sensitive communications</p>
+<p><strong>Business Continuity:</strong>
+- 99.99%+ uptime requirements with security controls in place
+- Rapid incident response without service disruption
+- Disaster recovery with security validation
+- Compliance audit requirements with minimal operational impact</p>
+<h3>Threat Landscape Analysis</h3>
+<p>Our security implementation addresses multiple threat vectors specific to telecommunications:</p>
+<p><strong>External Threats:</strong>
+- <strong>Distributed Denial of Service (DDoS)</strong>: Attacks targeting network availability
+- <strong>Advanced Persistent Threats (APTs)</strong>: Nation-state actors targeting infrastructure
+- <strong>Ransomware</strong>: Encryption attacks on operational systems
+- <strong>Data exfiltration</strong>: Attempts to steal subscriber and network data</p>
+<p><strong>Internal Threats:</strong>
+- <strong>Privileged access abuse</strong>: Misuse of administrative credentials
+- <strong>Insider threats</strong>: Malicious or negligent employee actions
+- <strong>Supply chain compromise</strong>: Compromised vendor access or equipment
+- <strong>Configuration drift</strong>: Unauthorized changes leading to vulnerabilities</p>
+<p><strong>Protocol-Specific Threats:</strong>
+- <strong>SS7/Diameter attacks</strong>: Exploitation of telecommunications signaling protocols
+- <strong>SIP flooding</strong>: Attacks on Voice over IP infrastructure
+- <strong>GTP tunneling abuse</strong>: Mobile data protocol exploitation
+- <strong>DNS poisoning</strong>: Service discovery manipulation</p>
+<h2>Security Architecture Overview</h2>
+<p>Our security architecture implements defense-in-depth principles across multiple layers:</p>
+<div class="codehilite"><pre><span></span><code><span class="n">graph</span><span class="w"> </span><span class="n">TB</span>
+<span class="w"> </span><span class="n">A</span><span class="p">[</span><span class="n">Internet</span><span class="o">/</span><span class="n">External</span><span class="w"> </span><span class="n">Networks</span><span class="p">]</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">B</span><span class="p">[</span><span class="n">DDoS</span><span class="w"> </span><span class="n">Protection</span><span class="w"> </span><span class="o">&amp;</span><span class="w"> </span><span class="n">WAF</span><span class="p">]</span>
+<span class="w"> </span><span class="n">B</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">C</span><span class="p">[</span><span class="n">Network</span><span class="w"> </span><span class="n">Perimeter</span><span class="w"> </span><span class="n">Firewalls</span><span class="p">]</span>
+<span class="w"> </span><span class="n">C</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">D</span><span class="p">[</span><span class="n">DMZ</span><span class="o">/</span><span class="n">Edge</span><span class="w"> </span><span class="n">Services</span><span class="p">]</span>
+<span class="w"> </span><span class="n">D</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">E</span><span class="p">[</span><span class="n">Internal</span><span class="w"> </span><span class="n">Network</span><span class="w"> </span><span class="n">Segmentation</span><span class="p">]</span>
+<span class="w"> </span><span class="n">E</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">F</span><span class="p">[</span><span class="n">Application</span><span class="w"> </span><span class="n">Security</span><span class="w"> </span><span class="n">Controls</span><span class="p">]</span>
+<span class="w"> </span><span class="n">F</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">G</span><span class="p">[</span><span class="n">Data</span><span class="w"> </span><span class="n">Protection</span><span class="w"> </span><span class="n">Layer</span><span class="p">]</span>
+<span class="w"> </span><span class="n">G</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">H</span><span class="p">[</span><span class="n">Identity</span><span class="w"> </span><span class="o">&amp;</span><span class="w"> </span><span class="n">Access</span><span class="w"> </span><span class="n">Management</span><span class="p">]</span>
+<span class="w"> </span><span class="n">H</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">I</span><span class="p">[</span><span class="n">Security</span><span class="w"> </span><span class="n">Monitoring</span><span class="w"> </span><span class="o">&amp;</span><span class="w"> </span><span class="n">SIEM</span><span class="p">]</span>
+<span class="w"> </span><span class="n">I</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">J</span><span class="p">[</span><span class="n">Incident</span><span class="w"> </span><span class="n">Response</span><span class="p">]</span>
+</code></pre></div> <h3>Network Security Foundation</h3>
+<h4>Zero-Trust Network Architecture</h4>
+<div class="codehilite"><pre><span></span><code><span class="c1"># Network policies implementing zero-trust principles</span>
+<span class="nt">apiVersion</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">networking.k8s.io/v1</span>
+<span class="nt">kind</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">NetworkPolicy</span>
+<span class="nt">metadata</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">wireless-services-zero-trust</span>
+<span class="w"> </span><span class="nt">namespace</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">telecommunications</span>
+<span class="nt">spec</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">podSelector</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">{}</span><span class="w"> </span><span class="c1"># Apply to all pods in namespace</span>
+<span class="w"> </span><span class="nt">policyTypes</span><span class="p">:</span>
+<span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Ingress</span>
+<span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Egress</span> <span class="w"> </span><span class="c1"># Default deny all traffic</span>
+<span class="w"> </span><span class="nt">ingress</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[]</span>
+<span class="w"> </span><span class="nt">egress</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[]</span> <span class="nn">---</span>
+<span class="c1"># Specific allow rules for required communications</span>
+<span class="nt">apiVersion</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">networking.k8s.io/v1</span>
+<span class="nt">kind</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">NetworkPolicy</span>
+<span class="nt">metadata</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">wireless-billing-ingress</span>
+<span class="w"> </span><span class="nt">namespace</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">telecommunications</span>
+<span class="nt">spec</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">podSelector</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">matchLabels</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">app</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">wireless-billing</span>
+<span class="w"> </span><span class="nt">policyTypes</span><span class="p">:</span>
+<span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Ingress</span>
+<span class="w"> </span><span class="nt">ingress</span><span class="p">:</span>
+<span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">from</span><span class="p">:</span>
+<span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">namespaceSelector</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">matchLabels</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">wireless-admin</span>
+<span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">namespaceSelector</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">matchLabels</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">wireless-manager</span>
+<span class="w"> </span><span class="nt">ports</span><span class="p">:</span>
+<span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">protocol</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">TCP</span>
+<span class="w"> </span><span class="nt">port</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">8080</span>
+<span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">protocol</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">TCP</span>
+<span class="w"> </span><span class="nt">port</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">8443</span><span class="w"> </span><span class="c1"># TLS port</span> <span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">from</span><span class="p">:</span>
+<span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">namespaceSelector</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">matchLabels</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">monitoring</span>
+<span class="w"> </span><span class="nt">ports</span><span class="p">:</span>
+<span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">protocol</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">TCP</span>
+<span class="w"> </span><span class="nt">port</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">9090</span><span class="w"> </span><span class="c1"># Metrics port</span> <span class="nn">---</span>
+<span class="c1"># Egress policy for database connections</span>
+<span class="nt">apiVersion</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">networking.k8s.io/v1</span>
+<span class="nt">kind</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">NetworkPolicy</span>
+<span class="nt">metadata</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">wireless-billing-egress</span>
+<span class="w"> </span><span class="nt">namespace</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">telecommunications</span>
+<span class="nt">spec</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">podSelector</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">matchLabels</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">app</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">wireless-billing</span>
+<span class="w"> </span><span class="nt">policyTypes</span><span class="p">:</span>
+<span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Egress</span>
+<span class="w"> </span><span class="nt">egress</span><span class="p">:</span>
+<span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">to</span><span class="p">:</span>
+<span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">namespaceSelector</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">matchLabels</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">databases</span>
+<span class="w"> </span><span class="nt">ports</span><span class="p">:</span>
+<span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">protocol</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">TCP</span>
+<span class="w"> </span><span class="nt">port</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">5432</span><span class="w"> </span><span class="c1"># PostgreSQL</span>
+<span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">protocol</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">TCP</span>
+<span class="w"> </span><span class="nt">port</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">3306</span><span class="w"> </span><span class="c1"># MySQL</span> <span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">to</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[]</span><span class="w"> </span><span class="c1"># DNS</span>
+<span class="w"> </span><span class="nt">ports</span><span class="p">:</span>
+<span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">protocol</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">UDP</span>
+<span class="w"> </span><span class="nt">port</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">53</span>
+<span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">protocol</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">TCP</span>
+<span class="w"> </span><span class="nt">port</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">53</span> <span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">to</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[]</span><span class="w"> </span><span class="c1"># HTTPS outbound for API calls</span>
+<span class="w"> </span><span class="nt">ports</span><span class="p">:</span>
+<span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">protocol</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">TCP</span>
+<span class="w"> </span><span class="nt">port</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">443</span>
+</code></pre></div> <h4>Network Segmentation Strategy</h4>
+<div class="codehilite"><pre><span></span><code><span class="c1"># VPC and subnet configuration for network isolation</span>
+<span class="nt">apiVersion</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">v1</span>
+<span class="nt">kind</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">ConfigMap</span>
+<span class="nt">metadata</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">network-segmentation-config</span>
+<span class="nt">data</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">network-zones.yaml</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">|</span>
+<span class="w"> </span><span class="no">zones:</span>
+<span class="w"> </span><span class="no">dmz:</span>
+<span class="w"> </span><span class="no">cidr: &quot;10.0.1.0/24&quot;</span>
+<span class="w"> </span><span class="no">purpose: &quot;External-facing services and load balancers&quot;</span>
+<span class="w"> </span><span class="no">security_level: &quot;high&quot;</span>
+<span class="w"> </span><span class="no">allowed_protocols: [&quot;HTTPS&quot;, &quot;SSH&quot;]</span> <span class="w"> </span><span class="no">application:</span>
+<span class="w"> </span><span class="no">cidr: &quot;10.0.10.0/24&quot; </span>
+<span class="w"> </span><span class="no">purpose: &quot;Application services and APIs&quot;</span>
+<span class="w"> </span><span class="no">security_level: &quot;high&quot;</span>
+<span class="w"> </span><span class="no">allowed_protocols: [&quot;HTTP&quot;, &quot;HTTPS&quot;, &quot;gRPC&quot;]</span> <span class="w"> </span><span class="no">data:</span>
+<span class="w"> </span><span class="no">cidr: &quot;10.0.20.0/24&quot;</span>
+<span class="w"> </span><span class="no">purpose: &quot;Database and data storage services&quot;</span>
+<span class="w"> </span><span class="no">security_level: &quot;critical&quot;</span>
+<span class="w"> </span><span class="no">allowed_protocols: [&quot;PostgreSQL&quot;, &quot;MySQL&quot;, &quot;MongoDB&quot;]</span> <span class="w"> </span><span class="no">management:</span>
+<span class="w"> </span><span class="no">cidr: &quot;10.0.30.0/24&quot;</span>
+<span class="w"> </span><span class="no">purpose: &quot;Administrative and monitoring services&quot;</span>
+<span class="w"> </span><span class="no">security_level: &quot;critical&quot;</span>
+<span class="w"> </span><span class="no">allowed_protocols: [&quot;SSH&quot;, &quot;SNMP&quot;, &quot;HTTPS&quot;]</span> <span class="w"> </span><span class="no">oob:</span>
+<span class="w"> </span><span class="no">cidr: &quot;10.0.40.0/24&quot;</span>
+<span class="w"> </span><span class="no">purpose: &quot;Out-of-band management network&quot;</span>
+<span class="w"> </span><span class="no">security_level: &quot;critical&quot;</span>
+<span class="w"> </span><span class="no">allowed_protocols: [&quot;SSH&quot;, &quot;IPMI&quot;, &quot;Serial Console&quot;]</span> <span class="w"> </span><span class="no">firewall_rules:</span>
+<span class="w"> </span><span class="no">- name: &quot;DMZ to Application&quot;</span>
+<span class="w"> </span><span class="no">from_zone: &quot;dmz&quot;</span>
+<span class="w"> </span><span class="no">to_zone: &quot;application&quot;</span>
+<span class="w"> </span><span class="no">action: &quot;allow&quot;</span>
+<span class="w"> </span><span class="no">protocols: [&quot;HTTPS&quot;]</span>
+<span class="w"> </span><span class="no">logging: true</span> <span class="w"> </span><span class="no">- name: &quot;Application to Data&quot;</span>
+<span class="w"> </span><span class="no">from_zone: &quot;application&quot;</span>
+<span class="w"> </span><span class="no">to_zone: &quot;data&quot; </span>
+<span class="w"> </span><span class="no">action: &quot;allow&quot;</span>
+<span class="w"> </span><span class="no">protocols: [&quot;PostgreSQL&quot;, &quot;MySQL&quot;]</span>
+<span class="w"> </span><span class="no">logging: true</span> <span class="w"> </span><span class="no">- name: &quot;Management Access&quot;</span>
+<span class="w"> </span><span class="no">from_zone: &quot;management&quot;</span>
+<span class="w"> </span><span class="no">to_zone: &quot;*&quot;</span>
+<span class="w"> </span><span class="no">action: &quot;allow&quot;</span>
+<span class="w"> </span><span class="no">protocols: [&quot;SSH&quot;, &quot;HTTPS&quot;]</span>
+<span class="w"> </span><span class="no">conditions: [&quot;source_ip_whitelist&quot;]</span>
+<span class="w"> </span><span class="no">logging: true</span> <span class="w"> </span><span class="no">- name: &quot;Default Deny&quot;</span>
+<span class="w"> </span><span class="no">from_zone: &quot;*&quot;</span>
+<span class="w"> </span><span class="no">to_zone: &quot;*&quot;</span>
+<span class="w"> </span><span class="no">action: &quot;deny&quot;</span>
+<span class="w"> </span><span class="no">logging: true</span>
+</code></pre></div> <h3>Identity and Access Management (IAM)</h3>
+<h4>HashiCorp Vault Integration</h4>
+<div class="codehilite"><pre><span></span><code><span class="c1"># Vault authentication and authorization configuration</span>
+<span class="nt">apiVersion</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">v1</span>
+<span class="nt">kind</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">ConfigMap</span>
+<span class="nt">metadata</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">vault-auth-config</span>
+<span class="nt">data</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">vault-config.hcl</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">|</span>
+<span class="w"> </span><span class="no"># Kubernetes authentication method</span>
+<span class="w"> </span><span class="no">auth &quot;kubernetes&quot; {</span>
+<span class="w"> </span><span class="no">type = &quot;kubernetes&quot;</span>
+<span class="w"> </span><span class="no">}</span> <span class="w"> </span><span class="no"># Database secrets engine</span>
+<span class="w"> </span><span class="no">secrets &quot;database&quot; {</span>
+<span class="w"> </span><span class="no">type = &quot;database&quot;</span>
+<span class="w"> </span><span class="no">}</span> <span class="w"> </span><span class="no"># PKI secrets engine for certificate management</span>
+<span class="w"> </span><span class="no">secrets &quot;pki&quot; {</span>
+<span class="w"> </span><span class="no">type = &quot;pki&quot;</span>
+<span class="w"> </span><span class="no">}</span> <span class="w"> </span><span class="no"># Policies for different service roles</span>
+<span class="w"> </span><span class="no">policy &quot;wireless-billing-policy&quot; {</span>
+<span class="w"> </span><span class="no">path &quot;database/creds/billing-readonly&quot; {</span>
+<span class="w"> </span><span class="no">capabilities = [&quot;read&quot;]</span>
+<span class="w"> </span><span class="no">}</span> <span class="w"> </span><span class="no">path &quot;database/creds/billing-readwrite&quot; {</span>
+<span class="w"> </span><span class="no">capabilities = [&quot;read&quot;]</span>
+<span class="w"> </span><span class="no">}</span> <span class="w"> </span><span class="no">path &quot;pki/issue/wireless-services&quot; {</span>
+<span class="w"> </span><span class="no">capabilities = [&quot;create&quot;, &quot;update&quot;]</span>
+<span class="w"> </span><span class="no">}</span> <span class="w"> </span><span class="no">path &quot;secret/data/wireless-billing/*&quot; {</span>
+<span class="w"> </span><span class="no">capabilities = [&quot;read&quot;]</span>
+<span class="w"> </span><span class="no">}</span>
+<span class="w"> </span><span class="no">}</span> <span class="w"> </span><span class="no">policy &quot;wireless-admin-policy&quot; {</span>
+<span class="w"> </span><span class="no">path &quot;database/creds/admin-readonly&quot; {</span>
+<span class="w"> </span><span class="no">capabilities = [&quot;read&quot;]</span>
+<span class="w"> </span><span class="no">}</span> <span class="w"> </span><span class="no">path &quot;secret/data/wireless-admin/*&quot; {</span>
+<span class="w"> </span><span class="no">capabilities = [&quot;read&quot;, &quot;create&quot;, &quot;update&quot;, &quot;delete&quot;]</span>
+<span class="w"> </span><span class="no">}</span> <span class="w"> </span><span class="no">path &quot;pki/issue/admin-services&quot; {</span>
+<span class="w"> </span><span class="no">capabilities = [&quot;create&quot;, &quot;update&quot;]</span>
+<span class="w"> </span><span class="no">}</span>
+<span class="w"> </span><span class="no">}</span> <span class="w"> </span><span class="no"># Role bindings for Kubernetes service accounts</span>
+<span class="w"> </span><span class="no">role &quot;wireless-billing&quot; {</span>
+<span class="w"> </span><span class="no">bound_service_account_names = [&quot;wireless-billing&quot;]</span>
+<span class="w"> </span><span class="no">bound_service_account_namespaces = [&quot;telecommunications&quot;]</span>
+<span class="w"> </span><span class="no">policies = [&quot;wireless-billing-policy&quot;]</span>
+<span class="w"> </span><span class="no">ttl = &quot;1h&quot;</span>
+<span class="w"> </span><span class="no">max_ttl = &quot;24h&quot;</span>
+<span class="w"> </span><span class="no">}</span> <span class="w"> </span><span class="no">role &quot;wireless-admin&quot; {</span>
+<span class="w"> </span><span class="no">bound_service_account_names = [&quot;wireless-admin&quot;]</span>
+<span class="w"> </span><span class="no">bound_service_account_namespaces = [&quot;telecommunications&quot;]</span>
+<span class="w"> </span><span class="no">policies = [&quot;wireless-admin-policy&quot;] </span>
+<span class="w"> </span><span class="no">ttl = &quot;1h&quot;</span>
+<span class="w"> </span><span class="no">max_ttl = &quot;24h&quot;</span>
+<span class="w"> </span><span class="no">}</span> <span class="nn">---</span>
+<span class="c1"># Service account configuration with Vault annotation</span>
+<span class="nt">apiVersion</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">v1</span>
+<span class="nt">kind</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">ServiceAccount</span>
+<span class="nt">metadata</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">wireless-billing</span>
+<span class="w"> </span><span class="nt">namespace</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">telecommunications</span>
+<span class="w"> </span><span class="nt">annotations</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">vault.hashicorp.com/agent-inject</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;true&quot;</span>
+<span class="w"> </span><span class="nt">vault.hashicorp.com/role</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;wireless-billing&quot;</span>
+<span class="w"> </span><span class="nt">vault.hashicorp.com/agent-inject-secret-db-creds</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;database/creds/billing-readwrite&quot;</span>
+<span class="w"> </span><span class="nt">vault.hashicorp.com/agent-inject-template-db-creds</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">|</span>
+<span class="w"> </span><span class="no">{{- with secret &quot;database/creds/billing-readwrite&quot; -}}</span>
+<span class="w"> </span><span class="no">export DB_USERNAME=&quot;{{ .Data.username }}&quot;</span>
+<span class="w"> </span><span class="no">export DB_PASSWORD=&quot;{{ .Data.password }}&quot;</span>
+<span class="w"> </span><span class="no">{{- end -}}</span>
+</code></pre></div> <h4>Role-Based Access Control (RBAC)</h4>
+<div class="codehilite"><pre><span></span><code><span class="c1"># Kubernetes RBAC for telecommunications services</span>
+<span class="nt">apiVersion</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">rbac.authorization.k8s.io/v1</span>
+<span class="nt">kind</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Role</span>
+<span class="nt">metadata</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">namespace</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">telecommunications</span>
+<span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">wireless-service-operator</span>
+<span class="nt">rules</span><span class="p">:</span>
+<span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">apiGroups</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="s">&quot;&quot;</span><span class="p p-Indicator">]</span>
+<span class="w"> </span><span class="nt">resources</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="s">&quot;pods&quot;</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="s">&quot;services&quot;</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="s">&quot;endpoints&quot;</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="s">&quot;configmaps&quot;</span><span class="p p-Indicator">]</span>
+<span class="w"> </span><span class="nt">verbs</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="s">&quot;get&quot;</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="s">&quot;list&quot;</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="s">&quot;watch&quot;</span><span class="p p-Indicator">]</span>
+<span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">apiGroups</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="s">&quot;apps&quot;</span><span class="p p-Indicator">]</span>
+<span class="w"> </span><span class="nt">resources</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="s">&quot;deployments&quot;</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="s">&quot;replicasets&quot;</span><span class="p p-Indicator">]</span>
+<span class="w"> </span><span class="nt">verbs</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="s">&quot;get&quot;</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="s">&quot;list&quot;</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="s">&quot;watch&quot;</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="s">&quot;create&quot;</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="s">&quot;update&quot;</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="s">&quot;patch&quot;</span><span class="p p-Indicator">]</span>
+<span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">apiGroups</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="s">&quot;networking.k8s.io&quot;</span><span class="p p-Indicator">]</span>
+<span class="w"> </span><span class="nt">resources</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="s">&quot;networkpolicies&quot;</span><span class="p p-Indicator">]</span>
+<span class="w"> </span><span class="nt">verbs</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="s">&quot;get&quot;</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="s">&quot;list&quot;</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="s">&quot;watch&quot;</span><span class="p p-Indicator">]</span> <span class="nn">---</span>
+<span class="nt">apiVersion</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">rbac.authorization.k8s.io/v1</span>
+<span class="nt">kind</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Role</span>
+<span class="nt">metadata</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">namespace</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">telecommunications</span>
+<span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">wireless-service-admin</span>
+<span class="nt">rules</span><span class="p">:</span>
+<span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">apiGroups</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="s">&quot;*&quot;</span><span class="p p-Indicator">]</span>
+<span class="w"> </span><span class="nt">resources</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="s">&quot;*&quot;</span><span class="p p-Indicator">]</span>
+<span class="w"> </span><span class="nt">verbs</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="s">&quot;*&quot;</span><span class="p p-Indicator">]</span> <span class="nn">---</span>
+<span class="nt">apiVersion</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">rbac.authorization.k8s.io/v1</span>
+<span class="nt">kind</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">RoleBinding</span>
+<span class="nt">metadata</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">wireless-operators</span>
+<span class="w"> </span><span class="nt">namespace</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">telecommunications</span>
+<span class="nt">subjects</span><span class="p">:</span>
+<span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">kind</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">User</span>
+<span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">jagannath@telecom.com</span>
+<span class="w"> </span><span class="nt">apiGroup</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">rbac.authorization.k8s.io</span>
+<span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">kind</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Group</span>
+<span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">telecom:wireless-operators</span>
+<span class="w"> </span><span class="nt">apiGroup</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">rbac.authorization.k8s.io</span>
+<span class="nt">roleRef</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">kind</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Role</span>
+<span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">wireless-service-operator</span>
+<span class="w"> </span><span class="nt">apiGroup</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">rbac.authorization.k8s.io</span> <span class="nn">---</span>
+<span class="nt">apiVersion</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">rbac.authorization.k8s.io/v1</span>
+<span class="nt">kind</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">RoleBinding</span>
+<span class="nt">metadata</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">wireless-admins</span>
+<span class="w"> </span><span class="nt">namespace</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">telecommunications</span>
+<span class="nt">subjects</span><span class="p">:</span>
+<span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">kind</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">User</span>
+<span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">security-admin@telecom.com</span>
+<span class="w"> </span><span class="nt">apiGroup</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">rbac.authorization.k8s.io</span>
+<span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">kind</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Group</span>
+<span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">telecom:security-admins</span>
+<span class="w"> </span><span class="nt">apiGroup</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">rbac.authorization.k8s.io</span>
+<span class="nt">roleRef</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">kind</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Role</span>
+<span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">wireless-service-admin</span>
+<span class="w"> </span><span class="nt">apiGroup</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">rbac.authorization.k8s.io</span>
+</code></pre></div> <h3>Data Protection and Encryption</h3>
+<h4>Encryption in Transit</h4>
+<div class="codehilite"><pre><span></span><code><span class="c1"># TLS configuration for inter-service communication</span>
+<span class="nt">apiVersion</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">networking.istio.io/v1beta1</span>
+<span class="nt">kind</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">DestinationRule</span>
+<span class="nt">metadata</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">wireless-services-tls</span>
+<span class="w"> </span><span class="nt">namespace</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">telecommunications</span>
+<span class="nt">spec</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">host</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;*.telecommunications.svc.cluster.local&quot;</span>
+<span class="w"> </span><span class="nt">trafficPolicy</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">tls</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">mode</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">ISTIO_MUTUAL</span><span class="w"> </span><span class="c1"># Mutual TLS for all communications</span>
+<span class="w"> </span><span class="nt">minProtocolVersion</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">TLSV1_3</span>
+<span class="w"> </span><span class="nt">cipherSuites</span><span class="p">:</span>
+<span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">ECDHE-RSA-AES256-GCM-SHA384</span>
+<span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">ECDHE-RSA-CHACHA20-POLY1305</span> <span class="nn">---</span>
+<span class="c1"># Certificate management with cert-manager</span>
+<span class="nt">apiVersion</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">cert-manager.io/v1</span>
+<span class="nt">kind</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Certificate</span>
+<span class="nt">metadata</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">wireless-services-tls</span>
+<span class="w"> </span><span class="nt">namespace</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">telecommunications</span>
+<span class="nt">spec</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">secretName</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">wireless-services-tls-secret</span>
+<span class="w"> </span><span class="nt">issuerRef</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">internal-ca-issuer</span>
+<span class="w"> </span><span class="nt">kind</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">ClusterIssuer</span>
+<span class="w"> </span><span class="nt">commonName</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">wireless-services.telecommunications.svc.cluster.local</span>
+<span class="w"> </span><span class="nt">dnsNames</span><span class="p">:</span>
+<span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">wireless-billing.telecommunications.svc.cluster.local</span>
+<span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">wireless-admin.telecommunications.svc.cluster.local</span>
+<span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">wireless-manager.telecommunications.svc.cluster.local</span>
+<span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="s">&quot;*.telecommunications.svc.cluster.local&quot;</span>
+<span class="w"> </span><span class="nt">duration</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">2160h</span><span class="w"> </span><span class="c1"># 90 days</span>
+<span class="w"> </span><span class="nt">renewBefore</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">360h</span><span class="w"> </span><span class="c1"># 15 days before expiry</span> <span class="nn">---</span>
+<span class="c1"># Ingress with TLS termination</span>
+<span class="nt">apiVersion</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">networking.k8s.io/v1</span>
+<span class="nt">kind</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Ingress</span>
+<span class="nt">metadata</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">wireless-services-ingress</span>
+<span class="w"> </span><span class="nt">namespace</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">telecommunications</span>
+<span class="w"> </span><span class="nt">annotations</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">nginx.ingress.kubernetes.io/ssl-protocols</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;TLSv1.3&quot;</span>
+<span class="w"> </span><span class="nt">nginx.ingress.kubernetes.io/ssl-ciphers</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;ECDHE-RSA-AES256-GCM-SHA384&quot;</span>
+<span class="w"> </span><span class="nt">nginx.ingress.kubernetes.io/force-ssl-redirect</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;true&quot;</span>
+<span class="w"> </span><span class="nt">nginx.ingress.kubernetes.io/backend-protocol</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;HTTPS&quot;</span>
+<span class="nt">spec</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">tls</span><span class="p">:</span>
+<span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">hosts</span><span class="p">:</span>
+<span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">api.wireless.telecom.com</span>
+<span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">admin.wireless.telecom.com</span>
+<span class="w"> </span><span class="nt">secretName</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">wireless-external-tls-secret</span>
+<span class="w"> </span><span class="nt">rules</span><span class="p">:</span>
+<span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">host</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">api.wireless.telecom.com</span>
+<span class="w"> </span><span class="nt">http</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">paths</span><span class="p">:</span>
+<span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">path</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">/billing</span>
+<span class="w"> </span><span class="nt">pathType</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Prefix</span>
+<span class="w"> </span><span class="nt">backend</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">service</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">wireless-billing</span>
+<span class="w"> </span><span class="nt">port</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">number</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">8443</span>
+<span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">host</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">admin.wireless.telecom.com</span>
+<span class="w"> </span><span class="nt">http</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">paths</span><span class="p">:</span>
+<span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">path</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">/</span>
+<span class="w"> </span><span class="nt">pathType</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Prefix</span>
+<span class="w"> </span><span class="nt">backend</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">service</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">wireless-admin</span>
+<span class="w"> </span><span class="nt">port</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">number</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">8443</span>
+</code></pre></div> <h4>Encryption at Rest</h4>
+<div class="codehilite"><pre><span></span><code><span class="c1"># Storage encryption configuration</span>
+<span class="nt">apiVersion</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">storage.k8s.io/v1</span>
+<span class="nt">kind</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">StorageClass</span>
+<span class="nt">metadata</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">encrypted-storage</span>
+<span class="nt">provisioner</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">kubernetes.io/aws-ebs</span>
+<span class="nt">parameters</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">gp3</span>
+<span class="w"> </span><span class="nt">encrypted</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;true&quot;</span>
+<span class="w"> </span><span class="nt">kmsKeyId</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;arn:aws:kms:us-east-1:123456789012:key/12345678-1234-1234-1234-123456789012&quot;</span>
+<span class="nt">volumeBindingMode</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">WaitForFirstConsumer</span>
+<span class="nt">allowVolumeExpansion</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span> <span class="nn">---</span>
+<span class="c1"># Database encryption configuration</span>
+<span class="nt">apiVersion</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">v1</span>
+<span class="nt">kind</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">ConfigMap</span>
+<span class="nt">metadata</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">database-encryption-config</span>
+<span class="nt">data</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">postgresql.conf</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">|</span>
+<span class="w"> </span><span class="no"># Enable TLS</span>
+<span class="w"> </span><span class="no">ssl = on</span>
+<span class="w"> </span><span class="no">ssl_cert_file = &#39;/etc/ssl/certs/postgresql.crt&#39;</span>
+<span class="w"> </span><span class="no">ssl_key_file = &#39;/etc/ssl/private/postgresql.key&#39;</span>
+<span class="w"> </span><span class="no">ssl_ca_file = &#39;/etc/ssl/certs/ca.crt&#39;</span>
+<span class="w"> </span><span class="no">ssl_crl_file = &#39;&#39;</span>
+<span class="w"> </span><span class="no">ssl_protocols = &#39;TLSv1.2,TLSv1.3&#39;</span>
+<span class="w"> </span><span class="no">ssl_ciphers = &#39;ECDHE+AESGCM:ECDHE+CHACHA20:DHE+AESGCM:DHE+CHACHA20:!aNULL:!MD5:!DSS&#39;</span> <span class="w"> </span><span class="no"># Enable data encryption</span>
+<span class="w"> </span><span class="no">shared_preload_libraries = &#39;pg_stat_statements,pg_tde&#39;</span> <span class="w"> </span><span class="no"># Audit logging</span>
+<span class="w"> </span><span class="no">log_statement = &#39;all&#39;</span>
+<span class="w"> </span><span class="no">log_connections = on</span>
+<span class="w"> </span><span class="no">log_disconnections = on</span>
+<span class="w"> </span><span class="no">log_checkpoints = on</span>
+<span class="w"> </span><span class="no">log_lock_waits = on</span> <span class="w"> </span><span class="nt">mysql.cnf</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">|</span>
+<span class="w"> </span><span class="no">[mysqld]</span>
+<span class="w"> </span><span class="no"># Enable SSL</span>
+<span class="w"> </span><span class="no">ssl=ON</span>
+<span class="w"> </span><span class="no">ssl-cert=/etc/mysql/ssl/mysql.crt</span>
+<span class="w"> </span><span class="no">ssl-key=/etc/mysql/ssl/mysql.key</span>
+<span class="w"> </span><span class="no">ssl-ca=/etc/mysql/ssl/ca.crt</span>
+<span class="w"> </span><span class="no">require_secure_transport=ON</span>
+<span class="w"> </span><span class="no">tls_version=TLSv1.2,TLSv1.3</span> <span class="w"> </span><span class="no"># Enable binary logging with encryption</span>
+<span class="w"> </span><span class="no">log-bin=/var/lib/mysql/binlog</span>
+<span class="w"> </span><span class="no">binlog-encrypt=ON</span> <span class="w"> </span><span class="no"># Enable data-at-rest encryption</span>
+<span class="w"> </span><span class="no">innodb-encrypt-tables=ON</span>
+<span class="w"> </span><span class="no">innodb-encrypt-log=ON</span>
+<span class="w"> </span><span class="no">innodb-encryption-threads=4</span> <span class="w"> </span><span class="no"># Audit logging</span>
+<span class="w"> </span><span class="no">plugin-load-add=audit_log.so</span>
+<span class="w"> </span><span class="no">audit_log_policy=ALL</span>
+<span class="w"> </span><span class="no">audit_log_format=JSON</span>
+</code></pre></div> <h3>Application Security Controls</h3>
+<h4>Container Security</h4>
+<div class="codehilite"><pre><span></span><code><span class="c1"># Pod Security Standards enforcement</span>
+<span class="nt">apiVersion</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">v1</span>
+<span class="nt">kind</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Namespace</span>
+<span class="nt">metadata</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">telecommunications</span>
+<span class="w"> </span><span class="nt">labels</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">pod-security.kubernetes.io/enforce</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">restricted</span>
+<span class="w"> </span><span class="nt">pod-security.kubernetes.io/audit</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">restricted</span>
+<span class="w"> </span><span class="nt">pod-security.kubernetes.io/warn</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">restricted</span> <span class="nn">---</span>
+<span class="c1"># Security context for wireless services</span>
+<span class="nt">apiVersion</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">apps/v1</span>
+<span class="nt">kind</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Deployment</span>
+<span class="nt">metadata</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">wireless-billing-secure</span>
+<span class="w"> </span><span class="nt">namespace</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">telecommunications</span>
+<span class="nt">spec</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">replicas</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">3</span>
+<span class="w"> </span><span class="nt">selector</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">matchLabels</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">app</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">wireless-billing</span>
+<span class="w"> </span><span class="nt">template</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">metadata</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">labels</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">app</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">wireless-billing</span>
+<span class="w"> </span><span class="nt">spec</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">serviceAccount</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">wireless-billing</span>
+<span class="w"> </span><span class="nt">securityContext</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">runAsNonRoot</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
+<span class="w"> </span><span class="nt">runAsUser</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1000</span>
+<span class="w"> </span><span class="nt">runAsGroup</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1000</span>
+<span class="w"> </span><span class="nt">fsGroup</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1000</span>
+<span class="w"> </span><span class="nt">seccompProfile</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">RuntimeDefault</span>
+<span class="w"> </span><span class="nt">containers</span><span class="p">:</span>
+<span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">wireless-billing</span>
+<span class="w"> </span><span class="nt">image</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">telecom/wireless-billing:secure-v2.1.0</span>
+<span class="w"> </span><span class="nt">securityContext</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">allowPrivilegeEscalation</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">false</span>
+<span class="w"> </span><span class="nt">readOnlyRootFilesystem</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
+<span class="w"> </span><span class="nt">runAsNonRoot</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
+<span class="w"> </span><span class="nt">runAsUser</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1000</span>
+<span class="w"> </span><span class="nt">capabilities</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">drop</span><span class="p">:</span>
+<span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">ALL</span>
+<span class="w"> </span><span class="nt">resources</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">limits</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">memory</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;2Gi&quot;</span>
+<span class="w"> </span><span class="nt">cpu</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;1000m&quot;</span>
+<span class="w"> </span><span class="nt">requests</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">memory</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;1Gi&quot;</span>
+<span class="w"> </span><span class="nt">cpu</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;500m&quot;</span>
+<span class="w"> </span><span class="nt">volumeMounts</span><span class="p">:</span>
+<span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">app-config</span>
+<span class="w"> </span><span class="nt">mountPath</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">/app/config</span>
+<span class="w"> </span><span class="nt">readOnly</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
+<span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">temp-storage</span>
+<span class="w"> </span><span class="nt">mountPath</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">/tmp</span>
+<span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">vault-secrets</span>
+<span class="w"> </span><span class="nt">mountPath</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">/vault/secrets</span>
+<span class="w"> </span><span class="nt">readOnly</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
+<span class="w"> </span><span class="nt">livenessProbe</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">httpGet</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">path</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">/health</span>
+<span class="w"> </span><span class="nt">port</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">8080</span>
+<span class="w"> </span><span class="nt">scheme</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">HTTP</span>
+<span class="w"> </span><span class="nt">initialDelaySeconds</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">30</span>
+<span class="w"> </span><span class="nt">periodSeconds</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">10</span>
+<span class="w"> </span><span class="nt">readinessProbe</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">httpGet</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">path</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">/ready</span>
+<span class="w"> </span><span class="nt">port</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">8080</span>
+<span class="w"> </span><span class="nt">scheme</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">HTTP</span>
+<span class="w"> </span><span class="nt">initialDelaySeconds</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">5</span>
+<span class="w"> </span><span class="nt">periodSeconds</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">5</span>
+<span class="w"> </span><span class="nt">volumes</span><span class="p">:</span>
+<span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">app-config</span>
+<span class="w"> </span><span class="nt">configMap</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">wireless-billing-config</span>
+<span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">temp-storage</span>
+<span class="w"> </span><span class="nt">emptyDir</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">sizeLimit</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1Gi</span>
+<span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">vault-secrets</span>
+<span class="w"> </span><span class="nt">secret</span><span class="p">:</span>
+<span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">&lt;REDACTED&gt; wireless-billing-vault-secrets</span>
+</code></pre></div> <h4>Application-Level Security</h4>
+<div class="codehilite"><pre><span></span><code><span class="c1"># Web Application Firewall (WAF) configuration</span>
+<span class="nt">apiVersion</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">networking.k8s.io/v1</span>
+<span class="nt">kind</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Ingress</span>
+<span class="nt">metadata</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">wireless-api-waf</span>
+<span class="w"> </span><span class="nt">namespace</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">telecommunications</span>
+<span class="w"> </span><span class="nt">annotations</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">nginx.ingress.kubernetes.io/modsecurity-snippet</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">|</span>
+<span class="w"> </span><span class="no">SecRuleEngine On</span>
+<span class="w"> </span><span class="no">SecRequestBodyAccess On</span>
+<span class="w"> </span><span class="no">SecRule REQUEST_HEADERS:Content-Type &quot;application/json&quot; \</span>
+<span class="w"> </span><span class="no">&quot;id:&#39;200001&#39;,phase:1,t:none,t:lowercase,pass,nolog,ctl:requestBodyProcessor=JSON&quot;</span> <span class="w"> </span><span class="no"># Block SQL injection attempts</span>
+<span class="w"> </span><span class="no">SecRule ARGS &quot;@detectSQLi&quot; \</span>
+<span class="w"> </span><span class="no">&quot;id:&#39;200002&#39;,phase:2,block,msg:&#39;SQL Injection Attack Detected&#39;,logdata:&#39;Matched Data: %{MATCHED_VAR} found within %{MATCHED_VAR_NAME}&#39;&quot;</span> <span class="w"> </span><span class="no"># Block XSS attempts</span>
+<span class="w"> </span><span class="no">SecRule ARGS &quot;@detectXSS&quot; \</span>
+<span class="w"> </span><span class="no">&quot;id:&#39;200003&#39;,phase:2,block,msg:&#39;XSS Attack Detected&#39;,logdata:&#39;Matched Data: %{MATCHED_VAR} found within %{MATCHED_VAR_NAME}&#39;&quot;</span> <span class="w"> </span><span class="no"># Rate limiting</span>
+<span class="w"> </span><span class="no">SecAction &quot;id:&#39;200004&#39;,phase:1,nolog,pass,initcol:IP=%{REMOTE_ADDR},setvar:IP.requests_per_minute=+1,expirevar:IP.requests_per_minute=60&quot;</span>
+<span class="w"> </span><span class="no">SecRule IP:REQUESTS_PER_MINUTE &quot;@gt 100&quot; \</span>
+<span class="w"> </span><span class="no">&quot;id:&#39;200005&#39;,phase:1,deny,status:429,msg:&#39;Rate limit exceeded&#39;&quot;</span> <span class="w"> </span><span class="nt">nginx.ingress.kubernetes.io/rate-limit</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;100&quot;</span>
+<span class="w"> </span><span class="nt">nginx.ingress.kubernetes.io/rate-limit-window</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;1m&quot;</span>
+<span class="nt">spec</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">ingressClassName</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">nginx-waf</span>
+<span class="w"> </span><span class="nt">rules</span><span class="p">:</span>
+<span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">host</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">api.wireless.telecom.com</span>
+<span class="w"> </span><span class="nt">http</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">paths</span><span class="p">:</span>
+<span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">path</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">/api/v1</span>
+<span class="w"> </span><span class="nt">pathType</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Prefix</span>
+<span class="w"> </span><span class="nt">backend</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">service</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">wireless-api-gateway</span>
+<span class="w"> </span><span class="nt">port</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">number</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">8443</span>
+</code></pre></div> <h2>Security Monitoring and Incident Response</h2>
+<h3>Security Information and Event Management (SIEM)</h3>
+<h4>Centralized Logging Architecture</h4>
+<div class="codehilite"><pre><span></span><code><span class="c1"># Fluentd configuration for security log collection</span>
+<span class="nt">apiVersion</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">v1</span>
+<span class="nt">kind</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">ConfigMap</span>
+<span class="nt">metadata</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">fluentd-security-config</span>
+<span class="nt">data</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">fluent.conf</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">|</span>
+<span class="w"> </span><span class="no"># Input sources for security events</span>
+<span class="w"> </span><span class="no">&lt;source&gt;</span>
+<span class="w"> </span><span class="no">@type tail</span>
+<span class="w"> </span><span class="no">@id audit-logs</span>
+<span class="w"> </span><span class="no">path /var/log/audit/audit.log</span>
+<span class="w"> </span><span class="no">pos_file /var/log/fluentd-audit.log.pos</span>
+<span class="w"> </span><span class="no">tag kubernetes.audit</span>
+<span class="w"> </span><span class="no">format json</span>
+<span class="w"> </span><span class="no">time_key timestamp</span>
+<span class="w"> </span><span class="no">time_format %Y-%m-%dT%H:%M:%S.%NZ</span>
+<span class="w"> </span><span class="no">&lt;/source&gt;</span> <span class="w"> </span><span class="no">&lt;source&gt;</span>
+<span class="w"> </span><span class="no">@type tail</span>
+<span class="w"> </span><span class="no">@id application-security</span>
+<span class="w"> </span><span class="no">path /var/log/containers/wireless-*-security.log</span>
+<span class="w"> </span><span class="no">pos_file /var/log/fluentd-app-security.log.pos</span>
+<span class="w"> </span><span class="no">tag kubernetes.application.security</span>
+<span class="w"> </span><span class="no">format multiline</span>
+<span class="w"> </span><span class="no">format_firstline /^\d{4}-\d{2}-\d{2}/</span>
+<span class="w"> </span><span class="no">format1 /^(?&lt;timestamp&gt;\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}) (?&lt;level&gt;\w+) (?&lt;source&gt;\w+) (?&lt;message&gt;.*)/</span>
+<span class="w"> </span><span class="no">&lt;/source&gt;</span> <span class="w"> </span><span class="no">&lt;source&gt;</span>
+<span class="w"> </span><span class="no">@type tail</span>
+<span class="w"> </span><span class="no">@id network-security</span>
+<span class="w"> </span><span class="no">path /var/log/iptables.log</span>
+<span class="w"> </span><span class="no">pos_file /var/log/fluentd-iptables.log.pos</span>
+<span class="w"> </span><span class="no">tag network.firewall</span>
+<span class="w"> </span><span class="no">format /^(?&lt;timestamp&gt;\w+ \d+ \d+:\d+:\d+) (?&lt;hostname&gt;\S+) kernel: (?&lt;message&gt;.*)/</span>
+<span class="w"> </span><span class="no">&lt;/source&gt;</span> <span class="w"> </span><span class="no"># Filters for security event enrichment</span>
+<span class="w"> </span><span class="no">&lt;filter kubernetes.audit&gt;</span>
+<span class="w"> </span><span class="no">@type record_transformer</span>
+<span class="w"> </span><span class="no">&lt;record&gt;</span>
+<span class="w"> </span><span class="no">security_domain &quot;kubernetes_api&quot;</span>
+<span class="w"> </span><span class="no">severity_level ${record[&quot;level&quot;] == &quot;Metadata&quot; ? &quot;info&quot; : &quot;warning&quot;}</span>
+<span class="w"> </span><span class="no">source_ip ${record[&quot;sourceIPs&quot;][0] if record[&quot;sourceIPs&quot;] else &quot;unknown&quot;}</span>
+<span class="w"> </span><span class="no">&lt;/record&gt;</span>
+<span class="w"> </span><span class="no">&lt;/filter&gt;</span> <span class="w"> </span><span class="no">&lt;filter kubernetes.application.security&gt;</span>
+<span class="w"> </span><span class="no">@type record_transformer</span>
+<span class="w"> </span><span class="no">&lt;record&gt;</span>
+<span class="w"> </span><span class="no">security_domain &quot;application&quot;</span>
+<span class="w"> </span><span class="no">severity_level ${record[&quot;level&quot;] == &quot;ERROR&quot; ? &quot;high&quot; : &quot;medium&quot;}</span>
+<span class="w"> </span><span class="no">&lt;/record&gt;</span>
+<span class="w"> </span><span class="no">&lt;/filter&gt;</span> <span class="w"> </span><span class="no"># Outputs to SIEM system</span>
+<span class="w"> </span><span class="no">&lt;match kubernetes.audit&gt;</span>
+<span class="w"> </span><span class="no">@type elasticsearch</span>
+<span class="w"> </span><span class="no">host elasticsearch-security.monitoring.svc.cluster.local</span>
+<span class="w"> </span><span class="no">port 9200</span>
+<span class="w"> </span><span class="no">index_name kubernetes-audit-logs</span>
+<span class="w"> </span><span class="no">type_name _doc</span>
+<span class="w"> </span><span class="no">include_tag_key true</span>
+<span class="w"> </span><span class="no">tag_key @log_name</span>
+<span class="w"> </span><span class="no">logstash_format true</span>
+<span class="w"> </span><span class="no">logstash_prefix kubernetes-audit</span>
+<span class="w"> </span><span class="no">&lt;buffer&gt;</span>
+<span class="w"> </span><span class="no">@type file</span>
+<span class="w"> </span><span class="no">path /var/log/fluentd-buffers/kubernetes-audit.buffer</span>
+<span class="w"> </span><span class="no">flush_mode interval</span>
+<span class="w"> </span><span class="no">flush_interval 5s</span>
+<span class="w"> </span><span class="no">chunk_limit_size 2M</span>
+<span class="w"> </span><span class="no">queue_limit_length 32</span>
+<span class="w"> </span><span class="no">retry_max_interval 30</span>
+<span class="w"> </span><span class="no">retry_forever true</span>
+<span class="w"> </span><span class="no">&lt;/buffer&gt;</span>
+<span class="w"> </span><span class="no">&lt;/match&gt;</span> <span class="w"> </span><span class="no">&lt;match kubernetes.application.security&gt;</span>
+<span class="w"> </span><span class="no">@type elasticsearch</span>
+<span class="w"> </span><span class="no">host elasticsearch-security.monitoring.svc.cluster.local</span>
+<span class="w"> </span><span class="no">port 9200</span>
+<span class="w"> </span><span class="no">index_name application-security-logs</span>
+<span class="w"> </span><span class="no">type_name _doc</span>
+<span class="w"> </span><span class="no">include_tag_key true</span>
+<span class="w"> </span><span class="no">tag_key @log_name</span>
+<span class="w"> </span><span class="no">logstash_format true</span>
+<span class="w"> </span><span class="no">logstash_prefix application-security</span>
+<span class="w"> </span><span class="no">&lt;buffer&gt;</span>
+<span class="w"> </span><span class="no">@type file</span>
+<span class="w"> </span><span class="no">path /var/log/fluentd-buffers/application-security.buffer</span>
+<span class="w"> </span><span class="no">flush_mode interval</span>
+<span class="w"> </span><span class="no">flush_interval 5s</span>
+<span class="w"> </span><span class="no">chunk_limit_size 2M</span>
+<span class="w"> </span><span class="no">queue_limit_length 32</span>
+<span class="w"> </span><span class="no">&lt;/buffer&gt;</span>
+<span class="w"> </span><span class="no">&lt;/match&gt;</span>
+</code></pre></div> <h4>Security Alerting Rules</h4>
+<div class="codehilite"><pre><span></span><code><span class="c1"># Prometheus alerting rules for security events</span>
+<span class="nt">groups</span><span class="p">:</span>
+<span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">security-alerts</span>
+<span class="w"> </span><span class="nt">rules</span><span class="p">:</span>
+<span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">alert</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">UnauthorizedKubernetesAPIAccess</span>
+<span class="w"> </span><span class="nt">expr</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">increase(kubernetes_audit_total{verb=&quot;create&quot;,objectRef_resource=&quot;pods&quot;,user!~&quot;system:.*|kubernetes-admin&quot;}[5m]) &gt; 0</span>
+<span class="w"> </span><span class="nt">for</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0m</span>
+<span class="w"> </span><span class="nt">labels</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">severity</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">high</span>
+<span class="w"> </span><span class="nt">security_domain</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">kubernetes</span>
+<span class="w"> </span><span class="nt">incident_type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">unauthorized_access</span>
+<span class="w"> </span><span class="nt">annotations</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">summary</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;Unauthorized</span><span class="nv"> </span><span class="s">pod</span><span class="nv"> </span><span class="s">creation</span><span class="nv"> </span><span class="s">attempt</span><span class="nv"> </span><span class="s">detected&quot;</span>
+<span class="w"> </span><span class="nt">description</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;User</span><span class="nv"> </span><span class="s">{{</span><span class="nv"> </span><span class="s">$labels.user</span><span class="nv"> </span><span class="s">}}</span><span class="nv"> </span><span class="s">attempted</span><span class="nv"> </span><span class="s">to</span><span class="nv"> </span><span class="s">create</span><span class="nv"> </span><span class="s">pods</span><span class="nv"> </span><span class="s">without</span><span class="nv"> </span><span class="s">proper</span><span class="nv"> </span><span class="s">authorization&quot;</span>
+<span class="w"> </span><span class="nt">remediation</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;Review</span><span class="nv"> </span><span class="s">user</span><span class="nv"> </span><span class="s">permissions</span><span class="nv"> </span><span class="s">and</span><span class="nv"> </span><span class="s">investigate</span><span class="nv"> </span><span class="s">potential</span><span class="nv"> </span><span class="s">compromise&quot;</span> <span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">alert</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">AbnormalNetworkTraffic</span>
+<span class="w"> </span><span class="nt">expr</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">rate(container_network_receive_bytes_total[5m]) &gt; 100000000</span><span class="w"> </span><span class="c1"># 100MB/s</span>
+<span class="w"> </span><span class="nt">for</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">2m</span>
+<span class="w"> </span><span class="nt">labels</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">severity</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">medium</span>
+<span class="w"> </span><span class="nt">security_domain</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">network</span>
+<span class="w"> </span><span class="nt">incident_type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">anomalous_traffic</span>
+<span class="w"> </span><span class="nt">annotations</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">summary</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;Abnormal</span><span class="nv"> </span><span class="s">network</span><span class="nv"> </span><span class="s">traffic</span><span class="nv"> </span><span class="s">detected</span><span class="nv"> </span><span class="s">in</span><span class="nv"> </span><span class="s">{{</span><span class="nv"> </span><span class="s">$labels.pod</span><span class="nv"> </span><span class="s">}}&quot;</span>
+<span class="w"> </span><span class="nt">description</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;Pod</span><span class="nv"> </span><span class="s">{{</span><span class="nv"> </span><span class="s">$labels.pod</span><span class="nv"> </span><span class="s">}}</span><span class="nv"> </span><span class="s">is</span><span class="nv"> </span><span class="s">receiving</span><span class="nv"> </span><span class="s">{{</span><span class="nv"> </span><span class="s">$value</span><span class="nv"> </span><span class="s">|</span><span class="nv"> </span><span class="s">humanize1024</span><span class="nv"> </span><span class="s">}}B/s</span><span class="nv"> </span><span class="s">of</span><span class="nv"> </span><span class="s">network</span><span class="nv"> </span><span class="s">traffic&quot;</span>
+<span class="w"> </span><span class="nt">remediation</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;Investigate</span><span class="nv"> </span><span class="s">potential</span><span class="nv"> </span><span class="s">DDoS</span><span class="nv"> </span><span class="s">or</span><span class="nv"> </span><span class="s">data</span><span class="nv"> </span><span class="s">exfiltration&quot;</span> <span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">alert</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">MultipleFailedLogins</span>
+<span class="w"> </span><span class="nt">expr</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">increase(authentication_failures_total[5m]) &gt; 10</span>
+<span class="w"> </span><span class="nt">for</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1m</span>
+<span class="w"> </span><span class="nt">labels</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">severity</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">high</span>
+<span class="w"> </span><span class="nt">security_domain</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">authentication</span>
+<span class="w"> </span><span class="nt">incident_type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">brute_force</span>
+<span class="w"> </span><span class="nt">annotations</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">summary</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;Multiple</span><span class="nv"> </span><span class="s">authentication</span><span class="nv"> </span><span class="s">failures</span><span class="nv"> </span><span class="s">detected&quot;</span>
+<span class="w"> </span><span class="nt">description</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;{{</span><span class="nv"> </span><span class="s">$value</span><span class="nv"> </span><span class="s">}}</span><span class="nv"> </span><span class="s">authentication</span><span class="nv"> </span><span class="s">failures</span><span class="nv"> </span><span class="s">from</span><span class="nv"> </span><span class="s">{{</span><span class="nv"> </span><span class="s">$labels.source_ip</span><span class="nv"> </span><span class="s">}}</span><span class="nv"> </span><span class="s">in</span><span class="nv"> </span><span class="s">the</span><span class="nv"> </span><span class="s">last</span><span class="nv"> </span><span class="s">5</span><span class="nv"> </span><span class="s">minutes&quot;</span>
+<span class="w"> </span><span class="nt">remediation</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;Block</span><span class="nv"> </span><span class="s">source</span><span class="nv"> </span><span class="s">IP</span><span class="nv"> </span><span class="s">and</span><span class="nv"> </span><span class="s">investigate</span><span class="nv"> </span><span class="s">credential</span><span class="nv"> </span><span class="s">compromise&quot;</span> <span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">alert</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">CriticalVulnerabilityDetected</span>
+<span class="w"> </span><span class="nt">expr</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">vulnerability_scanner_critical_count &gt; 0</span>
+<span class="w"> </span><span class="nt">for</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0m</span>
+<span class="w"> </span><span class="nt">labels</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">severity</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">critical</span>
+<span class="w"> </span><span class="nt">security_domain</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">vulnerability_management</span>
+<span class="w"> </span><span class="nt">incident_type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">security_vulnerability</span>
+<span class="w"> </span><span class="nt">annotations</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">summary</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;Critical</span><span class="nv"> </span><span class="s">security</span><span class="nv"> </span><span class="s">vulnerability</span><span class="nv"> </span><span class="s">detected&quot;</span>
+<span class="w"> </span><span class="nt">description</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;{{</span><span class="nv"> </span><span class="s">$value</span><span class="nv"> </span><span class="s">}}</span><span class="nv"> </span><span class="s">critical</span><span class="nv"> </span><span class="s">vulnerabilities</span><span class="nv"> </span><span class="s">found</span><span class="nv"> </span><span class="s">in</span><span class="nv"> </span><span class="s">{{</span><span class="nv"> </span><span class="s">$labels.container_image</span><span class="nv"> </span><span class="s">}}&quot;</span>
+<span class="w"> </span><span class="nt">remediation</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;Immediately</span><span class="nv"> </span><span class="s">patch</span><span class="nv"> </span><span class="s">or</span><span class="nv"> </span><span class="s">replace</span><span class="nv"> </span><span class="s">affected</span><span class="nv"> </span><span class="s">container</span><span class="nv"> </span><span class="s">image&quot;</span> <span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">alert</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">SuspiciousFileActivity</span>
+<span class="w"> </span><span class="nt">expr</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">increase(file_integrity_violations_total[5m]) &gt; 0</span>
+<span class="w"> </span><span class="nt">for</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0m</span>
+<span class="w"> </span><span class="nt">labels</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">severity</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">high</span>
+<span class="w"> </span><span class="nt">security_domain</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">file_integrity</span>
+<span class="w"> </span><span class="nt">incident_type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">unauthorized_modification</span>
+<span class="w"> </span><span class="nt">annotations</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">summary</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;Suspicious</span><span class="nv"> </span><span class="s">file</span><span class="nv"> </span><span class="s">modification</span><span class="nv"> </span><span class="s">detected&quot;</span>
+<span class="w"> </span><span class="nt">description</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;Unauthorized</span><span class="nv"> </span><span class="s">changes</span><span class="nv"> </span><span class="s">to</span><span class="nv"> </span><span class="s">critical</span><span class="nv"> </span><span class="s">files</span><span class="nv"> </span><span class="s">in</span><span class="nv"> </span><span class="s">{{</span><span class="nv"> </span><span class="s">$labels.pod</span><span class="nv"> </span><span class="s">}}&quot;</span>
+<span class="w"> </span><span class="nt">remediation</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;Investigate</span><span class="nv"> </span><span class="s">potential</span><span class="nv"> </span><span class="s">compromise</span><span class="nv"> </span><span class="s">and</span><span class="nv"> </span><span class="s">restore</span><span class="nv"> </span><span class="s">from</span><span class="nv"> </span><span class="s">backup&quot;</span>
+</code></pre></div> <h3>Automated Incident Response</h3>
+<h4>Security Runbooks</h4>
+<div class="codehilite"><pre><span></span><code><span class="ch">#!/bin/bash</span>
+<span class="c1"># security-incident-response.sh</span> <span class="nb">set</span><span class="w"> </span>-euo<span class="w"> </span>pipefail <span class="nv">INCIDENT_TYPE</span><span class="o">=</span><span class="nv">$1</span>
+<span class="nv">SEVERITY</span><span class="o">=</span><span class="nv">$2</span>
+<span class="nv">AFFECTED_SERVICE</span><span class="o">=</span><span class="si">${</span><span class="nv">3</span><span class="k">:-</span><span class="s2">&quot;unknown&quot;</span><span class="si">}</span>
+<span class="nv">SOURCE_IP</span><span class="o">=</span><span class="si">${</span><span class="nv">4</span><span class="k">:-</span><span class="s2">&quot;unknown&quot;</span><span class="si">}</span> <span class="nv">INCIDENT_ID</span><span class="o">=</span><span class="k">$(</span>date<span class="w"> </span>+%Y%m%d%H%M%S<span class="k">)</span>-<span class="k">$(</span>openssl<span class="w"> </span>rand<span class="w"> </span>-hex<span class="w"> </span><span class="m">4</span><span class="k">)</span>
+<span class="nv">INCIDENT_DIR</span><span class="o">=</span><span class="s2">&quot;/var/log/security-incidents/</span><span class="nv">$INCIDENT_ID</span><span class="s2">&quot;</span> <span class="c1"># Create incident directory and log</span>
+mkdir<span class="w"> </span>-p<span class="w"> </span><span class="s2">&quot;</span><span class="nv">$INCIDENT_DIR</span><span class="s2">&quot;</span>
+<span class="nb">echo</span><span class="w"> </span><span class="s2">&quot;</span><span class="k">$(</span>date<span class="w"> </span>-u<span class="w"> </span>-Iseconds<span class="k">)</span><span class="s2"> - Security incident </span><span class="nv">$INCIDENT_ID</span><span class="s2"> started&quot;</span><span class="w"> </span>&gt;<span class="w"> </span><span class="s2">&quot;</span><span class="nv">$INCIDENT_DIR</span><span class="s2">/incident.log&quot;</span>
+<span class="nb">echo</span><span class="w"> </span><span class="s2">&quot;Type: </span><span class="nv">$INCIDENT_TYPE</span><span class="s2">, Severity: </span><span class="nv">$SEVERITY</span><span class="s2">, Service: </span><span class="nv">$AFFECTED_SERVICE</span><span class="s2">, Source: </span><span class="nv">$SOURCE_IP</span><span class="s2">&quot;</span><span class="w"> </span>&gt;&gt;<span class="w"> </span><span class="s2">&quot;</span><span class="nv">$INCIDENT_DIR</span><span class="s2">/incident.log&quot;</span> log_action<span class="o">()</span><span class="w"> </span><span class="o">{</span>
+<span class="w"> </span><span class="nb">echo</span><span class="w"> </span><span class="s2">&quot;</span><span class="k">$(</span>date<span class="w"> </span>-u<span class="w"> </span>-Iseconds<span class="k">)</span><span class="s2"> - </span><span class="nv">$1</span><span class="s2">&quot;</span><span class="w"> </span>&gt;&gt;<span class="w"> </span><span class="s2">&quot;</span><span class="nv">$INCIDENT_DIR</span><span class="s2">/incident.log&quot;</span>
+<span class="w"> </span><span class="nb">echo</span><span class="w"> </span><span class="s2">&quot;</span><span class="nv">$1</span><span class="s2">&quot;</span>
+<span class="o">}</span> <span class="k">case</span><span class="w"> </span><span class="nv">$INCIDENT_TYPE</span><span class="w"> </span><span class="k">in</span>
+<span class="w"> </span><span class="s2">&quot;unauthorized_access&quot;</span><span class="o">)</span>
+<span class="w"> </span>log_action<span class="w"> </span><span class="s2">&quot;Responding to unauthorized access incident&quot;</span> <span class="w"> </span><span class="k">if</span><span class="w"> </span><span class="o">[[</span><span class="w"> </span><span class="s2">&quot;</span><span class="nv">$SEVERITY</span><span class="s2">&quot;</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="s2">&quot;high&quot;</span><span class="w"> </span><span class="o">||</span><span class="w"> </span><span class="s2">&quot;</span><span class="nv">$SEVERITY</span><span class="s2">&quot;</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="s2">&quot;critical&quot;</span><span class="w"> </span><span class="o">]]</span><span class="p">;</span><span class="w"> </span><span class="k">then</span>
+<span class="w"> </span><span class="c1"># Immediate containment actions</span>
+<span class="w"> </span>log_action<span class="w"> </span><span class="s2">&quot;Implementing immediate containment measures&quot;</span> <span class="w"> </span><span class="c1"># Block source IP</span>
+<span class="w"> </span><span class="k">if</span><span class="w"> </span><span class="o">[[</span><span class="w"> </span><span class="s2">&quot;</span><span class="nv">$SOURCE_IP</span><span class="s2">&quot;</span><span class="w"> </span>!<span class="o">=</span><span class="w"> </span><span class="s2">&quot;unknown&quot;</span><span class="w"> </span><span class="o">]]</span><span class="p">;</span><span class="w"> </span><span class="k">then</span>
+<span class="w"> </span>iptables<span class="w"> </span>-A<span class="w"> </span>INPUT<span class="w"> </span>-s<span class="w"> </span><span class="s2">&quot;</span><span class="nv">$SOURCE_IP</span><span class="s2">&quot;</span><span class="w"> </span>-j<span class="w"> </span>DROP
+<span class="w"> </span>log_action<span class="w"> </span><span class="s2">&quot;Blocked source IP: </span><span class="nv">$SOURCE_IP</span><span class="s2">&quot;</span>
+<span class="w"> </span><span class="k">fi</span> <span class="w"> </span><span class="c1"># Force session termination for affected service</span>
+<span class="w"> </span><span class="k">if</span><span class="w"> </span><span class="o">[[</span><span class="w"> </span><span class="s2">&quot;</span><span class="nv">$AFFECTED_SERVICE</span><span class="s2">&quot;</span><span class="w"> </span>!<span class="o">=</span><span class="w"> </span><span class="s2">&quot;unknown&quot;</span><span class="w"> </span><span class="o">]]</span><span class="p">;</span><span class="w"> </span><span class="k">then</span>
+<span class="w"> </span>kubectl<span class="w"> </span>delete<span class="w"> </span>pods<span class="w"> </span>-l<span class="w"> </span><span class="nv">app</span><span class="o">=</span><span class="s2">&quot;</span><span class="nv">$AFFECTED_SERVICE</span><span class="s2">&quot;</span><span class="w"> </span>-n<span class="w"> </span>telecommunications
+<span class="w"> </span>log_action<span class="w"> </span><span class="s2">&quot;Restarted pods for service: </span><span class="nv">$AFFECTED_SERVICE</span><span class="s2">&quot;</span>
+<span class="w"> </span><span class="k">fi</span> <span class="w"> </span><span class="c1"># Enable enhanced monitoring</span>
+<span class="w"> </span>kubectl<span class="w"> </span>patch<span class="w"> </span>deployment<span class="w"> </span><span class="s2">&quot;</span><span class="nv">$AFFECTED_SERVICE</span><span class="s2">&quot;</span><span class="w"> </span>-n<span class="w"> </span>telecommunications<span class="w"> </span>-p<span class="w"> </span><span class="s1">&#39;{&quot;spec&quot;:{&quot;template&quot;:{&quot;metadata&quot;:{&quot;annotations&quot;:{&quot;security.monitoring/enhanced&quot;:&quot;true&quot;}}}}}&#39;</span>
+<span class="w"> </span>log_action<span class="w"> </span><span class="s2">&quot;Enabled enhanced monitoring for </span><span class="nv">$AFFECTED_SERVICE</span><span class="s2">&quot;</span>
+<span class="w"> </span><span class="k">fi</span> <span class="w"> </span><span class="c1"># Collect evidence</span>
+<span class="w"> </span>log_action<span class="w"> </span><span class="s2">&quot;Collecting evidence&quot;</span>
+<span class="w"> </span>kubectl<span class="w"> </span>logs<span class="w"> </span>-l<span class="w"> </span><span class="nv">app</span><span class="o">=</span><span class="s2">&quot;</span><span class="nv">$AFFECTED_SERVICE</span><span class="s2">&quot;</span><span class="w"> </span>-n<span class="w"> </span>telecommunications<span class="w"> </span>--since<span class="o">=</span>1h<span class="w"> </span>&gt;<span class="w"> </span><span class="s2">&quot;</span><span class="nv">$INCIDENT_DIR</span><span class="s2">/service-logs.txt&quot;</span>
+<span class="w"> </span>kubectl<span class="w"> </span>get<span class="w"> </span>events<span class="w"> </span>-n<span class="w"> </span>telecommunications<span class="w"> </span>--sort-by<span class="o">=</span><span class="s1">&#39;.lastTimestamp&#39;</span><span class="w"> </span>&gt;<span class="w"> </span><span class="s2">&quot;</span><span class="nv">$INCIDENT_DIR</span><span class="s2">/kubernetes-events.txt&quot;</span> <span class="w"> </span><span class="c1"># Notify security team</span>
+<span class="w"> </span>curl<span class="w"> </span>-X<span class="w"> </span>POST<span class="w"> </span><span class="s2">&quot;</span><span class="nv">$SECURITY_WEBHOOK_URL</span><span class="s2">&quot;</span><span class="w"> </span><span class="se">\</span>
+<span class="w"> </span>-H<span class="w"> </span><span class="s2">&quot;Content-Type: application/json&quot;</span><span class="w"> </span><span class="se">\</span>
+<span class="w"> </span>-d<span class="w"> </span><span class="s2">&quot;{</span>
+<span class="s2"> \&quot;incident_id\&quot;: \&quot;</span><span class="nv">$INCIDENT_ID</span><span class="s2">\&quot;,</span>
+<span class="s2"> \&quot;type\&quot;: \&quot;</span><span class="nv">$INCIDENT_TYPE</span><span class="s2">\&quot;,</span>
+<span class="s2"> \&quot;severity\&quot;: \&quot;</span><span class="nv">$SEVERITY</span><span class="s2">\&quot;,</span>
+<span class="s2"> \&quot;service\&quot;: \&quot;</span><span class="nv">$AFFECTED_SERVICE</span><span class="s2">\&quot;,</span>
+<span class="s2"> \&quot;source_ip\&quot;: \&quot;</span><span class="nv">$SOURCE_IP</span><span class="s2">\&quot;,</span>
+<span class="s2"> \&quot;status\&quot;: \&quot;contained\&quot;,</span>
+<span class="s2"> \&quot;timestamp\&quot;: \&quot;</span><span class="k">$(</span>date<span class="w"> </span>-u<span class="w"> </span>-Iseconds<span class="k">)</span><span class="s2">\&quot;</span>
+<span class="s2"> }&quot;</span>
+<span class="w"> </span><span class="p">;;</span> <span class="w"> </span><span class="s2">&quot;brute_force&quot;</span><span class="o">)</span>
+<span class="w"> </span>log_action<span class="w"> </span><span class="s2">&quot;Responding to brute force attack&quot;</span> <span class="w"> </span><span class="c1"># Block attacking IP</span>
+<span class="w"> </span><span class="k">if</span><span class="w"> </span><span class="o">[[</span><span class="w"> </span><span class="s2">&quot;</span><span class="nv">$SOURCE_IP</span><span class="s2">&quot;</span><span class="w"> </span>!<span class="o">=</span><span class="w"> </span><span class="s2">&quot;unknown&quot;</span><span class="w"> </span><span class="o">]]</span><span class="p">;</span><span class="w"> </span><span class="k">then</span>
+<span class="w"> </span>iptables<span class="w"> </span>-A<span class="w"> </span>INPUT<span class="w"> </span>-s<span class="w"> </span><span class="s2">&quot;</span><span class="nv">$SOURCE_IP</span><span class="s2">&quot;</span><span class="w"> </span>-j<span class="w"> </span>DROP
+<span class="w"> </span>log_action<span class="w"> </span><span class="s2">&quot;Blocked brute force source IP: </span><span class="nv">$SOURCE_IP</span><span class="s2">&quot;</span> <span class="w"> </span><span class="c1"># Add to blacklist for 24 hours</span>
+<span class="w"> </span><span class="nb">echo</span><span class="w"> </span><span class="s2">&quot;</span><span class="nv">$SOURCE_IP</span><span class="s2"> </span><span class="k">$(</span>date<span class="w"> </span>-d<span class="w"> </span><span class="s1">&#39;+24 hours&#39;</span><span class="w"> </span>+%s<span class="k">)</span><span class="s2">&quot;</span><span class="w"> </span>&gt;&gt;<span class="w"> </span>/var/lib/security/ip-blacklist.txt
+<span class="w"> </span>log_action<span class="w"> </span><span class="s2">&quot;Added </span><span class="nv">$SOURCE_IP</span><span class="s2"> to 24-hour blacklist&quot;</span>
+<span class="w"> </span><span class="k">fi</span> <span class="w"> </span><span class="c1"># Increase authentication monitoring</span>
+<span class="w"> </span>kubectl<span class="w"> </span>patch<span class="w"> </span>configmap<span class="w"> </span>security-config<span class="w"> </span>-n<span class="w"> </span>telecommunications<span class="w"> </span>-p<span class="w"> </span><span class="s1">&#39;{&quot;data&quot;:{&quot;auth_monitoring_level&quot;:&quot;enhanced&quot;}}&#39;</span>
+<span class="w"> </span>log_action<span class="w"> </span><span class="s2">&quot;Enhanced authentication monitoring activated&quot;</span>
+<span class="w"> </span><span class="p">;;</span> <span class="w"> </span><span class="s2">&quot;anomalous_traffic&quot;</span><span class="o">)</span>
+<span class="w"> </span>log_action<span class="w"> </span><span class="s2">&quot;Responding to anomalous traffic incident&quot;</span> <span class="w"> </span><span class="k">if</span><span class="w"> </span><span class="o">[[</span><span class="w"> </span><span class="s2">&quot;</span><span class="nv">$SEVERITY</span><span class="s2">&quot;</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="s2">&quot;high&quot;</span><span class="w"> </span><span class="o">||</span><span class="w"> </span><span class="s2">&quot;</span><span class="nv">$SEVERITY</span><span class="s2">&quot;</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="s2">&quot;critical&quot;</span><span class="w"> </span><span class="o">]]</span><span class="p">;</span><span class="w"> </span><span class="k">then</span>
+<span class="w"> </span><span class="c1"># Implement traffic shaping</span>
+<span class="w"> </span>log_action<span class="w"> </span><span class="s2">&quot;Implementing traffic controls&quot;</span> <span class="w"> </span><span class="c1"># Update ingress annotations to add rate limiting</span>
+<span class="w"> </span>kubectl<span class="w"> </span>patch<span class="w"> </span>ingress<span class="w"> </span>wireless-services-ingress<span class="w"> </span>-n<span class="w"> </span>telecommunications<span class="w"> </span>-p<span class="w"> </span><span class="s1">&#39;{</span>
+<span class="s1"> &quot;metadata&quot;: {</span>
+<span class="s1"> &quot;annotations&quot;: {</span>
+<span class="s1"> &quot;nginx.ingress.kubernetes.io/rate-limit&quot;: &quot;50&quot;,</span>
+<span class="s1"> &quot;nginx.ingress.kubernetes.io/rate-limit-window&quot;: &quot;1m&quot;</span>
+<span class="s1"> }</span>
+<span class="s1"> }</span>
+<span class="s1"> }&#39;</span>
+<span class="w"> </span>log_action<span class="w"> </span><span class="s2">&quot;Applied aggressive rate limiting&quot;</span> <span class="w"> </span><span class="c1"># Scale up affected services</span>
+<span class="w"> </span><span class="k">if</span><span class="w"> </span><span class="o">[[</span><span class="w"> </span><span class="s2">&quot;</span><span class="nv">$AFFECTED_SERVICE</span><span class="s2">&quot;</span><span class="w"> </span>!<span class="o">=</span><span class="w"> </span><span class="s2">&quot;unknown&quot;</span><span class="w"> </span><span class="o">]]</span><span class="p">;</span><span class="w"> </span><span class="k">then</span>
+<span class="w"> </span><span class="nv">CURRENT_REPLICAS</span><span class="o">=</span><span class="k">$(</span>kubectl<span class="w"> </span>get<span class="w"> </span>deployment<span class="w"> </span><span class="s2">&quot;</span><span class="nv">$AFFECTED_SERVICE</span><span class="s2">&quot;</span><span class="w"> </span>-n<span class="w"> </span>telecommunications<span class="w"> </span>-o<span class="w"> </span><span class="nv">jsonpath</span><span class="o">=</span><span class="s1">&#39;{.spec.replicas}&#39;</span><span class="k">)</span>
+<span class="w"> </span><span class="nv">NEW_REPLICAS</span><span class="o">=</span><span class="k">$((</span><span class="nv">CURRENT_REPLICAS</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="m">2</span><span class="k">))</span>
+<span class="w"> </span>kubectl<span class="w"> </span>scale<span class="w"> </span>deployment<span class="w"> </span><span class="s2">&quot;</span><span class="nv">$AFFECTED_SERVICE</span><span class="s2">&quot;</span><span class="w"> </span>--replicas<span class="o">=</span><span class="s2">&quot;</span><span class="nv">$NEW_REPLICAS</span><span class="s2">&quot;</span><span class="w"> </span>-n<span class="w"> </span>telecommunications
+<span class="w"> </span>log_action<span class="w"> </span><span class="s2">&quot;Scaled up </span><span class="nv">$AFFECTED_SERVICE</span><span class="s2"> from </span><span class="nv">$CURRENT_REPLICAS</span><span class="s2"> to </span><span class="nv">$NEW_REPLICAS</span><span class="s2"> replicas&quot;</span>
+<span class="w"> </span><span class="k">fi</span>
+<span class="w"> </span><span class="k">fi</span> <span class="w"> </span><span class="c1"># Collect network metrics</span>
+<span class="w"> </span>curl<span class="w"> </span>-s<span class="w"> </span><span class="s2">&quot;http://prometheus.monitoring.svc.cluster.local:9090/api/v1/query_range?query=rate(container_network_receive_bytes_total[5m])&amp;start=</span><span class="k">$(</span>date<span class="w"> </span>-d<span class="w"> </span><span class="s1">&#39;1 hour ago&#39;</span><span class="w"> </span>+%s<span class="k">)</span><span class="s2">&amp;end=</span><span class="k">$(</span>date<span class="w"> </span>+%s<span class="k">)</span><span class="s2">&amp;step=60&quot;</span><span class="w"> </span>&gt;<span class="w"> </span><span class="s2">&quot;</span><span class="nv">$INCIDENT_DIR</span><span class="s2">/network-metrics.json&quot;</span>
+<span class="w"> </span>log_action<span class="w"> </span><span class="s2">&quot;Collected network metrics for analysis&quot;</span>
+<span class="w"> </span><span class="p">;;</span> <span class="w"> </span><span class="s2">&quot;security_vulnerability&quot;</span><span class="o">)</span>
+<span class="w"> </span>log_action<span class="w"> </span><span class="s2">&quot;Responding to security vulnerability&quot;</span> <span class="w"> </span><span class="k">if</span><span class="w"> </span><span class="o">[[</span><span class="w"> </span><span class="s2">&quot;</span><span class="nv">$SEVERITY</span><span class="s2">&quot;</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="s2">&quot;critical&quot;</span><span class="w"> </span><span class="o">]]</span><span class="p">;</span><span class="w"> </span><span class="k">then</span>
+<span class="w"> </span><span class="c1"># Immediately isolate affected containers</span>
+<span class="w"> </span>log_action<span class="w"> </span><span class="s2">&quot;Isolating vulnerable containers&quot;</span> <span class="w"> </span><span class="c1"># Apply network policy to isolate service</span>
+<span class="w"> </span>cat<span class="w"> </span><span class="s">&lt;&lt; EOF | kubectl apply -f -</span>
+<span class="s">apiVersion: networking.k8s.io/v1</span>
+<span class="s">kind: NetworkPolicy</span>
+<span class="s">metadata:</span>
+<span class="s"> name: $AFFECTED_SERVICE-quarantine</span>
+<span class="s"> namespace: telecommunications</span>
+<span class="s">spec:</span>
+<span class="s"> podSelector:</span>
+<span class="s"> matchLabels:</span>
+<span class="s"> app: $AFFECTED_SERVICE</span>
+<span class="s"> policyTypes:</span>
+<span class="s"> - Ingress</span>
+<span class="s"> - Egress</span>
+<span class="s"> ingress: []</span>
+<span class="s"> egress:</span>
+<span class="s"> - to: []</span>
+<span class="s"> ports:</span>
+<span class="s"> - protocol: UDP</span>
+<span class="s"> port: 53 # Allow DNS only</span>
+<span class="s">EOF</span>
+<span class="w"> </span>log_action<span class="w"> </span><span class="s2">&quot;Applied quarantine network policy for </span><span class="nv">$AFFECTED_SERVICE</span><span class="s2">&quot;</span> <span class="w"> </span><span class="c1"># Mark deployment for urgent patching</span>
+<span class="w"> </span>kubectl<span class="w"> </span>annotate<span class="w"> </span>deployment<span class="w"> </span><span class="s2">&quot;</span><span class="nv">$AFFECTED_SERVICE</span><span class="s2">&quot;</span><span class="w"> </span>-n<span class="w"> </span>telecommunications<span class="w"> </span>security.vulnerability/critical<span class="o">=</span><span class="s2">&quot;</span><span class="nv">$INCIDENT_ID</span><span class="s2">&quot;</span>
+<span class="w"> </span>log_action<span class="w"> </span><span class="s2">&quot;Marked </span><span class="nv">$AFFECTED_SERVICE</span><span class="s2"> for urgent security patching&quot;</span>
+<span class="w"> </span><span class="k">fi</span>
+<span class="w"> </span><span class="p">;;</span> <span class="w"> </span>*<span class="o">)</span>
+<span class="w"> </span>log_action<span class="w"> </span><span class="s2">&quot;Unknown incident type: </span><span class="nv">$INCIDENT_TYPE</span><span class="s2">&quot;</span>
+<span class="w"> </span><span class="c1"># Generic containment measures</span>
+<span class="w"> </span>log_action<span class="w"> </span><span class="s2">&quot;Applying generic security measures&quot;</span> <span class="w"> </span><span class="c1"># Enable enhanced monitoring across all services</span>
+<span class="w"> </span>kubectl<span class="w"> </span>patch<span class="w"> </span>configmap<span class="w"> </span>security-config<span class="w"> </span>-n<span class="w"> </span>telecommunications<span class="w"> </span>-p<span class="w"> </span><span class="s1">&#39;{&quot;data&quot;:{&quot;monitoring_level&quot;:&quot;enhanced&quot;}}&#39;</span>
+<span class="w"> </span><span class="p">;;</span>
+<span class="k">esac</span> log_action<span class="w"> </span><span class="s2">&quot;Incident response completed. Incident ID: </span><span class="nv">$INCIDENT_ID</span><span class="s2">&quot;</span> <span class="c1"># Create incident report</span>
+cat<span class="w"> </span><span class="s">&lt;&lt; EOF &gt; &quot;$INCIDENT_DIR/incident-report.md&quot;</span>
+<span class="s"># Security Incident Report</span> <span class="s">**Incident ID:** $INCIDENT_ID</span>
+<span class="s">**Date/Time:** $(date -u -Iseconds)</span>
+<span class="s">**Type:** $INCIDENT_TYPE</span>
+<span class="s">**Severity:** $SEVERITY</span>
+<span class="s">**Affected Service:** $AFFECTED_SERVICE</span>
+<span class="s">**Source IP:** $SOURCE_IP</span> <span class="s">## Actions Taken</span>
+<span class="s">$(cat &quot;$INCIDENT_DIR/incident.log&quot; | grep -v &quot;^$(date &#39;+%Y-%m-%d&#39;)&quot; | sed &#39;s/^/- /&#39;)</span> <span class="s">## Next Steps</span>
+<span class="s">- [ ] Complete forensic analysis</span>
+<span class="s">- [ ] Update security policies based on findings</span>
+<span class="s">- [ ] Conduct post-incident review</span>
+<span class="s">- [ ] Update incident response procedures if needed</span> <span class="s">## Evidence Collected</span>
+<span class="s">- Service logs: service-logs.txt</span>
+<span class="s">- Kubernetes events: kubernetes-events.txt</span>
+<span class="s">- Network metrics: network-metrics.json</span>
+<span class="s">EOF</span> <span class="nb">echo</span><span class="w"> </span><span class="s2">&quot;Incident report created: </span><span class="nv">$INCIDENT_DIR</span><span class="s2">/incident-report.md&quot;</span>
+</code></pre></div> <h2>Compliance and Audit Requirements</h2>
+<h3>Regulatory Compliance Framework</h3>
+<div class="codehilite"><pre><span></span><code><span class="c1"># Compliance policy definitions</span>
+<span class="nt">apiVersion</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">v1</span>
+<span class="nt">kind</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">ConfigMap</span>
+<span class="nt">metadata</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">compliance-policies</span>
+<span class="w"> </span><span class="nt">namespace</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">telecommunications</span>
+<span class="nt">data</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">gdpr-policy.yaml</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">|</span>
+<span class="w"> </span><span class="no"># GDPR compliance requirements</span>
+<span class="w"> </span><span class="no">data_protection:</span>
+<span class="w"> </span><span class="no">encryption:</span>
+<span class="w"> </span><span class="no">at_rest: &quot;AES-256&quot;</span>
+<span class="w"> </span><span class="no">in_transit: &quot;TLS 1.3&quot;</span>
+<span class="w"> </span><span class="no">key_management: &quot;HashiCorp Vault&quot;</span> <span class="w"> </span><span class="no">access_controls:</span>
+<span class="w"> </span><span class="no">authentication: &quot;multi_factor&quot;</span>
+<span class="w"> </span><span class="no">authorization: &quot;rbac&quot;</span>
+<span class="w"> </span><span class="no">audit_logging: &quot;enabled&quot;</span>
+<span class="w"> </span><span class="no">data_minimization: &quot;enforced&quot;</span> <span class="w"> </span><span class="no">data_subject_rights:</span>
+<span class="w"> </span><span class="no">right_to_access: &quot;automated_via_api&quot;</span>
+<span class="w"> </span><span class="no">right_to_rectification: &quot;automated_via_api&quot; </span>
+<span class="w"> </span><span class="no">right_to_erasure: &quot;automated_via_api&quot;</span>
+<span class="w"> </span><span class="no">right_to_portability: &quot;automated_via_api&quot;</span> <span class="w"> </span><span class="no">breach_notification:</span>
+<span class="w"> </span><span class="no">detection_time: &quot;&lt; 1 hour&quot;</span>
+<span class="w"> </span><span class="no">notification_time: &quot;&lt; 72 hours&quot;</span>
+<span class="w"> </span><span class="no">authority_notification: &quot;automated&quot;</span> <span class="w"> </span><span class="nt">fcc-policy.yaml</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">|</span>
+<span class="w"> </span><span class="no"># FCC compliance requirements (US)</span>
+<span class="w"> </span><span class="no">network_reliability:</span>
+<span class="w"> </span><span class="no">uptime_requirement: &quot;99.9%&quot;</span>
+<span class="w"> </span><span class="no">outage_reporting: &quot;automated&quot;</span>
+<span class="w"> </span><span class="no">backup_power: &quot;8_hours_minimum&quot;</span>
+<span class="w"> </span><span class="no">network_monitoring: &quot;24x7&quot;</span> <span class="w"> </span><span class="no">emergency_services:</span>
+<span class="w"> </span><span class="no">e911_availability: &quot;99.99%&quot;</span>
+<span class="w"> </span><span class="no">backup_routing: &quot;enabled&quot;</span>
+<span class="w"> </span><span class="no">location_accuracy: &quot;required&quot;</span>
+<span class="w"> </span><span class="no">test_procedures: &quot;monthly&quot;</span> <span class="w"> </span><span class="no">cybersecurity:</span>
+<span class="w"> </span><span class="no">security_plan: &quot;annual_update&quot;</span>
+<span class="w"> </span><span class="no">risk_assessment: &quot;annual&quot;</span>
+<span class="w"> </span><span class="no">incident_reporting: &quot;24_hours&quot;</span>
+<span class="w"> </span><span class="no">supply_chain_security: &quot;required&quot;</span> <span class="w"> </span><span class="nt">nis2-policy.yaml</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">|</span>
+<span class="w"> </span><span class="no"># NIS2 Directive compliance (EU)</span>
+<span class="w"> </span><span class="no">cybersecurity_measures:</span>
+<span class="w"> </span><span class="no">risk_management: &quot;comprehensive&quot;</span>
+<span class="w"> </span><span class="no">incident_handling: &quot;documented_procedures&quot;</span>
+<span class="w"> </span><span class="no">business_continuity: &quot;tested_annually&quot;</span>
+<span class="w"> </span><span class="no">supply_chain_security: &quot;enforced&quot;</span>
+<span class="w"> </span><span class="no">vulnerability_management: &quot;continuous&quot;</span> <span class="w"> </span><span class="no">incident_reporting:</span>
+<span class="w"> </span><span class="no">significant_incidents: &quot;24_hours&quot;</span>
+<span class="w"> </span><span class="no">early_warning: &quot;immediate&quot;</span>
+<span class="w"> </span><span class="no">incident_categories: &quot;classified&quot;</span> <span class="w"> </span><span class="no">governance:</span>
+<span class="w"> </span><span class="no">board_oversight: &quot;required&quot;</span>
+<span class="w"> </span><span class="no">training_programs: &quot;regular&quot;</span>
+<span class="w"> </span><span class="no">audit_framework: &quot;annual&quot;</span>
+</code></pre></div> <h3>Audit Trail Implementation</h3>
+<div class="codehilite"><pre><span></span><code><span class="c1"># Audit logging configuration</span>
+<span class="nt">apiVersion</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">v1</span>
+<span class="nt">kind</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">ConfigMap</span>
+<span class="nt">metadata</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">audit-config</span>
+<span class="nt">data</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">audit-policy.yaml</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">|</span>
+<span class="w"> </span><span class="no">apiVersion: audit.k8s.io/v1</span>
+<span class="w"> </span><span class="no">kind: Policy</span>
+<span class="w"> </span><span class="no">rules:</span>
+<span class="w"> </span><span class="no"># Log all security-relevant events</span>
+<span class="w"> </span><span class="no">- level: RequestResponse</span>
+<span class="w"> </span><span class="no">namespaces: [&quot;telecommunications&quot;]</span>
+<span class="w"> </span><span class="no">verbs: [&quot;create&quot;, &quot;update&quot;, &quot;patch&quot;, &quot;delete&quot;]</span>
+<span class="w"> </span><span class="no">resources:</span>
+<span class="w"> </span><span class="no">- group: &quot;&quot;</span>
+<span class="w"> </span><span class="no">resources: [&quot;secrets&quot;, &quot;configmaps&quot;, &quot;serviceaccounts&quot;]</span>
+<span class="w"> </span><span class="no">- group: &quot;rbac.authorization.k8s.io&quot;</span>
+<span class="w"> </span><span class="no">resources: [&quot;roles&quot;, &quot;rolebindings&quot;, &quot;clusterroles&quot;, &quot;clusterrolebindings&quot;]</span>
+<span class="w"> </span><span class="no">- group: &quot;networking.k8s.io&quot;</span>
+<span class="w"> </span><span class="no">resources: [&quot;networkpolicies&quot;]</span> <span class="w"> </span><span class="no"># Log authentication and authorization events</span>
+<span class="w"> </span><span class="no">- level: Request</span>
+<span class="w"> </span><span class="no">users: [&quot;system:anonymous&quot;]</span>
+<span class="w"> </span><span class="no">verbs: [&quot;*&quot;]</span> <span class="w"> </span><span class="no"># Log administrative actions</span>
+<span class="w"> </span><span class="no">- level: RequestResponse</span>
+<span class="w"> </span><span class="no">userGroups: [&quot;system:masters&quot;, &quot;telecom:admins&quot;]</span>
+<span class="w"> </span><span class="no">verbs: [&quot;*&quot;]</span> <span class="w"> </span><span class="no"># Log pod operations in production namespaces</span>
+<span class="w"> </span><span class="no">- level: Request</span>
+<span class="w"> </span><span class="no">namespaces: [&quot;telecommunications&quot;]</span>
+<span class="w"> </span><span class="no">verbs: [&quot;create&quot;, &quot;update&quot;, &quot;patch&quot;, &quot;delete&quot;]</span>
+<span class="w"> </span><span class="no">resources:</span>
+<span class="w"> </span><span class="no">- group: &quot;&quot;</span>
+<span class="w"> </span><span class="no">resources: [&quot;pods&quot;]</span>
+<span class="w"> </span><span class="no">- group: &quot;apps&quot;</span>
+<span class="w"> </span><span class="no">resources: [&quot;deployments&quot;, &quot;replicasets&quot;, &quot;statefulsets&quot;]</span> <span class="w"> </span><span class="no"># Exclude routine read operations to reduce log volume</span>
+<span class="w"> </span><span class="no">- level: None</span>
+<span class="w"> </span><span class="no">verbs: [&quot;get&quot;, &quot;list&quot;, &quot;watch&quot;]</span> <span class="w"> </span><span class="nt">application-audit.yaml</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">|</span>
+<span class="w"> </span><span class="no"># Application-level audit requirements</span>
+<span class="w"> </span><span class="no">audit_events:</span>
+<span class="w"> </span><span class="no">authentication:</span>
+<span class="w"> </span><span class="no">- login_success</span>
+<span class="w"> </span><span class="no">- login_failure</span>
+<span class="w"> </span><span class="no">- password_change</span>
+<span class="w"> </span><span class="no">- mfa_enrollment</span>
+<span class="w"> </span><span class="no">- session_timeout</span> <span class="w"> </span><span class="no">authorization:</span>
+<span class="w"> </span><span class="no">- permission_granted</span>
+<span class="w"> </span><span class="no">- permission_denied</span>
+<span class="w"> </span><span class="no">- role_assignment</span>
+<span class="w"> </span><span class="no">- privilege_escalation</span> <span class="w"> </span><span class="no">data_access:</span>
+<span class="w"> </span><span class="no">- subscriber_data_access</span>
+<span class="w"> </span><span class="no">- billing_data_access</span>
+<span class="w"> </span><span class="no">- configuration_change</span>
+<span class="w"> </span><span class="no">- backup_restore</span> <span class="w"> </span><span class="no">system_events:</span>
+<span class="w"> </span><span class="no">- service_start_stop</span>
+<span class="w"> </span><span class="no">- configuration_change</span>
+<span class="w"> </span><span class="no">- software_update</span>
+<span class="w"> </span><span class="no">- certificate_renewal</span> <span class="w"> </span><span class="no">audit_format:</span>
+<span class="w"> </span><span class="no">timestamp: &quot;RFC3339&quot;</span>
+<span class="w"> </span><span class="no">user_id: &quot;required&quot;</span>
+<span class="w"> </span><span class="no">source_ip: &quot;required&quot;</span>
+<span class="w"> </span><span class="no">action: &quot;required&quot;</span>
+<span class="w"> </span><span class="no">resource: &quot;required&quot;</span>
+<span class="w"> </span><span class="no">result: &quot;required&quot;</span>
+<span class="w"> </span><span class="no">additional_context: &quot;optional&quot;</span> <span class="w"> </span><span class="no">retention_policy:</span>
+<span class="w"> </span><span class="no">audit_logs: &quot;7_years&quot;</span>
+<span class="w"> </span><span class="no">security_logs: &quot;3_years&quot;</span>
+<span class="w"> </span><span class="no">access_logs: &quot;2_years&quot;</span>
+<span class="w"> </span><span class="no">compliance_reports: &quot;10_years&quot;</span>
+</code></pre></div> <h2>Results and Security Posture Improvements</h2>
+<h3>Security Metrics and KPIs</h3>
+<p><strong>Vulnerability Management:</strong>
+- <strong>Critical vulnerability response time</strong>: Reduced from 7 days to 4 hours
+- <strong>Security patch deployment</strong>: 95% of patches deployed within 24 hours
+- <strong>Vulnerability scan coverage</strong>: 100% of containers and infrastructure
+- <strong>Zero-day response</strong>: Automated isolation and containment within 15 minutes</p>
+<p><strong>Access Control Effectiveness:</strong>
+- <strong>Failed authentication attempts</strong>: 99.2% reduction through improved controls
+- <strong>Privileged access monitoring</strong>: 100% coverage of administrative actions
+- <strong>Credential compromise detection</strong>: Average detection time under 5 minutes
+- <strong>Access certification</strong>: 100% quarterly review completion rate</p>
+<p><strong>Security Incident Response:</strong>
+- <strong>Mean time to detection</strong>: Improved from 45 minutes to 3 minutes
+- <strong>Mean time to containment</strong>: Improved from 2 hours to 15 minutes
+- <strong>False positive rate</strong>: Reduced from 35% to 8%
+- <strong>Incident resolution time</strong>: 60% improvement in average resolution time</p>
+<h3>Compliance Achievement</h3>
+<p><strong>Regulatory Compliance Status:</strong>
+- <strong>GDPR compliance</strong>: 100% compliance audit score
+- <strong>FCC requirements</strong>: Full compliance with cybersecurity requirements
+- <strong>NIS2 Directive</strong>: Proactive compliance implementation
+- <strong>SOC 2 Type II</strong>: Clean audit with zero findings</p>
+<p><strong>Audit and Certification:</strong>
+- <strong>ISO 27001</strong>: Successfully implemented and certified
+- <strong>SOC 2</strong>: Type II certification with zero exceptions
+- <strong>PCI DSS</strong>: Level 1 compliance for payment processing
+- <strong>NIST Cybersecurity Framework</strong>: Comprehensive implementation</p>
+<h3>Risk Reduction Impact</h3>
+<p><strong>Security Risk Profile:</strong>
+- <strong>Critical risk exposure</strong>: 85% reduction through comprehensive controls
+- <strong>Supply chain risk</strong>: 70% reduction through vendor security requirements
+- <strong>Insider threat risk</strong>: 60% reduction through access controls and monitoring
+- <strong>Cyber attack surface</strong>: 50% reduction through network segmentation</p>
+<p><strong>Business Impact:</strong>
+- <strong>Security-related downtime</strong>: Zero incidents in the past 12 months
+- <strong>Data breaches</strong>: Zero incidents with comprehensive protection measures
+- <strong>Compliance violations</strong>: Zero regulatory violations or fines
+- <strong>Customer trust</strong>: 95% confidence rating in security measures</p>
+<h2>Lessons Learned and Best Practices</h2>
+<h3>1. Defense in Depth is Essential</h3>
+<p><strong>Key Learning:</strong> Single security controls are insufficient for telecommunications infrastructure.
+<strong>Implementation:</strong> Multi-layered security approach with redundant controls.
+<strong>Best Practice:</strong> Assume breach mentality with comprehensive detection and response capabilities.</p>
+<h3>2. Automation Enables Scale</h3>
+<p><strong>Key Learning:</strong> Manual security processes cannot keep pace with modern threat landscapes.
+<strong>Implementation:</strong> Automated vulnerability management, incident response, and compliance monitoring.
+<strong>Best Practice:</strong> Security automation should complement, not replace, human expertise.</p>
+<h3>3. Zero Trust Network Model</h3>
+<p><strong>Key Learning:</strong> Traditional perimeter-based security models are inadequate for cloud-native infrastructure.
+<strong>Implementation:</strong> Comprehensive network segmentation and identity-based access controls.
+<strong>Best Practice:</strong> Never trust, always verify - validate every connection and transaction.</p>
+<h3>4. Continuous Compliance Monitoring</h3>
+<p><strong>Key Learning:</strong> Point-in-time compliance assessments miss configuration drift and changes.
+<strong>Implementation:</strong> Real-time compliance monitoring with automated remediation.
+<strong>Best Practice:</strong> Treat compliance as code with version control and automated validation.</p>
+<h3>5. Security Culture and Training</h3>
+<p><strong>Key Learning:</strong> Technology alone cannot solve security challenges without organizational support.
+<strong>Implementation:</strong> Regular security training, awareness programs, and security champions.
+<strong>Best Practice:</strong> Make security everyone's responsibility, not just the security team's.</p>
+<h2>Future Security Roadmap</h2>
+<h3>Emerging Technologies Integration</h3>
+<p><strong>AI/ML Security Enhancement:</strong>
+- Machine learning-based threat detection and behavioral analysis
+- Automated security orchestration and response (SOAR)
+- Predictive vulnerability assessment and risk modeling
+- AI-powered fraud detection and prevention</p>
+<p><strong>Quantum-Safe Cryptography:</strong>
+- Post-quantum cryptographic algorithm implementation
+- Quantum key distribution for high-security communications
+- Quantum-resistant certificate authorities and PKI
+- Timeline planning for quantum threat mitigation</p>
+<p><strong>5G Security Requirements:</strong>
+- Network slicing security and isolation
+- Edge computing security architecture
+- Advanced threat protection for IoT devices
+- Private network security frameworks</p>
+<h3>Advanced Threat Protection</h3>
+<p><strong>Threat Intelligence Integration:</strong>
+- Real-time threat feed integration with SIEM
+- Automated indicator of compromise (IoC) blocking
+- Advanced persistent threat (APT) detection capabilities
+- Threat hunting automation and orchestration</p>
+<p><strong>Behavioral Analytics:</strong>
+- User and entity behavior analytics (UEBA)
+- Network traffic anomaly detection
+- Application behavior monitoring
+- Automated baseline establishment and deviation detection</p>
+<h2>Conclusion</h2>
+<p>Securing critical telecommunications infrastructure requires a comprehensive, multi-layered approach that addresses the unique challenges of this essential industry. Through the implementation of defense-in-depth strategies, zero-trust architectures, and comprehensive automation, we've built a security posture that protects millions of subscribers while enabling continued innovation and growth.</p>
+<p>The key principles that guided our success:</p>
+<ol>
+<li><strong>Comprehensive coverage</strong>: Security must be integrated into every layer of the infrastructure</li>
+<li><strong>Automation at scale</strong>: Manual processes cannot keep pace with modern threats</li>
+<li><strong>Continuous improvement</strong>: Security is not a destination but an ongoing journey</li>
+<li><strong>Regulatory alignment</strong>: Compliance must be built into the foundation, not bolted on later</li>
+<li><strong>Cultural transformation</strong>: Security requires organizational commitment beyond just technology</li>
+</ol>
+<p>The security architecture and practices detailed in this post provide a solid foundation for protecting telecommunications infrastructure against current and emerging threats. As the threat landscape continues to evolve, the principles and practices established here will adapt and grow to meet new challenges while maintaining the availability, integrity, and confidentiality requirements essential to telecommunications services.</p>
+<p>The investment in comprehensive security infrastructure pays dividends not only in risk reduction but in customer trust, regulatory compliance, and business resilience. For telecommunications providers embarking on security transformation initiatives, the lessons learned and patterns established in this implementation provide a proven blueprint for success.</p>
+<hr />
+<p><em>This blog post details real-world security implementations protecting critical telecommunications infrastructure serving millions of subscribers across multiple geographic regions and regulatory jurisdictions.</em></p>
+<p><strong>Key Technologies:</strong> HashiCorp Vault, Kubernetes Security, Istio Service Mesh, Prometheus, Elasticsearch, Network Policies<br />
+<strong>Scope:</strong> Defense-in-depth implementation, Multi-region security architecture, Comprehensive compliance framework<br />
+<strong>Impact:</strong> Zero security incidents, 100% compliance achievement, 85% risk reduction</p></div> <footer><ul class="stats"><li><a href="../index.html">Back to posts</a></li></ul></footer> </article> </div> <section id="sidebar"> <section> <div class="mini-posts"> <header><h3>Recent</h3></header> <ul>
+<li><a href="../posts/project--telecommunications-architecture-blog.html">Building Cloud-Native Telecommunications Architecture: From Legacy Networks to 5G-Ready Infrastructure</a> <span class=\"published\">Telecom</span></li>
+<li><a href="../posts/project--devops-automation-blog.html">DevOps Automation in Telecommunications: Building Self-Healing Infrastructure at Scale</a> <span class=\"published\">DevOps</span></li>
+<li><a href="../posts/project--ims-infrastructure-blog.html">Modernizing IMS Infrastructure: From Legacy Systems to Cloud-Native Excellence</a> <span class=\"published\">Infra</span></li>
+<li><a href="../posts/project--kubernetes-deployment-blog.html">Scaling Telecommunications Infrastructure: A Journey Through Kubernetes Deployments in Wireless Networks</a> <span class=\"published\">Containers</span></li>
+<li><a href="../posts/project--network-monitoring-blog.html">Building Robust Network Monitoring for Telecommunications: A CloudProber Journey</a> <span class=\"published\">Monitoring</span></li> </ul> </div> </section> <section> <header><h3>About</h3></header> <p>Notes on telecom, infra, and automation.</p> </section> </section> <section id="footer"><p class="copyright">&copy; 2025</p></section> </div> <script src="../assets/js/jquery.min.js"></script> <script src="../assets/js/browser.min.js"></script> <script src="../assets/js/breakpoints.min.js"></script> <script src="../assets/js/util.js"></script> <script src="../assets/js/main.js"></script> </body>
+</html>

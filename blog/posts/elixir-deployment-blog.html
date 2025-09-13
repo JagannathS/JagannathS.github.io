@@ -1,0 +1,789 @@
+<!DOCTYPE HTML>
+<html> <head> <title>Production-Ready Elixir: Modern Deployment Strategies for Phoenix Applications - Future Imperfect</title> <meta charset="utf-8" /> <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no" /> <link rel="stylesheet" href="../assets/css/main.css" /> <link rel="stylesheet" href="../assets/css/codehilite.css" /> </head> <body class="single is-preload"> <div id="wrapper"> <header id="header"> <h1><a href="../index.html">Future Imperfect</a></h1> <nav class="links"></nav> </header> <div id="main"> <article class="post"> <header> <div class="title"><h2>Production-Ready Elixir: Modern Deployment Strategies for Phoenix Applications</h2><p>Elixir and Phoenix have proven themselves as powerful tools for building fault-tolerant, scalable applications. However, deploying Elixir applications to production requires careful consideration of infrastructure, monitoring, and operational practices. This blog post details the journey of deploying a complex Elixir-based wireless network analysis service to production, covering modern deployment strategies, infrastructure patterns, and lessons learned.</p></div> <div class="meta"><span class="published">Other</span></div> </header> <div class="content markdown"><h1>Production-Ready Elixir: Modern Deployment Strategies for Phoenix Applications</h1>
+<h2>Introduction</h2>
+<p>Elixir and Phoenix have proven themselves as powerful tools for building fault-tolerant, scalable applications. However, deploying Elixir applications to production requires careful consideration of infrastructure, monitoring, and operational practices. This blog post details the journey of deploying a complex Elixir-based wireless network analysis service to production, covering modern deployment strategies, infrastructure patterns, and lessons learned.</p>
+<h2>The Elixir Application Landscape</h2>
+<h3>Application Overview</h3>
+<p>Our wireless PCAP extractor is built using:
+- <strong>Phoenix Framework</strong>: Web interface and API endpoints
+- <strong>GenServer</strong>: Concurrent processing of network traffic data
+- <strong>OTP Supervision Trees</strong>: Fault tolerance and automatic recovery
+- <strong>Ecto</strong>: Database management and migrations
+- <strong>Task.Supervisor</strong>: Async processing of large PCAP files</p>
+<h3>Production Requirements</h3>
+<p>The application needed to handle:
+- <strong>High Throughput</strong>: Processing gigabytes of network capture data
+- <strong>Real-time Processing</strong>: Live network traffic analysis
+- <strong>Fault Tolerance</strong>: 99.8% uptime SLA requirements
+- <strong>Horizontal Scaling</strong>: Support for traffic growth
+- <strong>Security</strong>: Secure handling of sensitive network data</p>
+<h2>Modern Elixir Deployment Architecture</h2>
+<h3>Containerization Strategy</h3>
+<h4>Dockerfile Optimization for Elixir</h4>
+<div class="codehilite"><pre><span></span><code><span class="c"># Multi-stage build for production optimization</span>
+<span class="k">FROM</span><span class="w"> </span><span class="s">elixir:1.15-alpine</span><span class="w"> </span><span class="k">AS</span><span class="w"> </span><span class="s">builder</span> <span class="c"># Install build dependencies</span>
+<span class="k">RUN</span><span class="w"> </span>apk<span class="w"> </span>add<span class="w"> </span>--no-cache<span class="w"> </span><span class="se">\</span>
+<span class="w"> </span>gcc<span class="w"> </span><span class="se">\</span>
+<span class="w"> </span>git<span class="w"> </span><span class="se">\</span>
+<span class="w"> </span>make<span class="w"> </span><span class="se">\</span>
+<span class="w"> </span>musl-dev<span class="w"> </span><span class="se">\</span>
+<span class="w"> </span>nodejs<span class="w"> </span><span class="se">\</span>
+<span class="w"> </span>npm <span class="k">WORKDIR</span><span class="w"> </span><span class="s">/app</span> <span class="c"># Install dependencies</span>
+<span class="k">COPY</span><span class="w"> </span>mix.exs<span class="w"> </span>mix.lock<span class="w"> </span>./
+<span class="k">COPY</span><span class="w"> </span>config<span class="w"> </span>config
+<span class="k">RUN</span><span class="w"> </span>mix<span class="w"> </span><span class="k">do</span><span class="w"> </span>deps.get,<span class="w"> </span>deps.compile <span class="c"># Compile assets</span>
+<span class="k">COPY</span><span class="w"> </span>assets<span class="w"> </span>assets
+<span class="k">COPY</span><span class="w"> </span>priv<span class="w"> </span>priv
+<span class="k">RUN</span><span class="w"> </span>npm<span class="w"> </span>install<span class="w"> </span>--prefix<span class="w"> </span>assets<span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span>npm<span class="w"> </span>run<span class="w"> </span>deploy<span class="w"> </span>--prefix<span class="w"> </span>assets
+<span class="k">RUN</span><span class="w"> </span>mix<span class="w"> </span>phx.digest <span class="c"># Compile application</span>
+<span class="k">COPY</span><span class="w"> </span>lib<span class="w"> </span>lib
+<span class="k">RUN</span><span class="w"> </span>mix<span class="w"> </span><span class="k">do</span><span class="w"> </span>compile,<span class="w"> </span>release <span class="c"># Production image</span>
+<span class="k">FROM</span><span class="w"> </span><span class="s">alpine:3.18</span> <span class="c"># Install runtime dependencies</span>
+<span class="k">RUN</span><span class="w"> </span>apk<span class="w"> </span>add<span class="w"> </span>--no-cache<span class="w"> </span><span class="se">\</span>
+<span class="w"> </span>libgcc<span class="w"> </span><span class="se">\</span>
+<span class="w"> </span>libstdc++<span class="w"> </span><span class="se">\</span>
+<span class="w"> </span>ncurses-libs<span class="w"> </span><span class="se">\</span>
+<span class="w"> </span>openssl <span class="k">WORKDIR</span><span class="w"> </span><span class="s">/app</span> <span class="c"># Create non-root user</span>
+<span class="k">RUN</span><span class="w"> </span>addgroup<span class="w"> </span>-g<span class="w"> </span><span class="m">1001</span><span class="w"> </span>-S<span class="w"> </span>appuser<span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span><span class="se">\</span>
+<span class="w"> </span>adduser<span class="w"> </span>-S<span class="w"> </span>-D<span class="w"> </span>-H<span class="w"> </span>-u<span class="w"> </span><span class="m">1001</span><span class="w"> </span>-h<span class="w"> </span>/app<span class="w"> </span>-s<span class="w"> </span>/sbin/nologin<span class="w"> </span>-G<span class="w"> </span>appuser<span class="w"> </span>-g<span class="w"> </span>appuser<span class="w"> </span>appuser <span class="c"># Copy release</span>
+<span class="k">COPY</span><span class="w"> </span>--from<span class="o">=</span>builder<span class="w"> </span>--chown<span class="o">=</span>appuser:appuser<span class="w"> </span>/app/_build/prod/rel/pcap_extractor<span class="w"> </span>./ <span class="k">USER</span><span class="w"> </span><span class="s">appuser</span> <span class="k">EXPOSE</span><span class="w"> </span><span class="s">4000</span> <span class="k">CMD</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;bin/pcap_extractor&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;start&quot;</span><span class="p">]</span>
+</code></pre></div> <h4>Release Configuration</h4>
+<p>Modern Elixir releases provide powerful configuration management:</p>
+<div class="codehilite"><pre><span></span><code><span class="c1"># config/runtime.exs - Runtime configuration</span>
+<span class="kn">import</span><span class="w"> </span><span class="nc">Config</span> <span class="c1"># Database configuration from environment</span>
+<span class="n">config</span><span class="w"> </span><span class="ss">:pcap_extractor</span><span class="p">,</span><span class="w"> </span><span class="nc">PcapExtractor.Repo</span><span class="p">,</span>
+<span class="w"> </span><span class="ss">url</span><span class="p">:</span><span class="w"> </span><span class="nc">System</span><span class="o">.</span><span class="n">get_env</span><span class="p">(</span><span class="s2">&quot;DATABASE_URL&quot;</span><span class="p">),</span>
+<span class="w"> </span><span class="ss">pool_size</span><span class="p">:</span><span class="w"> </span><span class="nc">String</span><span class="o">.</span><span class="n">to_integer</span><span class="p">(</span><span class="nc">System</span><span class="o">.</span><span class="n">get_env</span><span class="p">(</span><span class="s2">&quot;POOL_SIZE&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;10&quot;</span><span class="p">)),</span>
+<span class="w"> </span><span class="ss">ssl</span><span class="p">:</span><span class="w"> </span><span class="nc">System</span><span class="o">.</span><span class="n">get_env</span><span class="p">(</span><span class="s2">&quot;DATABASE_SSL&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;true&quot;</span><span class="p">)</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="s2">&quot;true&quot;</span> <span class="c1"># Phoenix endpoint configuration</span>
+<span class="n">config</span><span class="w"> </span><span class="ss">:pcap_extractor</span><span class="p">,</span><span class="w"> </span><span class="nc">PcapExtractorWeb.Endpoint</span><span class="p">,</span>
+<span class="w"> </span><span class="ss">http</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="ss">port</span><span class="p">:</span><span class="w"> </span><span class="nc">String</span><span class="o">.</span><span class="n">to_integer</span><span class="p">(</span><span class="nc">System</span><span class="o">.</span><span class="n">get_env</span><span class="p">(</span><span class="s2">&quot;PORT&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;4000&quot;</span><span class="p">))],</span>
+<span class="w"> </span><span class="ss">secret_key_base</span><span class="p">:</span><span class="w"> </span><span class="nc">System</span><span class="o">.</span><span class="n">get_env</span><span class="p">(</span><span class="s2">&quot;SECRET_KEY_BASE&quot;</span><span class="p">),</span>
+<span class="w"> </span><span class="ss">url</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="ss">host</span><span class="p">:</span><span class="w"> </span><span class="nc">System</span><span class="o">.</span><span class="n">get_env</span><span class="p">(</span><span class="s2">&quot;HOST&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;localhost&quot;</span><span class="p">)]</span> <span class="c1"># Vault integration for secrets</span>
+<span class="k">if</span><span class="w"> </span><span class="nc">System</span><span class="o">.</span><span class="n">get_env</span><span class="p">(</span><span class="s2">&quot;VAULT_ADDR&quot;</span><span class="p">)</span><span class="w"> </span><span class="k">do</span>
+<span class="w"> </span><span class="n">config</span><span class="w"> </span><span class="ss">:pcap_extractor</span><span class="p">,</span><span class="w"> </span><span class="ss">:vault</span><span class="p">,</span>
+<span class="w"> </span><span class="ss">address</span><span class="p">:</span><span class="w"> </span><span class="nc">System</span><span class="o">.</span><span class="n">get_env</span><span class="p">(</span><span class="s2">&quot;VAULT_ADDR&quot;</span><span class="p">),</span>
+<span class="w"> </span><span class="ss">auth_method</span><span class="p">:</span><span class="w"> </span><span class="nc">System</span><span class="o">.</span><span class="n">get_env</span><span class="p">(</span><span class="s2">&quot;VAULT_AUTH_METHOD&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;kubernetes&quot;</span><span class="p">),</span>
+<span class="w"> </span><span class="ss">role</span><span class="p">:</span><span class="w"> </span><span class="nc">System</span><span class="o">.</span><span class="n">get_env</span><span class="p">(</span><span class="s2">&quot;VAULT_ROLE&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;pcap-extractor&quot;</span><span class="p">)</span>
+<span class="k">end</span>
+</code></pre></div> <h3>Kubernetes Deployment Manifests</h3>
+<h4>Production Deployment Configuration</h4>
+<div class="codehilite"><pre><span></span><code><span class="c1"># deployment.yaml</span>
+<span class="nt">apiVersion</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">apps/v1</span>
+<span class="nt">kind</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Deployment</span>
+<span class="nt">metadata</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">pcap-extractor</span>
+<span class="w"> </span><span class="nt">labels</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">app</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">pcap-extractor</span>
+<span class="nt">spec</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">replicas</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">3</span>
+<span class="w"> </span><span class="nt">selector</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">matchLabels</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">app</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">pcap-extractor</span>
+<span class="w"> </span><span class="nt">template</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">metadata</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">labels</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">app</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">pcap-extractor</span>
+<span class="w"> </span><span class="nt">annotations</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">vault.hashicorp.com/agent-inject</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;true&quot;</span>
+<span class="w"> </span><span class="nt">vault.hashicorp.com/role</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;pcap-extractor&quot;</span>
+<span class="w"> </span><span class="nt">vault.hashicorp.com/agent-inject-secret-database</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;database/creds/pcap-extractor&quot;</span>
+<span class="w"> </span><span class="nt">spec</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">serviceAccountName</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">pcap-extractor-sa</span>
+<span class="w"> </span><span class="nt">containers</span><span class="p">:</span>
+<span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">pcap-extractor</span>
+<span class="w"> </span><span class="nt">image</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">pcap-extractor:latest</span>
+<span class="w"> </span><span class="nt">ports</span><span class="p">:</span>
+<span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">containerPort</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">4000</span>
+<span class="w"> </span><span class="nt">env</span><span class="p">:</span>
+<span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">PORT</span>
+<span class="w"> </span><span class="nt">value</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;4000&quot;</span>
+<span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">POOL_SIZE</span>
+<span class="w"> </span><span class="nt">value</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;20&quot;</span>
+<span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">SECRET_KEY_BASE</span>
+<span class="w"> </span><span class="nt">valueFrom</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">secretKeyRef</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">pcap-extractor-secrets</span>
+<span class="w"> </span><span class="nt">key</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">secret_key_base</span>
+<span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">ERLANG_COOKIE</span>
+<span class="w"> </span><span class="nt">valueFrom</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">secretKeyRef</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">pcap-extractor-secrets</span>
+<span class="w"> </span><span class="nt">key</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">erlang_cookie</span>
+<span class="w"> </span><span class="nt">resources</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">requests</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">memory</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;256Mi&quot;</span>
+<span class="w"> </span><span class="nt">cpu</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;100m&quot;</span>
+<span class="w"> </span><span class="nt">limits</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">memory</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;1Gi&quot;</span>
+<span class="w"> </span><span class="nt">cpu</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;500m&quot;</span>
+<span class="w"> </span><span class="nt">livenessProbe</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">httpGet</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">path</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">/health</span>
+<span class="w"> </span><span class="nt">port</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">4000</span>
+<span class="w"> </span><span class="nt">initialDelaySeconds</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">30</span>
+<span class="w"> </span><span class="nt">periodSeconds</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">10</span>
+<span class="w"> </span><span class="nt">readinessProbe</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">httpGet</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">path</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">/ready</span>
+<span class="w"> </span><span class="nt">port</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">4000</span>
+<span class="w"> </span><span class="nt">initialDelaySeconds</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">5</span>
+<span class="w"> </span><span class="nt">periodSeconds</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">5</span>
+<span class="w"> </span><span class="nt">volumeMounts</span><span class="p">:</span>
+<span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">pcap-storage</span>
+<span class="w"> </span><span class="nt">mountPath</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">/app/pcaps</span>
+<span class="w"> </span><span class="nt">volumes</span><span class="p">:</span>
+<span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">pcap-storage</span>
+<span class="w"> </span><span class="nt">persistentVolumeClaim</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">claimName</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">pcap-storage-pvc</span>
+</code></pre></div> <h4>Service and Ingress Configuration</h4>
+<div class="codehilite"><pre><span></span><code><span class="c1"># service.yaml</span>
+<span class="nt">apiVersion</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">v1</span>
+<span class="nt">kind</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Service</span>
+<span class="nt">metadata</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">pcap-extractor-service</span>
+<span class="nt">spec</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">selector</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">app</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">pcap-extractor</span>
+<span class="w"> </span><span class="nt">ports</span><span class="p">:</span>
+<span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">protocol</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">TCP</span>
+<span class="w"> </span><span class="nt">port</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">80</span>
+<span class="w"> </span><span class="nt">targetPort</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">4000</span>
+<span class="w"> </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">ClusterIP</span> <span class="nn">---</span>
+<span class="c1"># ingress.yaml</span>
+<span class="nt">apiVersion</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">networking.k8s.io/v1</span>
+<span class="nt">kind</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Ingress</span>
+<span class="nt">metadata</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">pcap-extractor-ingress</span>
+<span class="w"> </span><span class="nt">annotations</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">nginx.ingress.kubernetes.io/rewrite-target</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">/</span>
+<span class="w"> </span><span class="nt">nginx.ingress.kubernetes.io/ssl-redirect</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;true&quot;</span>
+<span class="nt">spec</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">tls</span><span class="p">:</span>
+<span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">hosts</span><span class="p">:</span>
+<span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">pcap-extractor.company.com</span>
+<span class="w"> </span><span class="nt">secretName</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">pcap-extractor-tls</span>
+<span class="w"> </span><span class="nt">rules</span><span class="p">:</span>
+<span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">host</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">pcap-extractor.company.com</span>
+<span class="w"> </span><span class="nt">http</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">paths</span><span class="p">:</span>
+<span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">path</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">/</span>
+<span class="w"> </span><span class="nt">pathType</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Prefix</span>
+<span class="w"> </span><span class="nt">backend</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">service</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">pcap-extractor-service</span>
+<span class="w"> </span><span class="nt">port</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">number</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">80</span>
+</code></pre></div> <h2>Elixir-Specific Production Configurations</h2>
+<h3>OTP Application Configuration</h3>
+<div class="codehilite"><pre><span></span><code><span class="c1"># lib/pcap_extractor/application.ex</span>
+<span class="kd">defmodule</span><span class="w"> </span><span class="nc">PcapExtractor.Application</span><span class="w"> </span><span class="k">do</span>
+<span class="w"> </span><span class="kn">use</span><span class="w"> </span><span class="nc">Application</span> <span class="w"> </span><span class="kd">def</span><span class="w"> </span><span class="n">start</span><span class="p">(</span><span class="n">_type</span><span class="p">,</span><span class="w"> </span><span class="n">_args</span><span class="p">)</span><span class="w"> </span><span class="k">do</span>
+<span class="w"> </span><span class="n">children</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span>
+<span class="w"> </span><span class="c1"># Database</span>
+<span class="w"> </span><span class="nc">PcapExtractor.Repo</span><span class="p">,</span> <span class="w"> </span><span class="c1"># Phoenix components</span>
+<span class="w"> </span><span class="nc">PcapExtractorWeb.Telemetry</span><span class="p">,</span>
+<span class="w"> </span><span class="p">{</span><span class="nc">Phoenix.PubSub</span><span class="p">,</span><span class="w"> </span><span class="ss">name</span><span class="p">:</span><span class="w"> </span><span class="nc">PcapExtractor.PubSub</span><span class="p">},</span>
+<span class="w"> </span><span class="nc">PcapExtractorWeb.Endpoint</span><span class="p">,</span> <span class="w"> </span><span class="c1"># Business logic supervision tree</span>
+<span class="w"> </span><span class="p">{</span><span class="nc">PcapExtractor.AsyncExtraction.Supervisor</span><span class="p">,</span><span class="w"> </span><span class="p">[]},</span>
+<span class="w"> </span><span class="p">{</span><span class="nc">PcapExtractor.Bootstrap.Supervisor</span><span class="p">,</span><span class="w"> </span><span class="p">[]},</span> <span class="w"> </span><span class="c1"># Cache and external services</span>
+<span class="w"> </span><span class="p">{</span><span class="nc">PcapExtractor.DistributedCache</span><span class="p">,</span><span class="w"> </span><span class="p">[]},</span>
+<span class="w"> </span><span class="p">{</span><span class="nc">PcapExtractor.HealthChecker</span><span class="p">,</span><span class="w"> </span><span class="p">[]},</span> <span class="w"> </span><span class="c1"># Task supervisor for concurrent processing</span>
+<span class="w"> </span><span class="p">{</span><span class="nc">Task.Supervisor</span><span class="p">,</span><span class="w"> </span><span class="ss">name</span><span class="p">:</span><span class="w"> </span><span class="nc">PcapExtractor.TaskSupervisor</span><span class="p">}</span>
+<span class="w"> </span><span class="p">]</span> <span class="w"> </span><span class="n">opts</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="ss">strategy</span><span class="p">:</span><span class="w"> </span><span class="ss">:one_for_one</span><span class="p">,</span><span class="w"> </span><span class="ss">name</span><span class="p">:</span><span class="w"> </span><span class="nc">PcapExtractor.Supervisor</span><span class="p">]</span>
+<span class="w"> </span><span class="nc">Supervisor</span><span class="o">.</span><span class="n">start_link</span><span class="p">(</span><span class="n">children</span><span class="p">,</span><span class="w"> </span><span class="n">opts</span><span class="p">)</span>
+<span class="w"> </span><span class="k">end</span> <span class="w"> </span><span class="kd">def</span><span class="w"> </span><span class="n">config_change</span><span class="p">(</span><span class="n">changed</span><span class="p">,</span><span class="w"> </span><span class="n">_new</span><span class="p">,</span><span class="w"> </span><span class="n">removed</span><span class="p">)</span><span class="w"> </span><span class="k">do</span>
+<span class="w"> </span><span class="nc">PcapExtractorWeb.Endpoint</span><span class="o">.</span><span class="n">config_change</span><span class="p">(</span><span class="n">changed</span><span class="p">,</span><span class="w"> </span><span class="n">removed</span><span class="p">)</span>
+<span class="w"> </span><span class="ss">:ok</span>
+<span class="w"> </span><span class="k">end</span>
+<span class="k">end</span>
+</code></pre></div> <h3>Supervision Strategy</h3>
+<div class="codehilite"><pre><span></span><code><span class="c1"># lib/pcap_extractor/async_extraction/supervisor.ex</span>
+<span class="kd">defmodule</span><span class="w"> </span><span class="nc">PcapExtractor.AsyncExtraction.Supervisor</span><span class="w"> </span><span class="k">do</span>
+<span class="w"> </span><span class="kn">use</span><span class="w"> </span><span class="nc">Supervisor</span> <span class="w"> </span><span class="kd">def</span><span class="w"> </span><span class="n">start_link</span><span class="p">(</span><span class="n">init_arg</span><span class="p">)</span><span class="w"> </span><span class="k">do</span>
+<span class="w"> </span><span class="nc">Supervisor</span><span class="o">.</span><span class="n">start_link</span><span class="p">(</span><span class="bp">__MODULE__</span><span class="p">,</span><span class="w"> </span><span class="n">init_arg</span><span class="p">,</span><span class="w"> </span><span class="ss">name</span><span class="p">:</span><span class="w"> </span><span class="bp">__MODULE__</span><span class="p">)</span>
+<span class="w"> </span><span class="k">end</span> <span class="w"> </span><span class="kd">def</span><span class="w"> </span><span class="n">init</span><span class="p">(</span><span class="n">_init_arg</span><span class="p">)</span><span class="w"> </span><span class="k">do</span>
+<span class="w"> </span><span class="n">children</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span>
+<span class="w"> </span><span class="c1"># Core extraction server</span>
+<span class="w"> </span><span class="p">{</span><span class="nc">PcapExtractor.AsyncExtraction.Server</span><span class="p">,</span><span class="w"> </span><span class="p">[]},</span> <span class="w"> </span><span class="c1"># Dynamic supervisor for extraction tasks</span>
+<span class="w"> </span><span class="p">{</span><span class="nc">DynamicSupervisor</span><span class="p">,</span><span class="w"> </span>
+<span class="w"> </span><span class="ss">name</span><span class="p">:</span><span class="w"> </span><span class="nc">PcapExtractor.AsyncExtraction.TaskSupervisor</span><span class="p">,</span>
+<span class="w"> </span><span class="ss">strategy</span><span class="p">:</span><span class="w"> </span><span class="ss">:one_for_one</span><span class="p">,</span>
+<span class="w"> </span><span class="ss">max_restarts</span><span class="p">:</span><span class="w"> </span><span class="mi">3</span><span class="p">,</span>
+<span class="w"> </span><span class="ss">max_seconds</span><span class="p">:</span><span class="w"> </span><span class="mi">5</span><span class="p">}</span>
+<span class="w"> </span><span class="p">]</span> <span class="w"> </span><span class="c1"># One-for-all strategy ensures coordinated shutdown</span>
+<span class="w"> </span><span class="nc">Supervisor</span><span class="o">.</span><span class="n">init</span><span class="p">(</span><span class="n">children</span><span class="p">,</span><span class="w"> </span><span class="ss">strategy</span><span class="p">:</span><span class="w"> </span><span class="ss">:one_for_all</span><span class="p">)</span>
+<span class="w"> </span><span class="k">end</span>
+<span class="k">end</span>
+</code></pre></div> <h3>Database Configuration and Migrations</h3>
+<h4>Production Database Setup</h4>
+<div class="codehilite"><pre><span></span><code><span class="c1"># config/prod.exs</span>
+<span class="n">config</span><span class="w"> </span><span class="ss">:pcap_extractor</span><span class="p">,</span><span class="w"> </span><span class="nc">PcapExtractor.Repo</span><span class="p">,</span>
+<span class="w"> </span><span class="ss">pool_size</span><span class="p">:</span><span class="w"> </span><span class="nc">System</span><span class="o">.</span><span class="n">get_env</span><span class="p">(</span><span class="s2">&quot;POOL_SIZE&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;15&quot;</span><span class="p">)</span><span class="w"> </span><span class="o">|&gt;</span><span class="w"> </span><span class="nc">String</span><span class="o">.</span><span class="n">to_integer</span><span class="p">(),</span>
+<span class="w"> </span><span class="ss">timeout</span><span class="p">:</span><span class="w"> </span><span class="mi">60_000</span><span class="p">,</span>
+<span class="w"> </span><span class="ss">queue_target</span><span class="p">:</span><span class="w"> </span><span class="mi">5000</span><span class="p">,</span>
+<span class="w"> </span><span class="ss">queue_interval</span><span class="p">:</span><span class="w"> </span><span class="mi">1000</span><span class="p">,</span>
+<span class="w"> </span><span class="ss">ssl</span><span class="p">:</span><span class="w"> </span><span class="no">true</span><span class="p">,</span>
+<span class="w"> </span><span class="ss">ssl_opts</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+<span class="w"> </span><span class="ss">verify</span><span class="p">:</span><span class="w"> </span><span class="ss">:verify_peer</span><span class="p">,</span>
+<span class="w"> </span><span class="ss">cacertfile</span><span class="p">:</span><span class="w"> </span><span class="nc">System</span><span class="o">.</span><span class="n">get_env</span><span class="p">(</span><span class="s2">&quot;DATABASE_CA_CERT_PATH&quot;</span><span class="p">),</span>
+<span class="w"> </span><span class="ss">server_name_indication</span><span class="p">:</span><span class="w"> </span><span class="ss">:disable</span>
+<span class="w"> </span><span class="p">]</span>
+</code></pre></div> <h4>Migration Strategy</h4>
+<div class="codehilite"><pre><span></span><code><span class="c1"># priv/repo/migrations/001_create_extraction_requests.exs</span>
+<span class="kd">defmodule</span><span class="w"> </span><span class="nc">PcapExtractor.Repo.Migrations.CreateExtractionRequests</span><span class="w"> </span><span class="k">do</span>
+<span class="w"> </span><span class="kn">use</span><span class="w"> </span><span class="nc">Ecto.Migration</span> <span class="w"> </span><span class="kd">def</span><span class="w"> </span><span class="n">up</span><span class="w"> </span><span class="k">do</span>
+<span class="w"> </span><span class="n">create</span><span class="w"> </span><span class="n">table</span><span class="p">(</span><span class="ss">:extraction_requests</span><span class="p">)</span><span class="w"> </span><span class="k">do</span>
+<span class="w"> </span><span class="n">add</span><span class="w"> </span><span class="ss">:request_id</span><span class="p">,</span><span class="w"> </span><span class="ss">:string</span><span class="p">,</span><span class="w"> </span><span class="ss">null</span><span class="p">:</span><span class="w"> </span><span class="no">false</span>
+<span class="w"> </span><span class="n">add</span><span class="w"> </span><span class="ss">:status</span><span class="p">,</span><span class="w"> </span><span class="ss">:string</span><span class="p">,</span><span class="w"> </span><span class="ss">default</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;pending&quot;</span>
+<span class="w"> </span><span class="n">add</span><span class="w"> </span><span class="ss">:protocol</span><span class="p">,</span><span class="w"> </span><span class="ss">:string</span><span class="p">,</span><span class="w"> </span><span class="ss">null</span><span class="p">:</span><span class="w"> </span><span class="no">false</span>
+<span class="w"> </span><span class="n">add</span><span class="w"> </span><span class="ss">:filters</span><span class="p">,</span><span class="w"> </span><span class="ss">:map</span><span class="p">,</span><span class="w"> </span><span class="ss">default</span><span class="p">:</span><span class="w"> </span><span class="p">%{}</span>
+<span class="w"> </span><span class="n">add</span><span class="w"> </span><span class="ss">:created_by</span><span class="p">,</span><span class="w"> </span><span class="ss">:string</span><span class="p">,</span><span class="w"> </span><span class="ss">null</span><span class="p">:</span><span class="w"> </span><span class="no">false</span>
+<span class="w"> </span><span class="n">add</span><span class="w"> </span><span class="ss">:pcap_files</span><span class="p">,</span><span class="w"> </span><span class="p">{</span><span class="ss">:array</span><span class="p">,</span><span class="w"> </span><span class="ss">:string</span><span class="p">},</span><span class="w"> </span><span class="ss">default</span><span class="p">:</span><span class="w"> </span><span class="p">[]</span>
+<span class="w"> </span><span class="n">add</span><span class="w"> </span><span class="ss">:result_location</span><span class="p">,</span><span class="w"> </span><span class="ss">:string</span>
+<span class="w"> </span><span class="n">add</span><span class="w"> </span><span class="ss">:processing_started_at</span><span class="p">,</span><span class="w"> </span><span class="ss">:utc_datetime</span>
+<span class="w"> </span><span class="n">add</span><span class="w"> </span><span class="ss">:processing_completed_at</span><span class="p">,</span><span class="w"> </span><span class="ss">:utc_datetime</span>
+<span class="w"> </span><span class="n">add</span><span class="w"> </span><span class="ss">:error_message</span><span class="p">,</span><span class="w"> </span><span class="ss">:text</span> <span class="w"> </span><span class="n">timestamps</span><span class="p">()</span>
+<span class="w"> </span><span class="k">end</span> <span class="w"> </span><span class="n">create</span><span class="w"> </span><span class="n">unique_index</span><span class="p">(</span><span class="ss">:extraction_requests</span><span class="p">,</span><span class="w"> </span><span class="p">[</span><span class="ss">:request_id</span><span class="p">])</span>
+<span class="w"> </span><span class="n">create</span><span class="w"> </span><span class="n">index</span><span class="p">(</span><span class="ss">:extraction_requests</span><span class="p">,</span><span class="w"> </span><span class="p">[</span><span class="ss">:status</span><span class="p">])</span>
+<span class="w"> </span><span class="n">create</span><span class="w"> </span><span class="n">index</span><span class="p">(</span><span class="ss">:extraction_requests</span><span class="p">,</span><span class="w"> </span><span class="p">[</span><span class="ss">:created_by</span><span class="p">])</span>
+<span class="w"> </span><span class="n">create</span><span class="w"> </span><span class="n">index</span><span class="p">(</span><span class="ss">:extraction_requests</span><span class="p">,</span><span class="w"> </span><span class="p">[</span><span class="ss">:protocol</span><span class="p">])</span>
+<span class="w"> </span><span class="k">end</span> <span class="w"> </span><span class="kd">def</span><span class="w"> </span><span class="n">down</span><span class="w"> </span><span class="k">do</span>
+<span class="w"> </span><span class="n">drop</span><span class="w"> </span><span class="n">table</span><span class="p">(</span><span class="ss">:extraction_requests</span><span class="p">)</span>
+<span class="w"> </span><span class="k">end</span>
+<span class="k">end</span>
+</code></pre></div> <h2>Advanced Elixir Production Features</h2>
+<h3>Telemetry and Monitoring</h3>
+<div class="codehilite"><pre><span></span><code><span class="c1"># lib/pcap_extractor_web/telemetry.ex</span>
+<span class="kd">defmodule</span><span class="w"> </span><span class="nc">PcapExtractorWeb.Telemetry</span><span class="w"> </span><span class="k">do</span>
+<span class="w"> </span><span class="kn">use</span><span class="w"> </span><span class="nc">Supervisor</span>
+<span class="w"> </span><span class="kn">import</span><span class="w"> </span><span class="nc">Telemetry.Metrics</span> <span class="w"> </span><span class="kd">def</span><span class="w"> </span><span class="n">start_link</span><span class="p">(</span><span class="n">arg</span><span class="p">)</span><span class="w"> </span><span class="k">do</span>
+<span class="w"> </span><span class="nc">Supervisor</span><span class="o">.</span><span class="n">start_link</span><span class="p">(</span><span class="bp">__MODULE__</span><span class="p">,</span><span class="w"> </span><span class="n">arg</span><span class="p">,</span><span class="w"> </span><span class="ss">name</span><span class="p">:</span><span class="w"> </span><span class="bp">__MODULE__</span><span class="p">)</span>
+<span class="w"> </span><span class="k">end</span> <span class="w"> </span><span class="kd">def</span><span class="w"> </span><span class="n">init</span><span class="p">(</span><span class="n">_arg</span><span class="p">)</span><span class="w"> </span><span class="k">do</span>
+<span class="w"> </span><span class="n">children</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span>
+<span class="w"> </span><span class="c1"># Prometheus metrics exporter</span>
+<span class="w"> </span><span class="p">{</span><span class="ss">:telemetry_poller</span><span class="p">,</span><span class="w"> </span><span class="ss">measurements</span><span class="p">:</span><span class="w"> </span><span class="n">periodic_measurements</span><span class="p">()},</span>
+<span class="w"> </span><span class="p">{</span><span class="nc">TelemetryMetricsPrometheus</span><span class="p">,</span><span class="w"> </span><span class="ss">metrics</span><span class="p">:</span><span class="w"> </span><span class="n">metrics</span><span class="p">()}</span>
+<span class="w"> </span><span class="p">]</span> <span class="w"> </span><span class="nc">Supervisor</span><span class="o">.</span><span class="n">init</span><span class="p">(</span><span class="n">children</span><span class="p">,</span><span class="w"> </span><span class="ss">strategy</span><span class="p">:</span><span class="w"> </span><span class="ss">:one_for_one</span><span class="p">)</span>
+<span class="w"> </span><span class="k">end</span> <span class="w"> </span><span class="kd">def</span><span class="w"> </span><span class="n">metrics</span><span class="w"> </span><span class="k">do</span>
+<span class="w"> </span><span class="p">[</span>
+<span class="w"> </span><span class="c1"># Phoenix metrics</span>
+<span class="w"> </span><span class="n">summary</span><span class="p">(</span><span class="s2">&quot;phoenix.endpoint.stop.duration&quot;</span><span class="p">,</span>
+<span class="w"> </span><span class="ss">unit</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="ss">:native</span><span class="p">,</span><span class="w"> </span><span class="ss">:millisecond</span><span class="p">},</span>
+<span class="w"> </span><span class="ss">tags</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="ss">:route</span><span class="p">]</span>
+<span class="w"> </span><span class="p">),</span>
+<span class="w"> </span><span class="n">counter</span><span class="p">(</span><span class="s2">&quot;phoenix.endpoint.stop.count&quot;</span><span class="p">,</span>
+<span class="w"> </span><span class="ss">tags</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="ss">:route</span><span class="p">,</span><span class="w"> </span><span class="ss">:status</span><span class="p">]</span>
+<span class="w"> </span><span class="p">),</span> <span class="w"> </span><span class="c1"># Database metrics</span>
+<span class="w"> </span><span class="n">summary</span><span class="p">(</span><span class="s2">&quot;pcap_extractor.repo.query.total_time&quot;</span><span class="p">,</span>
+<span class="w"> </span><span class="ss">unit</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="ss">:native</span><span class="p">,</span><span class="w"> </span><span class="ss">:millisecond</span><span class="p">},</span>
+<span class="w"> </span><span class="ss">description</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Database query execution time&quot;</span>
+<span class="w"> </span><span class="p">),</span>
+<span class="w"> </span><span class="n">counter</span><span class="p">(</span><span class="s2">&quot;pcap_extractor.repo.query.count&quot;</span><span class="p">,</span>
+<span class="w"> </span><span class="ss">tags</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="ss">:result</span><span class="p">]</span>
+<span class="w"> </span><span class="p">),</span> <span class="w"> </span><span class="c1"># Business metrics</span>
+<span class="w"> </span><span class="n">counter</span><span class="p">(</span><span class="s2">&quot;pcap_extractor.extraction.requests.total&quot;</span><span class="p">,</span>
+<span class="w"> </span><span class="ss">tags</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="ss">:protocol</span><span class="p">,</span><span class="w"> </span><span class="ss">:status</span><span class="p">]</span>
+<span class="w"> </span><span class="p">),</span>
+<span class="w"> </span><span class="n">summary</span><span class="p">(</span><span class="s2">&quot;pcap_extractor.extraction.processing_time&quot;</span><span class="p">,</span>
+<span class="w"> </span><span class="ss">unit</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="ss">:native</span><span class="p">,</span><span class="w"> </span><span class="ss">:second</span><span class="p">},</span>
+<span class="w"> </span><span class="ss">tags</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="ss">:protocol</span><span class="p">]</span>
+<span class="w"> </span><span class="p">),</span>
+<span class="w"> </span><span class="n">gauge</span><span class="p">(</span><span class="s2">&quot;pcap_extractor.extraction.active_sessions&quot;</span><span class="p">,</span>
+<span class="w"> </span><span class="ss">description</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Number of active extraction sessions&quot;</span>
+<span class="w"> </span><span class="p">)</span>
+<span class="w"> </span><span class="p">]</span>
+<span class="w"> </span><span class="k">end</span> <span class="w"> </span><span class="kd">defp</span><span class="w"> </span><span class="n">periodic_measurements</span><span class="w"> </span><span class="k">do</span>
+<span class="w"> </span><span class="p">[</span>
+<span class="w"> </span><span class="p">{</span><span class="bp">__MODULE__</span><span class="p">,</span><span class="w"> </span><span class="ss">:dispatch_vm_metrics</span><span class="p">,</span><span class="w"> </span><span class="p">[]},</span>
+<span class="w"> </span><span class="p">{</span><span class="bp">__MODULE__</span><span class="p">,</span><span class="w"> </span><span class="ss">:dispatch_application_metrics</span><span class="p">,</span><span class="w"> </span><span class="p">[]}</span>
+<span class="w"> </span><span class="p">]</span>
+<span class="w"> </span><span class="k">end</span> <span class="w"> </span><span class="kd">def</span><span class="w"> </span><span class="n">dispatch_vm_metrics</span><span class="w"> </span><span class="k">do</span>
+<span class="w"> </span><span class="ss">:telemetry</span><span class="o">.</span><span class="n">execute</span><span class="p">([</span><span class="ss">:vm</span><span class="p">,</span><span class="w"> </span><span class="ss">:memory</span><span class="p">],</span><span class="w"> </span><span class="ss">:erlang</span><span class="o">.</span><span class="n">memory</span><span class="p">())</span>
+<span class="w"> </span><span class="ss">:telemetry</span><span class="o">.</span><span class="n">execute</span><span class="p">([</span><span class="ss">:vm</span><span class="p">,</span><span class="w"> </span><span class="ss">:total_run_queue_lengths</span><span class="p">],</span><span class="w"> </span>
+<span class="w"> </span><span class="p">%{</span><span class="ss">total</span><span class="p">:</span><span class="w"> </span><span class="ss">:erlang</span><span class="o">.</span><span class="n">statistics</span><span class="p">(</span><span class="ss">:total_run_queue_lengths</span><span class="p">)})</span>
+<span class="w"> </span><span class="k">end</span> <span class="w"> </span><span class="kd">def</span><span class="w"> </span><span class="n">dispatch_application_metrics</span><span class="w"> </span><span class="k">do</span>
+<span class="w"> </span><span class="n">active_sessions</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nc">PcapExtractor.AsyncExtraction.Server</span><span class="o">.</span><span class="n">active_session_count</span><span class="p">()</span>
+<span class="w"> </span><span class="ss">:telemetry</span><span class="o">.</span><span class="n">execute</span><span class="p">([</span><span class="ss">:pcap_extractor</span><span class="p">,</span><span class="w"> </span><span class="ss">:extraction</span><span class="p">,</span><span class="w"> </span><span class="ss">:active_sessions</span><span class="p">],</span><span class="w"> </span>
+<span class="w"> </span><span class="p">%{</span><span class="ss">count</span><span class="p">:</span><span class="w"> </span><span class="n">active_sessions</span><span class="p">})</span>
+<span class="w"> </span><span class="k">end</span>
+<span class="k">end</span>
+</code></pre></div> <h3>Health Checks and Observability</h3>
+<div class="codehilite"><pre><span></span><code><span class="c1"># lib/pcap_extractor/health_checker.ex</span>
+<span class="kd">defmodule</span><span class="w"> </span><span class="nc">PcapExtractor.HealthChecker</span><span class="w"> </span><span class="k">do</span>
+<span class="w"> </span><span class="kn">use</span><span class="w"> </span><span class="nc">GenServer</span>
+<span class="w"> </span><span class="kn">require</span><span class="w"> </span><span class="nc">Logger</span> <span class="w"> </span><span class="kd">def</span><span class="w"> </span><span class="n">start_link</span><span class="p">(</span><span class="bp">_</span><span class="p">)</span><span class="w"> </span><span class="k">do</span>
+<span class="w"> </span><span class="nc">GenServer</span><span class="o">.</span><span class="n">start_link</span><span class="p">(</span><span class="bp">__MODULE__</span><span class="p">,</span><span class="w"> </span><span class="p">%{},</span><span class="w"> </span><span class="ss">name</span><span class="p">:</span><span class="w"> </span><span class="bp">__MODULE__</span><span class="p">)</span>
+<span class="w"> </span><span class="k">end</span> <span class="w"> </span><span class="kd">def</span><span class="w"> </span><span class="n">init</span><span class="p">(</span><span class="bp">_</span><span class="p">)</span><span class="w"> </span><span class="k">do</span>
+<span class="w"> </span><span class="n">schedule_check</span><span class="p">()</span>
+<span class="w"> </span><span class="p">{</span><span class="ss">:ok</span><span class="p">,</span><span class="w"> </span><span class="p">%{</span><span class="ss">status</span><span class="p">:</span><span class="w"> </span><span class="ss">:unknown</span><span class="p">,</span><span class="w"> </span><span class="ss">checks</span><span class="p">:</span><span class="w"> </span><span class="p">%{}}}</span>
+<span class="w"> </span><span class="k">end</span> <span class="w"> </span><span class="kd">def</span><span class="w"> </span><span class="n">health_status</span><span class="w"> </span><span class="k">do</span>
+<span class="w"> </span><span class="nc">GenServer</span><span class="o">.</span><span class="n">call</span><span class="p">(</span><span class="bp">__MODULE__</span><span class="p">,</span><span class="w"> </span><span class="ss">:get_status</span><span class="p">)</span>
+<span class="w"> </span><span class="k">end</span> <span class="w"> </span><span class="kd">def</span><span class="w"> </span><span class="n">handle_call</span><span class="p">(</span><span class="ss">:get_status</span><span class="p">,</span><span class="w"> </span><span class="n">_from</span><span class="p">,</span><span class="w"> </span><span class="n">state</span><span class="p">)</span><span class="w"> </span><span class="k">do</span>
+<span class="w"> </span><span class="p">{</span><span class="ss">:reply</span><span class="p">,</span><span class="w"> </span><span class="n">state</span><span class="p">,</span><span class="w"> </span><span class="n">state</span><span class="p">}</span>
+<span class="w"> </span><span class="k">end</span> <span class="w"> </span><span class="kd">def</span><span class="w"> </span><span class="n">handle_info</span><span class="p">(</span><span class="ss">:health_check</span><span class="p">,</span><span class="w"> </span><span class="n">state</span><span class="p">)</span><span class="w"> </span><span class="k">do</span>
+<span class="w"> </span><span class="n">checks</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">perform_health_checks</span><span class="p">()</span>
+<span class="w"> </span><span class="n">overall_status</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">determine_overall_status</span><span class="p">(</span><span class="n">checks</span><span class="p">)</span> <span class="w"> </span><span class="n">new_state</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">%{</span><span class="ss">status</span><span class="p">:</span><span class="w"> </span><span class="n">overall_status</span><span class="p">,</span><span class="w"> </span><span class="ss">checks</span><span class="p">:</span><span class="w"> </span><span class="n">checks</span><span class="p">,</span><span class="w"> </span><span class="ss">last_check</span><span class="p">:</span><span class="w"> </span><span class="nc">DateTime</span><span class="o">.</span><span class="n">utc_now</span><span class="p">()}</span> <span class="w"> </span><span class="c1"># Log status changes</span>
+<span class="w"> </span><span class="k">if</span><span class="w"> </span><span class="n">state</span><span class="o">.</span><span class="n">status</span><span class="w"> </span><span class="o">!=</span><span class="w"> </span><span class="n">overall_status</span><span class="w"> </span><span class="k">do</span>
+<span class="w"> </span><span class="nc">Logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Health status changed from </span><span class="si">#{</span><span class="n">state</span><span class="o">.</span><span class="n">status</span><span class="si">}</span><span class="s2"> to </span><span class="si">#{</span><span class="n">overall_status</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+<span class="w"> </span><span class="k">end</span> <span class="w"> </span><span class="n">schedule_check</span><span class="p">()</span>
+<span class="w"> </span><span class="p">{</span><span class="ss">:noreply</span><span class="p">,</span><span class="w"> </span><span class="n">new_state</span><span class="p">}</span>
+<span class="w"> </span><span class="k">end</span> <span class="w"> </span><span class="kd">defp</span><span class="w"> </span><span class="n">perform_health_checks</span><span class="w"> </span><span class="k">do</span>
+<span class="w"> </span><span class="p">%{</span>
+<span class="w"> </span><span class="ss">database</span><span class="p">:</span><span class="w"> </span><span class="n">check_database</span><span class="p">(),</span>
+<span class="w"> </span><span class="ss">vault</span><span class="p">:</span><span class="w"> </span><span class="n">check_vault</span><span class="p">(),</span>
+<span class="w"> </span><span class="ss">file_system</span><span class="p">:</span><span class="w"> </span><span class="n">check_file_system</span><span class="p">(),</span>
+<span class="w"> </span><span class="ss">extraction_service</span><span class="p">:</span><span class="w"> </span><span class="n">check_extraction_service</span><span class="p">()</span>
+<span class="w"> </span><span class="p">}</span>
+<span class="w"> </span><span class="k">end</span> <span class="w"> </span><span class="kd">defp</span><span class="w"> </span><span class="n">check_database</span><span class="w"> </span><span class="k">do</span>
+<span class="w"> </span><span class="k">try</span><span class="w"> </span><span class="k">do</span>
+<span class="w"> </span><span class="nc">Ecto.Adapters.SQL</span><span class="o">.</span><span class="n">query!</span><span class="p">(</span><span class="nc">PcapExtractor.Repo</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;SELECT 1&quot;</span><span class="p">,</span><span class="w"> </span><span class="p">[])</span>
+<span class="w"> </span><span class="ss">:healthy</span>
+<span class="w"> </span><span class="k">rescue</span>
+<span class="w"> </span><span class="bp">_</span><span class="w"> </span><span class="o">-&gt;</span><span class="w"> </span><span class="ss">:unhealthy</span>
+<span class="w"> </span><span class="k">end</span>
+<span class="w"> </span><span class="k">end</span> <span class="w"> </span><span class="kd">defp</span><span class="w"> </span><span class="n">check_vault</span><span class="w"> </span><span class="k">do</span>
+<span class="w"> </span><span class="k">case</span><span class="w"> </span><span class="nc">PcapExtractor.Consul.KvClient</span><span class="o">.</span><span class="n">health_check</span><span class="p">()</span><span class="w"> </span><span class="k">do</span>
+<span class="w"> </span><span class="ss">:ok</span><span class="w"> </span><span class="o">-&gt;</span><span class="w"> </span><span class="ss">:healthy</span>
+<span class="w"> </span><span class="bp">_</span><span class="w"> </span><span class="o">-&gt;</span><span class="w"> </span><span class="ss">:unhealthy</span>
+<span class="w"> </span><span class="k">end</span>
+<span class="w"> </span><span class="k">end</span> <span class="w"> </span><span class="kd">defp</span><span class="w"> </span><span class="n">check_file_system</span><span class="w"> </span><span class="k">do</span>
+<span class="w"> </span><span class="k">case</span><span class="w"> </span><span class="nc">File</span><span class="o">.</span><span class="n">stat</span><span class="p">(</span><span class="s2">&quot;/app/pcaps&quot;</span><span class="p">)</span><span class="w"> </span><span class="k">do</span>
+<span class="w"> </span><span class="p">{</span><span class="ss">:ok</span><span class="p">,</span><span class="w"> </span><span class="bp">_</span><span class="p">}</span><span class="w"> </span><span class="o">-&gt;</span><span class="w"> </span><span class="ss">:healthy</span>
+<span class="w"> </span><span class="p">{</span><span class="ss">:error</span><span class="p">,</span><span class="w"> </span><span class="bp">_</span><span class="p">}</span><span class="w"> </span><span class="o">-&gt;</span><span class="w"> </span><span class="ss">:unhealthy</span>
+<span class="w"> </span><span class="k">end</span>
+<span class="w"> </span><span class="k">end</span> <span class="w"> </span><span class="kd">defp</span><span class="w"> </span><span class="n">check_extraction_service</span><span class="w"> </span><span class="k">do</span>
+<span class="w"> </span><span class="k">case</span><span class="w"> </span><span class="nc">PcapExtractor.AsyncExtraction.Server</span><span class="o">.</span><span class="n">health_check</span><span class="p">()</span><span class="w"> </span><span class="k">do</span>
+<span class="w"> </span><span class="ss">:ok</span><span class="w"> </span><span class="o">-&gt;</span><span class="w"> </span><span class="ss">:healthy</span>
+<span class="w"> </span><span class="bp">_</span><span class="w"> </span><span class="o">-&gt;</span><span class="w"> </span><span class="ss">:unhealthy</span>
+<span class="w"> </span><span class="k">end</span>
+<span class="w"> </span><span class="k">end</span> <span class="w"> </span><span class="kd">defp</span><span class="w"> </span><span class="n">determine_overall_status</span><span class="p">(</span><span class="n">checks</span><span class="p">)</span><span class="w"> </span><span class="k">do</span>
+<span class="w"> </span><span class="n">unhealthy_checks</span><span class="w"> </span><span class="o">=</span><span class="w"> </span>
+<span class="w"> </span><span class="n">checks</span>
+<span class="w"> </span><span class="o">|&gt;</span><span class="w"> </span><span class="nc">Enum</span><span class="o">.</span><span class="n">filter</span><span class="p">(</span><span class="k">fn</span><span class="w"> </span><span class="p">{</span><span class="bp">_</span><span class="p">,</span><span class="w"> </span><span class="n">status</span><span class="p">}</span><span class="w"> </span><span class="o">-&gt;</span><span class="w"> </span><span class="n">status</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="ss">:unhealthy</span><span class="w"> </span><span class="k">end</span><span class="p">)</span>
+<span class="w"> </span><span class="o">|&gt;</span><span class="w"> </span><span class="n">length</span><span class="p">()</span> <span class="w"> </span><span class="k">cond</span><span class="w"> </span><span class="k">do</span>
+<span class="w"> </span><span class="n">unhealthy_checks</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="mi">0</span><span class="w"> </span><span class="o">-&gt;</span><span class="w"> </span><span class="ss">:healthy</span>
+<span class="w"> </span><span class="n">unhealthy_checks</span><span class="w"> </span><span class="o">&lt;=</span><span class="w"> </span><span class="mi">1</span><span class="w"> </span><span class="o">-&gt;</span><span class="w"> </span><span class="ss">:degraded</span>
+<span class="w"> </span><span class="no">true</span><span class="w"> </span><span class="o">-&gt;</span><span class="w"> </span><span class="ss">:unhealthy</span>
+<span class="w"> </span><span class="k">end</span>
+<span class="w"> </span><span class="k">end</span> <span class="w"> </span><span class="kd">defp</span><span class="w"> </span><span class="n">schedule_check</span><span class="w"> </span><span class="k">do</span>
+<span class="w"> </span><span class="nc">Process</span><span class="o">.</span><span class="n">send_after</span><span class="p">(</span><span class="n">self</span><span class="p">(),</span><span class="w"> </span><span class="ss">:health_check</span><span class="p">,</span><span class="w"> </span><span class="mi">30_000</span><span class="p">)</span>
+<span class="w"> </span><span class="k">end</span>
+<span class="k">end</span>
+</code></pre></div> <h2>Infrastructure as Code with project</h2>
+<h3>project Deployment Configuration</h3>
+<div class="codehilite"><pre><span></span><code><span class="c1"># meta-dev.yml - Development deployment</span>
+<span class="nn">---</span>
+<span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Deploy PCAP Extractor to Development</span>
+<span class="w"> </span><span class="nt">hosts</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">wireless-dev</span>
+<span class="w"> </span><span class="nt">become</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
+<span class="w"> </span><span class="nt">vars</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">app_name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">pcap-extractor</span>
+<span class="w"> </span><span class="nt">app_version</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;{{</span><span class="nv"> </span><span class="s">lookup(&#39;file&#39;,</span><span class="nv"> </span><span class="s">&#39;VERSION&#39;)</span><span class="nv"> </span><span class="s">|</span><span class="nv"> </span><span class="s">default(&#39;latest&#39;)</span><span class="nv"> </span><span class="s">}}&quot;</span>
+<span class="w"> </span><span class="nt">environment</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">development</span> <span class="w"> </span><span class="nt">tasks</span><span class="p">:</span>
+<span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Create application directory</span>
+<span class="w"> </span><span class="nt">file</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">path</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;/opt/{{</span><span class="nv"> </span><span class="s">app_name</span><span class="nv"> </span><span class="s">}}&quot;</span>
+<span class="w"> </span><span class="nt">state</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">directory</span>
+<span class="w"> </span><span class="nt">owner</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">app</span>
+<span class="w"> </span><span class="nt">group</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">app</span>
+<span class="w"> </span><span class="nt">mode</span><span class="p">:</span><span class="w"> </span><span class="s">&#39;0755&#39;</span> <span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Deploy Docker Compose configuration</span>
+<span class="w"> </span><span class="nt">template</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">src</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">docker-compose.yml.j2</span>
+<span class="w"> </span><span class="nt">dest</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;/opt/{{</span><span class="nv"> </span><span class="s">app_name</span><span class="nv"> </span><span class="s">}}/docker-compose.yml&quot;</span>
+<span class="w"> </span><span class="nt">owner</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">app</span>
+<span class="w"> </span><span class="nt">group</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">app</span>
+<span class="w"> </span><span class="nt">mode</span><span class="p">:</span><span class="w"> </span><span class="s">&#39;0644&#39;</span>
+<span class="w"> </span><span class="nt">notify</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">restart application</span> <span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Deploy environment configuration</span>
+<span class="w"> </span><span class="nt">template</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">src</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">.env.j2</span>
+<span class="w"> </span><span class="nt">dest</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;/opt/{{</span><span class="nv"> </span><span class="s">app_name</span><span class="nv"> </span><span class="s">}}/.env&quot;</span>
+<span class="w"> </span><span class="nt">owner</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">app</span>
+<span class="w"> </span><span class="nt">group</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">app</span>
+<span class="w"> </span><span class="nt">mode</span><span class="p">:</span><span class="w"> </span><span class="s">&#39;0600&#39;</span>
+<span class="w"> </span><span class="nt">notify</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">restart application</span> <span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Create PCAP storage directory</span>
+<span class="w"> </span><span class="nt">file</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">path</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;/opt/{{</span><span class="nv"> </span><span class="s">app_name</span><span class="nv"> </span><span class="s">}}/pcaps&quot;</span>
+<span class="w"> </span><span class="nt">state</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">directory</span>
+<span class="w"> </span><span class="nt">owner</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">app</span>
+<span class="w"> </span><span class="nt">group</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">app</span>
+<span class="w"> </span><span class="nt">mode</span><span class="p">:</span><span class="w"> </span><span class="s">&#39;0750&#39;</span> <span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Pull latest Docker image</span>
+<span class="w"> </span><span class="nt">docker_image</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;{{</span><span class="nv"> </span><span class="s">docker_registry</span><span class="nv"> </span><span class="s">}}/{{</span><span class="nv"> </span><span class="s">app_name</span><span class="nv"> </span><span class="s">}}:{{</span><span class="nv"> </span><span class="s">app_version</span><span class="nv"> </span><span class="s">}}&quot;</span>
+<span class="w"> </span><span class="nt">source</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">pull</span>
+<span class="w"> </span><span class="nt">force_source</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span> <span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Start application services</span>
+<span class="w"> </span><span class="nt">docker_compose</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">project_src</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;/opt/{{</span><span class="nv"> </span><span class="s">app_name</span><span class="nv"> </span><span class="s">}}&quot;</span>
+<span class="w"> </span><span class="nt">state</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">present</span> <span class="w"> </span><span class="nt">handlers</span><span class="p">:</span>
+<span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">restart application</span>
+<span class="w"> </span><span class="nt">docker_compose</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">project_src</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;/opt/{{</span><span class="nv"> </span><span class="s">app_name</span><span class="nv"> </span><span class="s">}}&quot;</span>
+<span class="w"> </span><span class="nt">restarted</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
+</code></pre></div> <h3>Docker Compose for Local Development</h3>
+<div class="codehilite"><pre><span></span><code><span class="c1"># docker-compose.yml.j2</span>
+<span class="nt">version</span><span class="p">:</span><span class="w"> </span><span class="s">&#39;3.8&#39;</span> <span class="nt">services</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">pcap-extractor</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">image</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;{{</span><span class="nv"> </span><span class="s">docker_registry</span><span class="nv"> </span><span class="s">}}/{{</span><span class="nv"> </span><span class="s">app_name</span><span class="nv"> </span><span class="s">}}:{{</span><span class="nv"> </span><span class="s">app_version</span><span class="nv"> </span><span class="s">}}&quot;</span>
+<span class="w"> </span><span class="nt">container_name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">pcap-extractor</span>
+<span class="w"> </span><span class="nt">restart</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">unless-stopped</span>
+<span class="w"> </span><span class="nt">environment</span><span class="p">:</span>
+<span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">DATABASE_URL=postgresql://{{ db_user }}:{{ db_password }}@postgres:5432/{{ db_name }}</span>
+<span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">SECRET_KEY_BASE={{ secret_key_base }}</span>
+<span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">ERLANG_COOKIE={{ erlang_cookie }}</span>
+<span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">VAULT_ADDR={{ vault_addr }}</span>
+<span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">VAULT_ROLE=pcap-extractor</span>
+<span class="w"> </span><span class="nt">ports</span><span class="p">:</span>
+<span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="s">&quot;4000:4000&quot;</span>
+<span class="w"> </span><span class="nt">volumes</span><span class="p">:</span>
+<span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">pcap_storage:/app/pcaps:rw</span>
+<span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">./logs:/app/logs:rw</span>
+<span class="w"> </span><span class="nt">depends_on</span><span class="p">:</span>
+<span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">postgres</span>
+<span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">redis</span>
+<span class="w"> </span><span class="nt">healthcheck</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">test</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="s">&quot;CMD&quot;</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="s">&quot;curl&quot;</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="s">&quot;-f&quot;</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="s">&quot;http://localhost:4000/health&quot;</span><span class="p p-Indicator">]</span>
+<span class="w"> </span><span class="nt">interval</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">30s</span>
+<span class="w"> </span><span class="nt">timeout</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">10s</span>
+<span class="w"> </span><span class="nt">retries</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">3</span>
+<span class="w"> </span><span class="nt">start_period</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">60s</span> <span class="w"> </span><span class="nt">postgres</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">image</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">postgres:15-alpine</span>
+<span class="w"> </span><span class="nt">container_name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">pcap-extractor-db</span>
+<span class="w"> </span><span class="nt">restart</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">unless-stopped</span>
+<span class="w"> </span><span class="nt">environment</span><span class="p">:</span>
+<span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">POSTGRES_DB={{ db_name }}</span>
+<span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">POSTGRES_USER={{ db_user }}</span>
+<span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">POSTGRES_PASSWORD={{ db_password }}</span>
+<span class="w"> </span><span class="nt">volumes</span><span class="p">:</span>
+<span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">postgres_data:/var/lib/postgresql/data</span>
+<span class="w"> </span><span class="nt">ports</span><span class="p">:</span>
+<span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="s">&quot;5432:5432&quot;</span> <span class="w"> </span><span class="nt">redis</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">image</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">redis:7-alpine</span>
+<span class="w"> </span><span class="nt">container_name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">pcap-extractor-cache</span>
+<span class="w"> </span><span class="nt">restart</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">unless-stopped</span>
+<span class="w"> </span><span class="nt">command</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">redis-server --appendonly yes</span>
+<span class="w"> </span><span class="nt">volumes</span><span class="p">:</span>
+<span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">redis_data:/data</span>
+<span class="w"> </span><span class="nt">ports</span><span class="p">:</span>
+<span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="s">&quot;6379:6379&quot;</span> <span class="nt">volumes</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">pcap_storage</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">driver</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">local</span>
+<span class="w"> </span><span class="nt">postgres_data</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">driver</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">local</span>
+<span class="w"> </span><span class="nt">redis_data</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">driver</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">local</span> <span class="nt">networks</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">default</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">pcap-extractor-network</span>
+</code></pre></div> <h2>Production Operational Practices</h2>
+<h3>Deployment Pipeline</h3>
+<div class="codehilite"><pre><span></span><code><span class="c1"># Automated deployment script</span>
+<span class="c1">#!/bin/bash</span>
+<span class="nb">set</span><span class="w"> </span>-euo<span class="w"> </span>pipefail <span class="c1"># Variables</span>
+<span class="nv">APP_NAME</span><span class="o">=</span><span class="s2">&quot;pcap-extractor&quot;</span>
+<span class="nv">REGISTRY</span><span class="o">=</span><span class="s2">&quot;company.com/wireless&quot;</span>
+<span class="nv">VERSION</span><span class="o">=</span><span class="k">$(</span>cat<span class="w"> </span>VERSION<span class="k">)</span>
+<span class="nv">ENVIRONMENT</span><span class="o">=</span><span class="si">${</span><span class="nv">1</span><span class="k">:-</span><span class="nv">dev</span><span class="si">}</span> <span class="c1"># Build and test</span>
+<span class="nb">echo</span><span class="w"> </span><span class="s2">&quot;Building application...&quot;</span>
+docker<span class="w"> </span>build<span class="w"> </span>-t<span class="w"> </span><span class="nv">$REGISTRY</span>/<span class="nv">$APP_NAME</span>:<span class="nv">$VERSION</span><span class="w"> </span>.
+docker<span class="w"> </span>tag<span class="w"> </span><span class="nv">$REGISTRY</span>/<span class="nv">$APP_NAME</span>:<span class="nv">$VERSION</span><span class="w"> </span><span class="nv">$REGISTRY</span>/<span class="nv">$APP_NAME</span>:latest <span class="nb">echo</span><span class="w"> </span><span class="s2">&quot;Running tests...&quot;</span>
+docker<span class="w"> </span>run<span class="w"> </span>--rm<span class="w"> </span><span class="nv">$REGISTRY</span>/<span class="nv">$APP_NAME</span>:<span class="nv">$VERSION</span><span class="w"> </span>bin/pcap_extractor<span class="w"> </span><span class="nb">eval</span><span class="w"> </span><span class="s2">&quot;PcapExtractor.ReleaseTasks.test()&quot;</span> <span class="c1"># Push to registry</span>
+<span class="nb">echo</span><span class="w"> </span><span class="s2">&quot;Pushing to registry...&quot;</span>
+docker<span class="w"> </span>push<span class="w"> </span><span class="nv">$REGISTRY</span>/<span class="nv">$APP_NAME</span>:<span class="nv">$VERSION</span>
+docker<span class="w"> </span>push<span class="w"> </span><span class="nv">$REGISTRY</span>/<span class="nv">$APP_NAME</span>:latest <span class="c1"># Deploy to environment</span>
+<span class="nb">echo</span><span class="w"> </span><span class="s2">&quot;Deploying to </span><span class="nv">$ENVIRONMENT</span><span class="s2">...&quot;</span>
+project-playbook<span class="w"> </span>-i<span class="w"> </span>inventory/<span class="nv">$ENVIRONMENT</span><span class="w"> </span>meta-<span class="nv">$ENVIRONMENT</span>.yml<span class="w"> </span><span class="se">\</span>
+<span class="w"> </span>--extra-vars<span class="w"> </span><span class="s2">&quot;app_version=</span><span class="nv">$VERSION</span><span class="s2">&quot;</span> <span class="c1"># Health check</span>
+<span class="nb">echo</span><span class="w"> </span><span class="s2">&quot;Performing health check...&quot;</span>
+sleep<span class="w"> </span><span class="m">30</span>
+curl<span class="w"> </span>-f<span class="w"> </span><span class="s2">&quot;https://pcap-extractor-</span><span class="nv">$ENVIRONMENT</span><span class="s2">.company.com/health&quot;</span><span class="w"> </span><span class="o">||</span><span class="w"> </span><span class="o">{</span>
+<span class="w"> </span><span class="nb">echo</span><span class="w"> </span><span class="s2">&quot;Health check failed - rolling back&quot;</span>
+<span class="w"> </span>project-playbook<span class="w"> </span>-i<span class="w"> </span>inventory/<span class="nv">$ENVIRONMENT</span><span class="w"> </span>rollback.yml
+<span class="w"> </span><span class="nb">exit</span><span class="w"> </span><span class="m">1</span>
+<span class="o">}</span> <span class="nb">echo</span><span class="w"> </span><span class="s2">&quot;Deployment successful!&quot;</span>
+</code></pre></div> <h3>Release Management</h3>
+<div class="codehilite"><pre><span></span><code><span class="c1"># lib/release_tasks.ex</span>
+<span class="kd">defmodule</span><span class="w"> </span><span class="nc">PcapExtractor.ReleaseTasks</span><span class="w"> </span><span class="k">do</span>
+<span class="w"> </span><span class="na">@app</span><span class="w"> </span><span class="ss">:pcap_extractor</span> <span class="w"> </span><span class="kd">def</span><span class="w"> </span><span class="n">migrate</span><span class="w"> </span><span class="k">do</span>
+<span class="w"> </span><span class="n">load_app</span><span class="p">()</span> <span class="w"> </span><span class="k">for</span><span class="w"> </span><span class="n">repo</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">repos</span><span class="p">()</span><span class="w"> </span><span class="k">do</span>
+<span class="w"> </span><span class="p">{</span><span class="ss">:ok</span><span class="p">,</span><span class="w"> </span><span class="bp">_</span><span class="p">,</span><span class="w"> </span><span class="bp">_</span><span class="p">}</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nc">Ecto.Migrator</span><span class="o">.</span><span class="n">with_repo</span><span class="p">(</span><span class="n">repo</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="nc">Ecto.Migrator</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="ni">&amp;1</span><span class="p">,</span><span class="w"> </span><span class="ss">:up</span><span class="p">,</span><span class="w"> </span><span class="ss">all</span><span class="p">:</span><span class="w"> </span><span class="no">true</span><span class="p">))</span>
+<span class="w"> </span><span class="k">end</span>
+<span class="w"> </span><span class="k">end</span> <span class="w"> </span><span class="kd">def</span><span class="w"> </span><span class="n">rollback</span><span class="p">(</span><span class="n">repo</span><span class="p">,</span><span class="w"> </span><span class="n">version</span><span class="p">)</span><span class="w"> </span><span class="k">do</span>
+<span class="w"> </span><span class="n">load_app</span><span class="p">()</span>
+<span class="w"> </span><span class="p">{</span><span class="ss">:ok</span><span class="p">,</span><span class="w"> </span><span class="bp">_</span><span class="p">,</span><span class="w"> </span><span class="bp">_</span><span class="p">}</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nc">Ecto.Migrator</span><span class="o">.</span><span class="n">with_repo</span><span class="p">(</span><span class="n">repo</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="nc">Ecto.Migrator</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="ni">&amp;1</span><span class="p">,</span><span class="w"> </span><span class="ss">:down</span><span class="p">,</span><span class="w"> </span><span class="ss">to</span><span class="p">:</span><span class="w"> </span><span class="n">version</span><span class="p">))</span>
+<span class="w"> </span><span class="k">end</span> <span class="w"> </span><span class="kd">def</span><span class="w"> </span><span class="n">seed</span><span class="w"> </span><span class="k">do</span>
+<span class="w"> </span><span class="n">load_app</span><span class="p">()</span> <span class="w"> </span><span class="k">for</span><span class="w"> </span><span class="n">repo</span><span class="w"> </span><span class="o">&lt;-</span><span class="w"> </span><span class="n">repos</span><span class="p">()</span><span class="w"> </span><span class="k">do</span>
+<span class="w"> </span><span class="p">{</span><span class="ss">:ok</span><span class="p">,</span><span class="w"> </span><span class="bp">_</span><span class="p">,</span><span class="w"> </span><span class="bp">_</span><span class="p">}</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nc">Ecto.Migrator</span><span class="o">.</span><span class="n">with_repo</span><span class="p">(</span><span class="n">repo</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">run_seeds_for</span><span class="o">/</span><span class="mi">1</span><span class="p">)</span>
+<span class="w"> </span><span class="k">end</span>
+<span class="w"> </span><span class="k">end</span> <span class="w"> </span><span class="kd">defp</span><span class="w"> </span><span class="n">repos</span><span class="w"> </span><span class="k">do</span>
+<span class="w"> </span><span class="nc">Application</span><span class="o">.</span><span class="n">fetch_env!</span><span class="p">(</span><span class="na">@app</span><span class="p">,</span><span class="w"> </span><span class="ss">:ecto_repos</span><span class="p">)</span>
+<span class="w"> </span><span class="k">end</span> <span class="w"> </span><span class="kd">defp</span><span class="w"> </span><span class="n">run_seeds_for</span><span class="p">(</span><span class="n">repo</span><span class="p">)</span><span class="w"> </span><span class="k">do</span>
+<span class="w"> </span><span class="c1"># Run the seed script if it exists</span>
+<span class="w"> </span><span class="n">seed_script</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">priv_path_for</span><span class="p">(</span><span class="n">repo</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;seeds.exs&quot;</span><span class="p">)</span> <span class="w"> </span><span class="k">if</span><span class="w"> </span><span class="nc">File</span><span class="o">.</span><span class="n">exists?</span><span class="p">(</span><span class="n">seed_script</span><span class="p">)</span><span class="w"> </span><span class="k">do</span>
+<span class="w"> </span><span class="nc">Code</span><span class="o">.</span><span class="n">eval_file</span><span class="p">(</span><span class="n">seed_script</span><span class="p">)</span>
+<span class="w"> </span><span class="k">end</span>
+<span class="w"> </span><span class="k">end</span> <span class="w"> </span><span class="kd">defp</span><span class="w"> </span><span class="n">priv_path_for</span><span class="p">(</span><span class="n">repo</span><span class="p">,</span><span class="w"> </span><span class="n">filename</span><span class="p">)</span><span class="w"> </span><span class="k">do</span>
+<span class="w"> </span><span class="n">app</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nc">Keyword</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">repo</span><span class="o">.</span><span class="n">config</span><span class="p">,</span><span class="w"> </span><span class="ss">:otp_app</span><span class="p">)</span>
+<span class="w"> </span><span class="n">repo_underscore</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">repo</span><span class="w"> </span><span class="o">|&gt;</span><span class="w"> </span><span class="nc">Module</span><span class="o">.</span><span class="n">split</span><span class="p">()</span><span class="w"> </span><span class="o">|&gt;</span><span class="w"> </span><span class="nc">List</span><span class="o">.</span><span class="n">last</span><span class="p">()</span><span class="w"> </span><span class="o">|&gt;</span><span class="w"> </span><span class="nc">Macro</span><span class="o">.</span><span class="n">underscore</span><span class="p">()</span>
+<span class="w"> </span><span class="n">priv_dir</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;</span><span class="si">#{</span><span class="ss">:code</span><span class="o">.</span><span class="n">priv_dir</span><span class="p">(</span><span class="n">app</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span> <span class="w"> </span><span class="nc">Path</span><span class="o">.</span><span class="n">join</span><span class="p">([</span><span class="n">priv_dir</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;repo&quot;</span><span class="p">,</span><span class="w"> </span><span class="n">repo_underscore</span><span class="p">,</span><span class="w"> </span><span class="n">filename</span><span class="p">])</span>
+<span class="w"> </span><span class="k">end</span> <span class="w"> </span><span class="kd">defp</span><span class="w"> </span><span class="n">load_app</span><span class="w"> </span><span class="k">do</span>
+<span class="w"> </span><span class="nc">Application</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="na">@app</span><span class="p">)</span>
+<span class="w"> </span><span class="k">end</span>
+<span class="k">end</span>
+</code></pre></div> <h2>Performance Optimization and Scaling</h2>
+<h3>Concurrent Processing Optimization</h3>
+<div class="codehilite"><pre><span></span><code><span class="c1"># lib/pcap_extractor/async_extraction/server.ex</span>
+<span class="kd">defmodule</span><span class="w"> </span><span class="nc">PcapExtractor.AsyncExtraction.Server</span><span class="w"> </span><span class="k">do</span>
+<span class="w"> </span><span class="kn">use</span><span class="w"> </span><span class="nc">GenServer</span>
+<span class="w"> </span><span class="kn">require</span><span class="w"> </span><span class="nc">Logger</span> <span class="w"> </span><span class="na">@max_concurrent_extractions</span><span class="w"> </span><span class="mi">10</span> <span class="w"> </span><span class="kd">def</span><span class="w"> </span><span class="n">start_link</span><span class="p">(</span><span class="bp">_</span><span class="p">)</span><span class="w"> </span><span class="k">do</span>
+<span class="w"> </span><span class="nc">GenServer</span><span class="o">.</span><span class="n">start_link</span><span class="p">(</span><span class="bp">__MODULE__</span><span class="p">,</span><span class="w"> </span><span class="p">%{},</span><span class="w"> </span><span class="ss">name</span><span class="p">:</span><span class="w"> </span><span class="bp">__MODULE__</span><span class="p">)</span>
+<span class="w"> </span><span class="k">end</span> <span class="w"> </span><span class="kd">def</span><span class="w"> </span><span class="n">extract_async</span><span class="p">(</span><span class="n">request</span><span class="p">)</span><span class="w"> </span><span class="k">do</span>
+<span class="w"> </span><span class="nc">GenServer</span><span class="o">.</span><span class="n">cast</span><span class="p">(</span><span class="bp">__MODULE__</span><span class="p">,</span><span class="w"> </span><span class="p">{</span><span class="ss">:extract</span><span class="p">,</span><span class="w"> </span><span class="n">request</span><span class="p">})</span>
+<span class="w"> </span><span class="k">end</span> <span class="w"> </span><span class="kd">def</span><span class="w"> </span><span class="n">init</span><span class="p">(</span><span class="bp">_</span><span class="p">)</span><span class="w"> </span><span class="k">do</span>
+<span class="w"> </span><span class="n">state</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">%{</span>
+<span class="w"> </span><span class="ss">active_extractions</span><span class="p">:</span><span class="w"> </span><span class="p">%{},</span>
+<span class="w"> </span><span class="ss">pending_queue</span><span class="p">:</span><span class="w"> </span><span class="ss">:queue</span><span class="o">.</span><span class="n">new</span><span class="p">(),</span>
+<span class="w"> </span><span class="ss">max_concurrent</span><span class="p">:</span><span class="w"> </span><span class="na">@max_concurrent_extractions</span>
+<span class="w"> </span><span class="p">}</span> <span class="w"> </span><span class="p">{</span><span class="ss">:ok</span><span class="p">,</span><span class="w"> </span><span class="n">state</span><span class="p">}</span>
+<span class="w"> </span><span class="k">end</span> <span class="w"> </span><span class="kd">def</span><span class="w"> </span><span class="n">handle_cast</span><span class="p">({</span><span class="ss">:extract</span><span class="p">,</span><span class="w"> </span><span class="n">request</span><span class="p">},</span><span class="w"> </span><span class="n">state</span><span class="p">)</span><span class="w"> </span><span class="k">do</span>
+<span class="w"> </span><span class="k">if</span><span class="w"> </span><span class="n">map_size</span><span class="p">(</span><span class="n">state</span><span class="o">.</span><span class="n">active_extractions</span><span class="p">)</span><span class="w"> </span><span class="o">&lt;</span><span class="w"> </span><span class="n">state</span><span class="o">.</span><span class="n">max_concurrent</span><span class="w"> </span><span class="k">do</span>
+<span class="w"> </span><span class="n">start_extraction</span><span class="p">(</span><span class="n">request</span><span class="p">,</span><span class="w"> </span><span class="n">state</span><span class="p">)</span>
+<span class="w"> </span><span class="k">else</span>
+<span class="w"> </span><span class="n">queue_extraction</span><span class="p">(</span><span class="n">request</span><span class="p">,</span><span class="w"> </span><span class="n">state</span><span class="p">)</span>
+<span class="w"> </span><span class="k">end</span>
+<span class="w"> </span><span class="k">end</span> <span class="w"> </span><span class="kd">defp</span><span class="w"> </span><span class="n">start_extraction</span><span class="p">(</span><span class="n">request</span><span class="p">,</span><span class="w"> </span><span class="n">state</span><span class="p">)</span><span class="w"> </span><span class="k">do</span>
+<span class="w"> </span><span class="n">task_pid</span><span class="w"> </span><span class="o">=</span><span class="w"> </span>
+<span class="w"> </span><span class="nc">Task.Supervisor</span><span class="o">.</span><span class="n">async_nolink</span><span class="p">(</span>
+<span class="w"> </span><span class="nc">PcapExtractor.TaskSupervisor</span><span class="p">,</span>
+<span class="w"> </span><span class="k">fn</span><span class="w"> </span><span class="o">-&gt;</span><span class="w"> </span><span class="n">perform_extraction</span><span class="p">(</span><span class="n">request</span><span class="p">)</span><span class="w"> </span><span class="k">end</span>
+<span class="w"> </span><span class="p">)</span> <span class="w"> </span><span class="n">new_active</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nc">Map</span><span class="o">.</span><span class="n">put</span><span class="p">(</span><span class="n">state</span><span class="o">.</span><span class="n">active_extractions</span><span class="p">,</span><span class="w"> </span><span class="n">task_pid</span><span class="o">.</span><span class="n">pid</span><span class="p">,</span><span class="w"> </span><span class="n">request</span><span class="p">)</span>
+<span class="w"> </span><span class="nc">Process</span><span class="o">.</span><span class="n">monitor</span><span class="p">(</span><span class="n">task_pid</span><span class="o">.</span><span class="n">pid</span><span class="p">)</span> <span class="w"> </span><span class="nc">Logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Started extraction for request </span><span class="si">#{</span><span class="n">request</span><span class="o">.</span><span class="n">id</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span> <span class="w"> </span><span class="p">{</span><span class="ss">:noreply</span><span class="p">,</span><span class="w"> </span><span class="p">%{</span><span class="n">state</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="ss">active_extractions</span><span class="p">:</span><span class="w"> </span><span class="n">new_active</span><span class="p">}}</span>
+<span class="w"> </span><span class="k">end</span> <span class="w"> </span><span class="kd">defp</span><span class="w"> </span><span class="n">perform_extraction</span><span class="p">(</span><span class="n">request</span><span class="p">)</span><span class="w"> </span><span class="k">do</span>
+<span class="w"> </span><span class="c1"># Actual extraction logic with proper error handling</span>
+<span class="w"> </span><span class="k">try</span><span class="w"> </span><span class="k">do</span>
+<span class="w"> </span><span class="n">result</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nc">PcapExtractor.Extractor</span><span class="o">.</span><span class="n">process</span><span class="p">(</span><span class="n">request</span><span class="p">)</span>
+<span class="w"> </span><span class="nc">PcapExtractor.Notifier</span><span class="o">.</span><span class="n">notify_completion</span><span class="p">(</span><span class="n">request</span><span class="o">.</span><span class="n">id</span><span class="p">,</span><span class="w"> </span><span class="n">result</span><span class="p">)</span>
+<span class="w"> </span><span class="p">{</span><span class="ss">:ok</span><span class="p">,</span><span class="w"> </span><span class="n">result</span><span class="p">}</span>
+<span class="w"> </span><span class="k">rescue</span>
+<span class="w"> </span><span class="n">error</span><span class="w"> </span><span class="o">-&gt;</span>
+<span class="w"> </span><span class="nc">Logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="s2">&quot;Extraction failed for </span><span class="si">#{</span><span class="n">request</span><span class="o">.</span><span class="n">id</span><span class="si">}</span><span class="s2">: </span><span class="si">#{</span><span class="n">inspect</span><span class="p">(</span><span class="n">error</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+<span class="w"> </span><span class="nc">PcapExtractor.Notifier</span><span class="o">.</span><span class="n">notify_error</span><span class="p">(</span><span class="n">request</span><span class="o">.</span><span class="n">id</span><span class="p">,</span><span class="w"> </span><span class="n">error</span><span class="p">)</span>
+<span class="w"> </span><span class="p">{</span><span class="ss">:error</span><span class="p">,</span><span class="w"> </span><span class="n">error</span><span class="p">}</span>
+<span class="w"> </span><span class="k">end</span>
+<span class="w"> </span><span class="k">end</span> <span class="w"> </span><span class="kd">def</span><span class="w"> </span><span class="n">handle_info</span><span class="p">({</span><span class="ss">:DOWN</span><span class="p">,</span><span class="w"> </span><span class="n">_ref</span><span class="p">,</span><span class="w"> </span><span class="ss">:process</span><span class="p">,</span><span class="w"> </span><span class="n">pid</span><span class="p">,</span><span class="w"> </span><span class="n">reason</span><span class="p">},</span><span class="w"> </span><span class="n">state</span><span class="p">)</span><span class="w"> </span><span class="k">do</span>
+<span class="w"> </span><span class="k">case</span><span class="w"> </span><span class="nc">Map</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="n">state</span><span class="o">.</span><span class="n">active_extractions</span><span class="p">,</span><span class="w"> </span><span class="n">pid</span><span class="p">)</span><span class="w"> </span><span class="k">do</span>
+<span class="w"> </span><span class="p">{</span><span class="no">nil</span><span class="p">,</span><span class="w"> </span><span class="bp">_</span><span class="p">}</span><span class="w"> </span><span class="o">-&gt;</span><span class="w"> </span>
+<span class="w"> </span><span class="p">{</span><span class="ss">:noreply</span><span class="p">,</span><span class="w"> </span><span class="n">state</span><span class="p">}</span>
+<span class="w"> </span><span class="p">{</span><span class="n">request</span><span class="p">,</span><span class="w"> </span><span class="n">new_active</span><span class="p">}</span><span class="w"> </span><span class="o">-&gt;</span>
+<span class="w"> </span><span class="nc">Logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Extraction process ended for </span><span class="si">#{</span><span class="n">request</span><span class="o">.</span><span class="n">id</span><span class="si">}</span><span class="s2">: </span><span class="si">#{</span><span class="n">inspect</span><span class="p">(</span><span class="n">reason</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span> <span class="w"> </span><span class="c1"># Process next queued extraction if available</span>
+<span class="w"> </span><span class="n">new_state</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">%{</span><span class="n">state</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="ss">active_extractions</span><span class="p">:</span><span class="w"> </span><span class="n">new_active</span><span class="p">}</span>
+<span class="w"> </span><span class="n">process_next_queued</span><span class="p">(</span><span class="n">new_state</span><span class="p">)</span>
+<span class="w"> </span><span class="k">end</span>
+<span class="w"> </span><span class="k">end</span> <span class="w"> </span><span class="kd">defp</span><span class="w"> </span><span class="n">process_next_queued</span><span class="p">(</span><span class="n">state</span><span class="p">)</span><span class="w"> </span><span class="k">do</span>
+<span class="w"> </span><span class="k">case</span><span class="w"> </span><span class="ss">:queue</span><span class="o">.</span><span class="n">out</span><span class="p">(</span><span class="n">state</span><span class="o">.</span><span class="n">pending_queue</span><span class="p">)</span><span class="w"> </span><span class="k">do</span>
+<span class="w"> </span><span class="p">{{</span><span class="ss">:value</span><span class="p">,</span><span class="w"> </span><span class="n">request</span><span class="p">},</span><span class="w"> </span><span class="n">new_queue</span><span class="p">}</span><span class="w"> </span><span class="o">-&gt;</span>
+<span class="w"> </span><span class="n">new_state</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">%{</span><span class="n">state</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="ss">pending_queue</span><span class="p">:</span><span class="w"> </span><span class="n">new_queue</span><span class="p">}</span>
+<span class="w"> </span><span class="n">start_extraction</span><span class="p">(</span><span class="n">request</span><span class="p">,</span><span class="w"> </span><span class="n">new_state</span><span class="p">)</span>
+<span class="w"> </span><span class="p">{</span><span class="ss">:empty</span><span class="p">,</span><span class="w"> </span><span class="bp">_</span><span class="p">}</span><span class="w"> </span><span class="o">-&gt;</span>
+<span class="w"> </span><span class="p">{</span><span class="ss">:noreply</span><span class="p">,</span><span class="w"> </span><span class="n">state</span><span class="p">}</span>
+<span class="w"> </span><span class="k">end</span>
+<span class="w"> </span><span class="k">end</span>
+<span class="k">end</span>
+</code></pre></div> <h3>Database Connection Pooling</h3>
+<div class="codehilite"><pre><span></span><code><span class="c1"># config/prod.exs - Production database configuration</span>
+<span class="n">config</span><span class="w"> </span><span class="ss">:pcap_extractor</span><span class="p">,</span><span class="w"> </span><span class="nc">PcapExtractor.Repo</span><span class="p">,</span>
+<span class="w"> </span><span class="c1"># Connection pool configuration</span>
+<span class="w"> </span><span class="ss">pool_size</span><span class="p">:</span><span class="w"> </span><span class="mi">20</span><span class="p">,</span>
+<span class="w"> </span><span class="ss">queue_target</span><span class="p">:</span><span class="w"> </span><span class="mi">5000</span><span class="p">,</span>
+<span class="w"> </span><span class="ss">queue_interval</span><span class="p">:</span><span class="w"> </span><span class="mi">1000</span><span class="p">,</span> <span class="w"> </span><span class="c1"># Connection timeouts</span>
+<span class="w"> </span><span class="ss">timeout</span><span class="p">:</span><span class="w"> </span><span class="mi">60_000</span><span class="p">,</span>
+<span class="w"> </span><span class="ss">connect_timeout</span><span class="p">:</span><span class="w"> </span><span class="mi">60_000</span><span class="p">,</span>
+<span class="w"> </span><span class="ss">handshake_timeout</span><span class="p">:</span><span class="w"> </span><span class="mi">60_000</span><span class="p">,</span> <span class="w"> </span><span class="c1"># SSL configuration for production</span>
+<span class="w"> </span><span class="ss">ssl</span><span class="p">:</span><span class="w"> </span><span class="no">true</span><span class="p">,</span>
+<span class="w"> </span><span class="ss">ssl_opts</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+<span class="w"> </span><span class="ss">verify</span><span class="p">:</span><span class="w"> </span><span class="ss">:verify_peer</span><span class="p">,</span>
+<span class="w"> </span><span class="ss">cacertfile</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;/etc/ssl/certs/ca-certificates.crt&quot;</span><span class="p">,</span>
+<span class="w"> </span><span class="ss">server_name_indication</span><span class="p">:</span><span class="w"> </span><span class="ss">:disable</span><span class="p">,</span>
+<span class="w"> </span><span class="ss">customize_hostname_check</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+<span class="w"> </span><span class="ss">match_fun</span><span class="p">:</span><span class="w"> </span><span class="ss">:public_key</span><span class="o">.</span><span class="n">pkix_verify_hostname_match_fun</span><span class="p">(</span><span class="ss">:https</span><span class="p">)</span>
+<span class="w"> </span><span class="p">]</span>
+<span class="w"> </span><span class="p">],</span> <span class="w"> </span><span class="c1"># Performance tuning</span>
+<span class="w"> </span><span class="ss">prepare</span><span class="p">:</span><span class="w"> </span><span class="ss">:named</span><span class="p">,</span>
+<span class="w"> </span><span class="ss">parameters</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+<span class="w"> </span><span class="ss">plan_cache_mode</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;force_custom_plan&quot;</span>
+<span class="w"> </span><span class="p">]</span>
+</code></pre></div> <h2>Monitoring and Alerting</h2>
+<h3>Prometheus Metrics Integration</h3>
+<div class="codehilite"><pre><span></span><code><span class="c1"># lib/pcap_extractor/prometheus.ex</span>
+<span class="kd">defmodule</span><span class="w"> </span><span class="nc">PcapExtractor.Prometheus</span><span class="w"> </span><span class="k">do</span>
+<span class="w"> </span><span class="kn">use</span><span class="w"> </span><span class="nc">Prometheus.Metric</span> <span class="w"> </span><span class="na">@http_requests_total</span><span class="w"> </span><span class="ss">:prometheus_counter</span><span class="o">.</span><span class="n">new</span><span class="p">(</span>
+<span class="w"> </span><span class="ss">name</span><span class="p">:</span><span class="w"> </span><span class="ss">:http_requests_total</span><span class="p">,</span>
+<span class="w"> </span><span class="ss">help</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Total number of HTTP requests&quot;</span><span class="p">,</span>
+<span class="w"> </span><span class="ss">labels</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="ss">:method</span><span class="p">,</span><span class="w"> </span><span class="ss">:route</span><span class="p">,</span><span class="w"> </span><span class="ss">:status_code</span><span class="p">]</span>
+<span class="w"> </span><span class="p">)</span> <span class="w"> </span><span class="na">@extraction_processing_time</span><span class="w"> </span><span class="ss">:prometheus_histogram</span><span class="o">.</span><span class="n">new</span><span class="p">(</span>
+<span class="w"> </span><span class="ss">name</span><span class="p">:</span><span class="w"> </span><span class="ss">:extraction_processing_seconds</span><span class="p">,</span>
+<span class="w"> </span><span class="ss">help</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Time spent processing extractions&quot;</span><span class="p">,</span>
+<span class="w"> </span><span class="ss">labels</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="ss">:protocol</span><span class="p">,</span><span class="w"> </span><span class="ss">:status</span><span class="p">],</span>
+<span class="w"> </span><span class="ss">buckets</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="mf">0.1</span><span class="p">,</span><span class="w"> </span><span class="mf">0.5</span><span class="p">,</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="mi">2</span><span class="p">,</span><span class="w"> </span><span class="mi">5</span><span class="p">,</span><span class="w"> </span><span class="mi">10</span><span class="p">,</span><span class="w"> </span><span class="mi">30</span><span class="p">,</span><span class="w"> </span><span class="mi">60</span><span class="p">,</span><span class="w"> </span><span class="mi">120</span><span class="p">,</span><span class="w"> </span><span class="mi">300</span><span class="p">]</span>
+<span class="w"> </span><span class="p">)</span> <span class="w"> </span><span class="na">@active_extractions</span><span class="w"> </span><span class="ss">:prometheus_gauge</span><span class="o">.</span><span class="n">new</span><span class="p">(</span>
+<span class="w"> </span><span class="ss">name</span><span class="p">:</span><span class="w"> </span><span class="ss">:active_extractions_count</span><span class="p">,</span>
+<span class="w"> </span><span class="ss">help</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Number of currently active extraction processes&quot;</span>
+<span class="w"> </span><span class="p">)</span> <span class="w"> </span><span class="kd">def</span><span class="w"> </span><span class="n">track_request</span><span class="p">(</span><span class="n">method</span><span class="p">,</span><span class="w"> </span><span class="n">route</span><span class="p">,</span><span class="w"> </span><span class="n">status_code</span><span class="p">)</span><span class="w"> </span><span class="k">do</span>
+<span class="w"> </span><span class="ss">:prometheus_counter</span><span class="o">.</span><span class="n">inc</span><span class="p">(</span><span class="na">@http_requests_total</span><span class="p">,</span><span class="w"> </span><span class="p">[</span><span class="n">method</span><span class="p">,</span><span class="w"> </span><span class="n">route</span><span class="p">,</span><span class="w"> </span><span class="n">status_code</span><span class="p">])</span>
+<span class="w"> </span><span class="k">end</span> <span class="w"> </span><span class="kd">def</span><span class="w"> </span><span class="n">track_extraction_time</span><span class="p">(</span><span class="n">protocol</span><span class="p">,</span><span class="w"> </span><span class="n">status</span><span class="p">,</span><span class="w"> </span><span class="n">duration</span><span class="p">)</span><span class="w"> </span><span class="k">do</span>
+<span class="w"> </span><span class="ss">:prometheus_histogram</span><span class="o">.</span><span class="n">observe</span><span class="p">(</span><span class="na">@extraction_processing_time</span><span class="p">,</span><span class="w"> </span><span class="p">[</span><span class="n">protocol</span><span class="p">,</span><span class="w"> </span><span class="n">status</span><span class="p">],</span><span class="w"> </span><span class="n">duration</span><span class="p">)</span>
+<span class="w"> </span><span class="k">end</span> <span class="w"> </span><span class="kd">def</span><span class="w"> </span><span class="n">update_active_extractions</span><span class="p">(</span><span class="n">count</span><span class="p">)</span><span class="w"> </span><span class="k">do</span>
+<span class="w"> </span><span class="ss">:prometheus_gauge</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="na">@active_extractions</span><span class="p">,</span><span class="w"> </span><span class="n">count</span><span class="p">)</span>
+<span class="w"> </span><span class="k">end</span>
+<span class="k">end</span>
+</code></pre></div> <h3>Application Performance Monitoring</h3>
+<div class="codehilite"><pre><span></span><code><span class="c1"># grafana-dashboard.json (excerpt)</span>
+<span class="p p-Indicator">{</span>
+<span class="w"> </span><span class="s">&quot;dashboard&quot;</span><span class="p p-Indicator">:</span><span class="w"> </span><span class="p p-Indicator">{</span>
+<span class="w"> </span><span class="s">&quot;id&quot;</span><span class="p p-Indicator">:</span><span class="w"> </span><span class="nv">null</span><span class="p p-Indicator">,</span>
+<span class="w"> </span><span class="s">&quot;title&quot;</span><span class="p p-Indicator">:</span><span class="w"> </span><span class="s">&quot;PCAP</span><span class="nv"> </span><span class="s">Extractor</span><span class="nv"> </span><span class="s">Monitoring&quot;</span><span class="p p-Indicator">,</span>
+<span class="w"> </span><span class="s">&quot;tags&quot;</span><span class="p p-Indicator">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="s">&quot;elixir&quot;</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="s">&quot;phoenix&quot;</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="s">&quot;wireless&quot;</span><span class="p p-Indicator">],</span>
+<span class="w"> </span><span class="s">&quot;timezone&quot;</span><span class="p p-Indicator">:</span><span class="w"> </span><span class="s">&quot;browser&quot;</span><span class="p p-Indicator">,</span>
+<span class="w"> </span><span class="s">&quot;panels&quot;</span><span class="p p-Indicator">:</span><span class="w"> </span><span class="p p-Indicator">[</span>
+<span class="w"> </span><span class="p p-Indicator">{</span>
+<span class="w"> </span><span class="s">&quot;title&quot;</span><span class="p p-Indicator">:</span><span class="w"> </span><span class="s">&quot;Request</span><span class="nv"> </span><span class="s">Rate&quot;</span><span class="p p-Indicator">,</span>
+<span class="w"> </span><span class="s">&quot;type&quot;</span><span class="p p-Indicator">:</span><span class="w"> </span><span class="s">&quot;graph&quot;</span><span class="p p-Indicator">,</span>
+<span class="w"> </span><span class="s">&quot;targets&quot;</span><span class="p p-Indicator">:</span><span class="w"> </span><span class="p p-Indicator">[</span>
+<span class="w"> </span><span class="p p-Indicator">{</span>
+<span class="w"> </span><span class="s">&quot;expr&quot;</span><span class="p p-Indicator">:</span><span class="w"> </span><span class="s">&quot;rate(http_requests_total{job=\&quot;pcap-extractor\&quot;}[5m])&quot;</span><span class="p p-Indicator">,</span>
+<span class="w"> </span><span class="s">&quot;legendFormat&quot;</span><span class="p p-Indicator">:</span><span class="w"> </span><span class="s">&quot;{{method}}</span><span class="nv"> </span><span class="s">{{route}}</span><span class="nv"> </span><span class="s">{{status_code}}&quot;</span>
+<span class="w"> </span><span class="p p-Indicator">}</span>
+<span class="w"> </span><span class="p p-Indicator">]</span>
+<span class="w"> </span><span class="p p-Indicator">},</span>
+<span class="w"> </span><span class="p p-Indicator">{</span>
+<span class="w"> </span><span class="s">&quot;title&quot;</span><span class="p p-Indicator">:</span><span class="w"> </span><span class="s">&quot;Extraction</span><span class="nv"> </span><span class="s">Processing</span><span class="nv"> </span><span class="s">Time&quot;</span><span class="p p-Indicator">,</span>
+<span class="w"> </span><span class="s">&quot;type&quot;</span><span class="p p-Indicator">:</span><span class="w"> </span><span class="s">&quot;graph&quot;</span><span class="p p-Indicator">,</span>
+<span class="w"> </span><span class="s">&quot;targets&quot;</span><span class="p p-Indicator">:</span><span class="w"> </span><span class="p p-Indicator">[</span>
+<span class="w"> </span><span class="p p-Indicator">{</span>
+<span class="w"> </span><span class="s">&quot;expr&quot;</span><span class="p p-Indicator">:</span><span class="w"> </span><span class="s">&quot;histogram_quantile(0.95,</span><span class="nv"> </span><span class="s">rate(extraction_processing_seconds_bucket[5m]))&quot;</span><span class="p p-Indicator">,</span>
+<span class="w"> </span><span class="s">&quot;legendFormat&quot;</span><span class="p p-Indicator">:</span><span class="w"> </span><span class="s">&quot;95th</span><span class="nv"> </span><span class="s">percentile&quot;</span>
+<span class="w"> </span><span class="p p-Indicator">}</span>
+<span class="w"> </span><span class="p p-Indicator">]</span>
+<span class="w"> </span><span class="p p-Indicator">},</span>
+<span class="w"> </span><span class="p p-Indicator">{</span>
+<span class="w"> </span><span class="s">&quot;title&quot;</span><span class="p p-Indicator">:</span><span class="w"> </span><span class="s">&quot;Active</span><span class="nv"> </span><span class="s">Extractions&quot;</span><span class="p p-Indicator">,</span>
+<span class="w"> </span><span class="s">&quot;type&quot;</span><span class="p p-Indicator">:</span><span class="w"> </span><span class="s">&quot;singlestat&quot;</span><span class="p p-Indicator">,</span>
+<span class="w"> </span><span class="s">&quot;targets&quot;</span><span class="p p-Indicator">:</span><span class="w"> </span><span class="p p-Indicator">[</span>
+<span class="w"> </span><span class="p p-Indicator">{</span>
+<span class="w"> </span><span class="s">&quot;expr&quot;</span><span class="p p-Indicator">:</span><span class="w"> </span><span class="s">&quot;active_extractions_count&quot;</span><span class="p p-Indicator">,</span>
+<span class="w"> </span><span class="s">&quot;legendFormat&quot;</span><span class="p p-Indicator">:</span><span class="w"> </span><span class="s">&quot;Active&quot;</span>
+<span class="w"> </span><span class="p p-Indicator">}</span>
+<span class="w"> </span><span class="p p-Indicator">]</span>
+<span class="w"> </span><span class="p p-Indicator">}</span>
+<span class="w"> </span><span class="p p-Indicator">]</span>
+<span class="w"> </span><span class="p p-Indicator">}</span>
+<span class="p p-Indicator">}</span>
+</code></pre></div> <h2>Security Best Practices</h2>
+<h3>Secrets Management Integration</h3>
+<div class="codehilite"><pre><span></span><code><span class="c1"># lib/pcap_extractor/vault_client.ex</span>
+<span class="kd">defmodule</span><span class="w"> </span><span class="nc">PcapExtractor.VaultClient</span><span class="w"> </span><span class="k">do</span>
+<span class="w"> </span><span class="kn">use</span><span class="w"> </span><span class="nc">GenServer</span>
+<span class="w"> </span><span class="kn">require</span><span class="w"> </span><span class="nc">Logger</span> <span class="w"> </span><span class="kd">def</span><span class="w"> </span><span class="n">start_link</span><span class="p">(</span><span class="bp">_</span><span class="p">)</span><span class="w"> </span><span class="k">do</span>
+<span class="w"> </span><span class="nc">GenServer</span><span class="o">.</span><span class="n">start_link</span><span class="p">(</span><span class="bp">__MODULE__</span><span class="p">,</span><span class="w"> </span><span class="p">%{},</span><span class="w"> </span><span class="ss">name</span><span class="p">:</span><span class="w"> </span><span class="bp">__MODULE__</span><span class="p">)</span>
+<span class="w"> </span><span class="k">end</span> <span class="w"> </span><span class="kd">def</span><span class="w"> </span><span class="n">get_secret</span><span class="p">(</span><span class="n">path</span><span class="p">)</span><span class="w"> </span><span class="k">do</span>
+<span class="w"> </span><span class="nc">GenServer</span><span class="o">.</span><span class="n">call</span><span class="p">(</span><span class="bp">__MODULE__</span><span class="p">,</span><span class="w"> </span><span class="p">{</span><span class="ss">:get_secret</span><span class="p">,</span><span class="w"> </span><span class="n">path</span><span class="p">})</span>
+<span class="w"> </span><span class="k">end</span> <span class="w"> </span><span class="kd">def</span><span class="w"> </span><span class="n">init</span><span class="p">(</span><span class="bp">_</span><span class="p">)</span><span class="w"> </span><span class="k">do</span>
+<span class="w"> </span><span class="c1"># Authenticate with Vault using Kubernetes auth</span>
+<span class="w"> </span><span class="n">auth_response</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">authenticate</span><span class="p">()</span> <span class="w"> </span><span class="n">state</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">%{</span>
+<span class="w"> </span><span class="ss">token</span><span class="p">:</span><span class="w"> </span><span class="o">&lt;</span><span class="nc">REDACTED</span><span class="o">&gt;</span><span class="s2">&quot;client_token&quot;</span><span class="p">],</span>
+<span class="w"> </span><span class="ss">lease_duration</span><span class="p">:</span><span class="w"> </span><span class="n">auth_response</span><span class="p">[</span><span class="s2">&quot;lease_duration&quot;</span><span class="p">],</span>
+<span class="w"> </span><span class="ss">authenticated_at</span><span class="p">:</span><span class="w"> </span><span class="nc">System</span><span class="o">.</span><span class="n">system_time</span><span class="p">(</span><span class="ss">:second</span><span class="p">)</span>
+<span class="w"> </span><span class="p">}</span> <span class="w"> </span><span class="n">schedule_token_renewal</span><span class="p">(</span><span class="n">state</span><span class="o">.</span><span class="n">lease_duration</span><span class="p">)</span>
+<span class="w"> </span><span class="p">{</span><span class="ss">:ok</span><span class="p">,</span><span class="w"> </span><span class="n">state</span><span class="p">}</span>
+<span class="w"> </span><span class="k">end</span> <span class="w"> </span><span class="kd">def</span><span class="w"> </span><span class="n">handle_call</span><span class="p">({</span><span class="ss">:get_secret</span><span class="p">,</span><span class="w"> </span><span class="n">path</span><span class="p">},</span><span class="w"> </span><span class="n">_from</span><span class="p">,</span><span class="w"> </span><span class="n">state</span><span class="p">)</span><span class="w"> </span><span class="k">do</span>
+<span class="w"> </span><span class="k">case</span><span class="w"> </span><span class="n">fetch_secret</span><span class="p">(</span><span class="n">path</span><span class="p">,</span><span class="w"> </span><span class="n">state</span><span class="o">.</span><span class="n">token</span><span class="p">)</span><span class="w"> </span><span class="k">do</span>
+<span class="w"> </span><span class="p">{</span><span class="ss">:ok</span><span class="p">,</span><span class="w"> </span><span class="n">secret</span><span class="p">}</span><span class="w"> </span><span class="o">-&gt;</span><span class="w"> </span><span class="p">{</span><span class="ss">:reply</span><span class="p">,</span><span class="w"> </span><span class="p">{</span><span class="ss">:ok</span><span class="p">,</span><span class="w"> </span><span class="n">secret</span><span class="p">},</span><span class="w"> </span><span class="n">state</span><span class="p">}</span>
+<span class="w"> </span><span class="p">{</span><span class="ss">:error</span><span class="p">,</span><span class="w"> </span><span class="n">reason</span><span class="p">}</span><span class="w"> </span><span class="o">-&gt;</span><span class="w"> </span><span class="p">{</span><span class="ss">:reply</span><span class="p">,</span><span class="w"> </span><span class="p">{</span><span class="ss">:error</span><span class="p">,</span><span class="w"> </span><span class="n">reason</span><span class="p">},</span><span class="w"> </span><span class="n">state</span><span class="p">}</span>
+<span class="w"> </span><span class="k">end</span>
+<span class="w"> </span><span class="k">end</span> <span class="w"> </span><span class="kd">def</span><span class="w"> </span><span class="n">handle_info</span><span class="p">(</span><span class="ss">:renew_token</span><span class="p">,</span><span class="w"> </span><span class="n">state</span><span class="p">)</span><span class="w"> </span><span class="k">do</span>
+<span class="w"> </span><span class="k">case</span><span class="w"> </span><span class="n">renew_token</span><span class="p">(</span><span class="n">state</span><span class="o">.</span><span class="n">token</span><span class="p">)</span><span class="w"> </span><span class="k">do</span>
+<span class="w"> </span><span class="p">{</span><span class="ss">:ok</span><span class="p">,</span><span class="w"> </span><span class="n">new_state</span><span class="p">}</span><span class="w"> </span><span class="o">-&gt;</span>
+<span class="w"> </span><span class="n">schedule_token_renewal</span><span class="p">(</span><span class="n">new_state</span><span class="o">.</span><span class="n">lease_duration</span><span class="p">)</span>
+<span class="w"> </span><span class="p">{</span><span class="ss">:noreply</span><span class="p">,</span><span class="w"> </span><span class="n">new_state</span><span class="p">}</span>
+<span class="w"> </span><span class="p">{</span><span class="ss">:error</span><span class="p">,</span><span class="w"> </span><span class="n">_reason</span><span class="p">}</span><span class="w"> </span><span class="o">-&gt;</span>
+<span class="w"> </span><span class="c1"># Token renewal failed, re-authenticate</span>
+<span class="w"> </span><span class="p">{</span><span class="ss">:ok</span><span class="p">,</span><span class="w"> </span><span class="n">new_state</span><span class="p">}</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">init</span><span class="p">(</span><span class="no">nil</span><span class="p">)</span>
+<span class="w"> </span><span class="p">{</span><span class="ss">:noreply</span><span class="p">,</span><span class="w"> </span><span class="n">new_state</span><span class="p">}</span>
+<span class="w"> </span><span class="k">end</span>
+<span class="w"> </span><span class="k">end</span> <span class="w"> </span><span class="kd">defp</span><span class="w"> </span><span class="n">authenticate</span><span class="w"> </span><span class="k">do</span>
+<span class="w"> </span><span class="c1"># Kubernetes service account token authentication</span>
+<span class="w"> </span><span class="n">token</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="o">&lt;</span><span class="nc">REDACTED</span><span class="o">&gt;</span><span class="s2">&quot;/var/run/secrets/kubernetes.io/serviceaccount/token&quot;</span><span class="p">)</span> <span class="w"> </span><span class="n">vault_addr</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nc">System</span><span class="o">.</span><span class="n">get_env</span><span class="p">(</span><span class="s2">&quot;VAULT_ADDR&quot;</span><span class="p">)</span>
+<span class="w"> </span><span class="n">role</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nc">System</span><span class="o">.</span><span class="n">get_env</span><span class="p">(</span><span class="s2">&quot;VAULT_ROLE&quot;</span><span class="p">)</span> <span class="w"> </span><span class="n">body</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">%{</span><span class="ss">jwt</span><span class="p">:</span><span class="w"> </span><span class="n">token</span><span class="p">,</span><span class="w"> </span><span class="ss">role</span><span class="p">:</span><span class="w"> </span><span class="n">role</span><span class="p">}</span><span class="w"> </span><span class="o">|&gt;</span><span class="w"> </span><span class="nc">Jason</span><span class="o">.</span><span class="n">encode!</span><span class="p">()</span> <span class="w"> </span><span class="k">case</span><span class="w"> </span><span class="nc">HTTPoison</span><span class="o">.</span><span class="n">post</span><span class="p">(</span><span class="s2">&quot;</span><span class="si">#{</span><span class="n">vault_addr</span><span class="si">}</span><span class="s2">/v1/auth/kubernetes/login&quot;</span><span class="p">,</span><span class="w"> </span><span class="n">body</span><span class="p">,</span><span class="w"> </span><span class="p">[</span>
+<span class="w"> </span><span class="p">{</span><span class="s2">&quot;Content-Type&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;application/json&quot;</span><span class="p">}</span>
+<span class="w"> </span><span class="p">])</span><span class="w"> </span><span class="k">do</span>
+<span class="w"> </span><span class="p">{</span><span class="ss">:ok</span><span class="p">,</span><span class="w"> </span><span class="p">%</span><span class="nc">HTTPoison.Response</span><span class="p">{</span><span class="ss">status_code</span><span class="p">:</span><span class="w"> </span><span class="mi">200</span><span class="p">,</span><span class="w"> </span><span class="ss">body</span><span class="p">:</span><span class="w"> </span><span class="n">response_body</span><span class="p">}}</span><span class="w"> </span><span class="o">-&gt;</span>
+<span class="w"> </span><span class="nc">Jason</span><span class="o">.</span><span class="n">decode!</span><span class="p">(</span><span class="n">response_body</span><span class="p">)[</span><span class="s2">&quot;auth&quot;</span><span class="p">]</span>
+<span class="w"> </span><span class="n">error</span><span class="w"> </span><span class="o">-&gt;</span>
+<span class="w"> </span><span class="nc">Logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="s2">&quot;Vault authentication failed: </span><span class="si">#{</span><span class="n">inspect</span><span class="p">(</span><span class="n">error</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+<span class="w"> </span><span class="k">raise</span><span class="w"> </span><span class="s2">&quot;Failed to authenticate with Vault&quot;</span>
+<span class="w"> </span><span class="k">end</span>
+<span class="w"> </span><span class="k">end</span> <span class="w"> </span><span class="kd">defp</span><span class="w"> </span><span class="n">fetch_secret</span><span class="p">(</span><span class="n">path</span><span class="p">,</span><span class="w"> </span><span class="n">token</span><span class="p">)</span><span class="w"> </span><span class="k">do</span>
+<span class="w"> </span><span class="n">vault_addr</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nc">System</span><span class="o">.</span><span class="n">get_env</span><span class="p">(</span><span class="s2">&quot;VAULT_ADDR&quot;</span><span class="p">)</span> <span class="w"> </span><span class="k">case</span><span class="w"> </span><span class="nc">HTTPoison</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;</span><span class="si">#{</span><span class="n">vault_addr</span><span class="si">}</span><span class="s2">/v1/</span><span class="si">#{</span><span class="n">path</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">,</span><span class="w"> </span><span class="p">[</span>
+<span class="w"> </span><span class="p">{</span><span class="s2">&quot;X-Vault-Token&quot;</span><span class="p">,</span><span class="w"> </span><span class="n">token</span><span class="p">}</span>
+<span class="w"> </span><span class="p">])</span><span class="w"> </span><span class="k">do</span>
+<span class="w"> </span><span class="p">{</span><span class="ss">:ok</span><span class="p">,</span><span class="w"> </span><span class="p">%</span><span class="nc">HTTPoison.Response</span><span class="p">{</span><span class="ss">status_code</span><span class="p">:</span><span class="w"> </span><span class="mi">200</span><span class="p">,</span><span class="w"> </span><span class="ss">body</span><span class="p">:</span><span class="w"> </span><span class="n">response_body</span><span class="p">}}</span><span class="w"> </span><span class="o">-&gt;</span>
+<span class="w"> </span><span class="n">data</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nc">Jason</span><span class="o">.</span><span class="n">decode!</span><span class="p">(</span><span class="n">response_body</span><span class="p">)[</span><span class="s2">&quot;data&quot;</span><span class="p">][</span><span class="s2">&quot;data&quot;</span><span class="p">]</span>
+<span class="w"> </span><span class="p">{</span><span class="ss">:ok</span><span class="p">,</span><span class="w"> </span><span class="n">data</span><span class="p">}</span>
+<span class="w"> </span><span class="n">error</span><span class="w"> </span><span class="o">-&gt;</span>
+<span class="w"> </span><span class="nc">Logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="s2">&quot;Failed to fetch secret </span><span class="si">#{</span><span class="n">path</span><span class="si">}</span><span class="s2">: </span><span class="si">#{</span><span class="n">inspect</span><span class="p">(</span><span class="n">error</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+<span class="w"> </span><span class="p">{</span><span class="ss">:error</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;Failed to fetch secret&quot;</span><span class="p">}</span>
+<span class="w"> </span><span class="k">end</span>
+<span class="w"> </span><span class="k">end</span> <span class="w"> </span><span class="kd">defp</span><span class="w"> </span><span class="n">schedule_token_renewal</span><span class="p">(</span><span class="n">lease_duration</span><span class="p">)</span><span class="w"> </span><span class="k">do</span>
+<span class="w"> </span><span class="c1"># Renew token at 50% of lease duration</span>
+<span class="w"> </span><span class="n">renewal_time</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">div</span><span class="p">(</span><span class="n">lease_duration</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="mi">1000</span><span class="p">,</span><span class="w"> </span><span class="mi">2</span><span class="p">)</span>
+<span class="w"> </span><span class="nc">Process</span><span class="o">.</span><span class="n">send_after</span><span class="p">(</span><span class="n">self</span><span class="p">(),</span><span class="w"> </span><span class="ss">:renew_token</span><span class="p">,</span><span class="w"> </span><span class="n">renewal_time</span><span class="p">)</span>
+<span class="w"> </span><span class="k">end</span>
+<span class="k">end</span>
+</code></pre></div> <h2>Lessons Learned and Best Practices</h2>
+<h3>Production Deployment Checklist</h3>
+<div class="codehilite"><pre><span></span><code><span class="err">✓</span><span class="w"> </span><span class="nx">Container</span><span class="w"> </span><span class="nx">security</span><span class="w"> </span><span class="nx">hardening</span>
+<span class="err">✓</span><span class="w"> </span><span class="nx">Resource</span><span class="w"> </span><span class="nx">limits</span><span class="w"> </span><span class="k">and</span><span class="w"> </span><span class="nx">requests</span><span class="w"> </span><span class="nx">configured</span>
+<span class="err">✓</span><span class="w"> </span><span class="nx">Health</span><span class="w"> </span><span class="nx">checks</span><span class="w"> </span><span class="k">and</span><span class="w"> </span><span class="nx">readiness</span><span class="w"> </span><span class="nx">probes</span><span class="w"> </span><span class="nx">implemented</span>
+<span class="err">✓</span><span class="w"> </span><span class="nx">Secrets</span><span class="w"> </span><span class="nx">management</span><span class="w"> </span><span class="nx">integration</span>
+<span class="err">✓</span><span class="w"> </span><span class="nx">Database</span><span class="w"> </span><span class="nx">connection</span><span class="w"> </span><span class="nx">pooling</span><span class="w"> </span><span class="nx">optimized</span>
+<span class="err">✓</span><span class="w"> </span><span class="nx">Monitoring</span><span class="w"> </span><span class="k">and</span><span class="w"> </span><span class="nx">alerting</span><span class="w"> </span><span class="nx">configured</span>
+<span class="err">✓</span><span class="w"> </span><span class="nx">Log</span><span class="w"> </span><span class="nx">aggregation</span><span class="w"> </span><span class="nx">configured</span>
+<span class="err">✓</span><span class="w"> </span><span class="nx">Backup</span><span class="w"> </span><span class="k">and</span><span class="w"> </span><span class="nx">disaster</span><span class="w"> </span><span class="nx">recovery</span><span class="w"> </span><span class="nx">procedures</span>
+<span class="err">✓</span><span class="w"> </span><span class="nx">Performance</span><span class="w"> </span><span class="nx">testing</span><span class="w"> </span><span class="nx">completed</span>
+<span class="err">✓</span><span class="w"> </span><span class="nx">Security</span><span class="w"> </span><span class="nx">testing</span><span class="w"> </span><span class="nx">completed</span>
+<span class="err">✓</span><span class="w"> </span><span class="nx">Documentation</span><span class="w"> </span><span class="nx">updated</span>
+<span class="err">✓</span><span class="w"> </span><span class="nx">Team</span><span class="w"> </span><span class="nx">training</span><span class="w"> </span><span class="nx">completed</span>
+</code></pre></div> <h3>Performance Optimization Strategies</h3>
+<ol>
+<li>
+<p><strong>BEAM VM Tuning</strong> <code>bash # Production BEAM configuration export ERL_FLAGS="+P 1048576 +t db +A 30 +K true" export ELIXIR_ERL_OPTIONS="+sssdio 128"</code></p>
+</li>
+<li>
+<p><strong>Database Query Optimization</strong> <code>elixir # Use database indexes effectively from(r in ExtractionRequest, where: r.status == ^status and r.protocol == ^protocol, order_by: [desc: r.inserted_at], limit: ^limit, preload: [:user] )</code></p>
+</li>
+<li>
+<p><strong>Memory Management</strong> <code>elixir # Configure garbage collection for large data processing :erlang.garbage_collect(self(), [{:type, :major}])</code></p>
+</li>
+</ol>
+<h2>Conclusion</h2>
+<p>Deploying Elixir applications to production requires careful attention to OTP principles, infrastructure automation, and operational practices. The fault-tolerant nature of the BEAM VM provides an excellent foundation, but proper configuration, monitoring, and deployment practices are essential for production success.</p>
+<p>Key takeaways from this deployment journey:</p>
+<ol>
+<li><strong>Leverage OTP</strong>: Use supervision trees and GenServers for fault tolerance</li>
+<li><strong>Embrace Containers</strong>: Docker provides consistent deployment environments</li>
+<li><strong>Automate Everything</strong>: Infrastructure as Code reduces deployment complexity</li>
+<li><strong>Monitor Proactively</strong>: Comprehensive monitoring prevents issues before they impact users</li>
+<li><strong>Secure by Design</strong>: Implement security best practices from the beginning</li>
+<li><strong>Plan for Scale</strong>: Design systems to handle growth from day one</li>
+</ol>
+<p>The combination of Elixir's concurrency model, Phoenix's productivity, and modern deployment practices creates a powerful foundation for building scalable, maintainable production systems. With proper implementation of these practices, Elixir applications can achieve the high availability and performance that modern business requirements demand.</p>
+<h2>Additional Resources</h2>
+<ul>
+<li><a href="https://hexdocs.pm/phoenix/deployment.html">Elixir Deployment Guide</a></li>
+<li><a href="https://erlang.org/doc/design_principles/users_guide.html">OTP Design Principles</a></li>
+<li><a href="https://hexdocs.pm/phoenix/deployment.html#putting-it-all-together">Phoenix Production Checklist</a></li>
+<li><a href="https://www.erlang.org/doc/efficiency_guide/users_guide.html">BEAM Performance Tuning</a></li>
+</ul></div> <footer><ul class="stats"><li><a href="../index.html">Back to posts</a></li></ul></footer> </article> </div> <section id="sidebar"> <section> <div class="mini-posts"> <header><h3>Recent</h3></header> <ul>
+<li><a href="../posts/project-new--telecommunications-monitoring-blog.html">Automating Telecommunications Infrastructure Monitoring: A DevOps Approach to MSISDN Stock Management</a> <span class=\"published\">Monitoring</span></li>
+<li><a href="../posts/project--cicd-pipeline-blog.html">Building Rock-Solid CI/CD Pipelines for Mission-Critical Telecommunications Infrastructure</a> <span class=\"published\">DevOps</span></li>
+<li><a href="../posts/project--containerization-blog.html">Containerizing Critical VoLTE Infrastructure: Lessons from Production IMS Deployment</a> <span class=\"published\">Containers</span></li>
+<li><a href="../posts/project--ims-architecture-blog.html">Modernizing VoLTE IMS Architecture: From Monolith to Cloud-Native Microservices</a> <span class=\"published\">Telecom</span></li>
+<li><a href="../posts/project--monorepo-microservices-blog.html">Transforming Monolithic VoLTE Systems: A Journey from Single Container to Microservices Architecture</a> <span class=\"published\">Telecom</span></li> </ul> </div> </section> <section> <header><h3>About</h3></header> <p>Notes on telecom, infra, and automation.</p> </section> </section> <section id="footer"><p class="copyright">&copy; 2025</p></section> </div> <script src="../assets/js/jquery.min.js"></script> <script src="../assets/js/browser.min.js"></script> <script src="../assets/js/breakpoints.min.js"></script> <script src="../assets/js/util.js"></script> <script src="../assets/js/main.js"></script> </body>
+</html>

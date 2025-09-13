@@ -1,0 +1,428 @@
+<!DOCTYPE HTML>
+<html> <head> <title>Implementing Prometheus Metrics for DNS Services: A Complete Observability Strategy - Future Imperfect</title> <meta charset="utf-8" /> <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no" /> <link rel="stylesheet" href="../assets/css/main.css" /> <link rel="stylesheet" href="../assets/css/codehilite.css" /> </head> <body class="single is-preload"> <div id="wrapper"> <header id="header"> <h1><a href="../index.html">Future Imperfect</a></h1> <nav class="links"></nav> </header> <div id="main"> <article class="post"> <header> <div class="title"><h2>Implementing Prometheus Metrics for DNS Services: A Complete Observability Strategy</h2><p>In modern network infrastructure, visibility is paramount. DNS services, being critical infrastructure components, require comprehensive monitoring to ensure reliability, performance, and security. This post explores implementing Prometheus metrics for DNS services, with practical examples from building a custom CoreDNS deployment for wireless infrastructure.</p></div> <div class="meta"><span class="published">Monitoring</span></div> </header> <div class="content markdown"><h1>Implementing Prometheus Metrics for DNS Services: A Complete Observability Strategy</h1>
+<h2>Introduction</h2>
+<p>In modern network infrastructure, visibility is paramount. DNS services, being critical infrastructure components, require comprehensive monitoring to ensure reliability, performance, and security. This post explores implementing Prometheus metrics for DNS services, with practical examples from building a custom CoreDNS deployment for wireless infrastructure.</p>
+<h2>The Observability Challenge in DNS Services</h2>
+<h3>Traditional DNS Monitoring Limitations</h3>
+<ul>
+<li><strong>Limited visibility</strong>: Basic up/down monitoring insufficient for production</li>
+<li><strong>Performance blind spots</strong>: No insight into query response times</li>
+<li><strong>Capacity planning difficulties</strong>: Unclear resource utilization trends</li>
+<li><strong>Security gaps</strong>: No monitoring of DNS-based attacks or anomalies</li>
+<li><strong>Troubleshooting complexity</strong>: Lack of detailed operational metrics</li>
+</ul>
+<h3>Modern Observability Requirements</h3>
+<div class="codehilite"><pre><span></span><code><span class="c1"># DNS service observability goals</span>
+<span class="nt">observability</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">availability</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">99.99%</span>
+<span class="w"> </span><span class="nt">response_time</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">&lt; 10ms (cached), &lt; 100ms (recursive)</span>
+<span class="w"> </span><span class="nt">query_success_rate</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">&gt;</span><span class="err"> 99.9%</span>
+<span class="w"> </span><span class="nt">security_monitoring</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">real-time threat detection</span>
+<span class="w"> </span><span class="nt">capacity_planning</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">predictive scaling metrics</span>
+</code></pre></div> <h2>Prometheus Integration Architecture</h2>
+<h3>CoreDNS Prometheus Plugin Configuration</h3>
+<div class="codehilite"><pre><span></span><code><span class="c1"># Corefile configuration for metrics</span>
+<span class="l l-Scalar l-Scalar-Plain">.:53 {</span>
+<span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">prometheus :11915</span>
+<span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">forward . 8.8.8.8 8.8.4.4</span>
+<span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">cache 30</span>
+<span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">log</span>
+<span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">errors</span>
+<span class="l l-Scalar l-Scalar-Plain">}</span>
+</code></pre></div> <p><strong>Key Configuration Elements:</strong>
+- <strong>Port 11915</strong>: Dedicated metrics endpoint separate from DNS port
+- <strong>Prometheus plugin</strong>: Native CoreDNS metrics export
+- <strong>Cache integration</strong>: Metrics on cache performance
+- <strong>Error tracking</strong>: Detailed error classification and counting
+- <strong>Logging correlation</strong>: Metrics aligned with log data</p>
+<h3>Container Metrics Exposure</h3>
+<div class="codehilite"><pre><span></span><code><span class="k">FROM</span><span class="w"> </span><span class="s">coredns/coredns:1.11.1</span> <span class="c"># Expose DNS port (53) and metrics port (11915)</span>
+<span class="k">EXPOSE</span><span class="w"> </span><span class="s">53/udp 53/tcp</span>
+<span class="k">EXPOSE</span><span class="w"> </span><span class="s">11915/tcp</span> <span class="c"># Health check using metrics endpoint</span>
+<span class="k">HEALTHCHECK</span><span class="w"> </span>--interval<span class="o">=</span>30s<span class="w"> </span>--timeout<span class="o">=</span>3s<span class="w"> </span><span class="se">\</span>
+<span class="w"> </span><span class="k">CMD</span><span class="w"> </span>wget<span class="w"> </span>-q<span class="w"> </span>--spider<span class="w"> </span>http://localhost:11915/metrics<span class="w"> </span><span class="o">||</span><span class="w"> </span><span class="nb">exit</span><span class="w"> </span><span class="m">1</span>
+</code></pre></div> <p><strong>Design Principles:</strong>
+1. <strong>Separate ports</strong>: DNS and metrics on different ports for security
+2. <strong>Health checks</strong>: Metrics endpoint doubles as health check
+3. <strong>Container-native</strong>: Metrics accessible from container orchestration
+4. <strong>Security isolation</strong>: Metrics port not exposed externally</p>
+<h2>Core DNS Metrics Categories</h2>
+<h3>Query Performance Metrics</h3>
+<div class="codehilite"><pre><span></span><code><span class="c1"># Query response time by type</span>
+<span class="nv">coredns_dns_request_duration_seconds_bucket</span><span class="p">{</span><span class="nl">job</span><span class="o">=</span><span class="p">&quot;</span><span class="s">project</span><span class="p">&quot;}</span> <span class="c1"># Query rate by type and response code</span>
+<span class="kr">rate</span><span class="o">(</span><span class="nv">coredns_dns_requests_total</span><span class="p">{</span><span class="nl">job</span><span class="o">=</span><span class="p">&quot;</span><span class="s">project</span><span class="p">&quot;}[</span><span class="s">5m</span><span class="p">]</span><span class="o">)</span> <span class="c1"># Response code distribution</span>
+<span class="nv">coredns_dns_responses_total</span><span class="p">{</span><span class="nl">job</span><span class="o">=</span><span class="p">&quot;</span><span class="s">project</span><span class="p">&quot;}</span>
+</code></pre></div> <p><strong>Key Performance Indicators:</strong>
+- <strong>Response time percentiles</strong>: P50, P95, P99 latency measurements
+- <strong>Query throughput</strong>: Requests per second by query type
+- <strong>Success rate</strong>: Percentage of successful DNS resolutions
+- <strong>Error classification</strong>: NXDOMAIN, SERVFAIL, timeout rates</p>
+<h3>Cache Performance Metrics</h3>
+<div class="codehilite"><pre><span></span><code><span class="c1"># Cache hit ratio</span>
+<span class="o">(</span>
+<span class="w"> </span><span class="kr">rate</span><span class="o">(</span><span class="nv">coredns_cache_hits_total</span><span class="p">{</span><span class="nl">job</span><span class="o">=</span><span class="p">&quot;</span><span class="s">project</span><span class="p">&quot;}[</span><span class="s">5m</span><span class="p">]</span><span class="o">)</span><span class="w"> </span><span class="o">/</span>
+<span class="w"> </span><span class="kr">rate</span><span class="o">(</span><span class="nv">coredns_cache_requests_total</span><span class="p">{</span><span class="nl">job</span><span class="o">=</span><span class="p">&quot;</span><span class="s">project</span><span class="p">&quot;}[</span><span class="s">5m</span><span class="p">]</span><span class="o">)</span>
+<span class="o">)</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="mi">100</span> <span class="c1"># Cache size and capacity</span>
+<span class="nv">coredns_cache_entries</span><span class="p">{</span><span class="nl">job</span><span class="o">=</span><span class="p">&quot;</span><span class="s">project</span><span class="p">&quot;}</span>
+<span class="nv">coredns_cache_capacity</span><span class="p">{</span><span class="nl">job</span><span class="o">=</span><span class="p">&quot;</span><span class="s">project</span><span class="p">&quot;}</span>
+</code></pre></div> <p><strong>Cache Optimization Metrics:</strong>
+- <strong>Hit ratio</strong>: Percentage of queries served from cache
+- <strong>Cache size</strong>: Current number of cached entries
+- <strong>Eviction rate</strong>: How frequently cache entries are removed
+- <strong>Memory usage</strong>: Cache memory consumption patterns</p>
+<h3>Upstream Resolver Metrics</h3>
+<div class="codehilite"><pre><span></span><code><span class="c1"># Upstream query success rate</span>
+<span class="kr">rate</span><span class="o">(</span><span class="nv">coredns_forward_requests_total</span><span class="p">{</span><span class="nl">rcode</span><span class="o">=</span><span class="p">&quot;</span><span class="s">NOERROR</span><span class="p">&quot;,</span><span class="nl">job</span><span class="o">=</span><span class="p">&quot;</span><span class="s">project</span><span class="p">&quot;}[</span><span class="s">5m</span><span class="p">]</span><span class="o">)</span><span class="w"> </span><span class="o">/</span>
+<span class="kr">rate</span><span class="o">(</span><span class="nv">coredns_forward_requests_total</span><span class="p">{</span><span class="nl">job</span><span class="o">=</span><span class="p">&quot;</span><span class="s">project</span><span class="p">&quot;}[</span><span class="s">5m</span><span class="p">]</span><span class="o">)</span> <span class="c1"># Upstream response time</span>
+<span class="nv">coredns_forward_request_duration_seconds</span><span class="p">{</span><span class="nl">job</span><span class="o">=</span><span class="p">&quot;</span><span class="s">project</span><span class="p">&quot;}</span>
+</code></pre></div> <p><strong>Upstream Monitoring:</strong>
+- <strong>Resolver health</strong>: Success rates for each upstream DNS server
+- <strong>Failover behavior</strong>: Automatic switching between upstream servers
+- <strong>Response time correlation</strong>: Impact of upstream latency on client experience
+- <strong>Load distribution</strong>: Query distribution across upstream servers</p>
+<h2>Advanced Metrics Implementation</h2>
+<h3>Custom Metrics for Wireless Infrastructure</h3>
+<div class="codehilite"><pre><span></span><code><span class="c1"># Custom CoreDNS plugin configuration for wireless-specific metrics</span>
+<span class="l l-Scalar l-Scalar-Plain">.:53 {</span>
+<span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">prometheus :11915 {</span>
+<span class="w"> </span><span class="l l-Scalar l-Scalar-Plain"># Custom metrics for wireless infrastructure</span>
+<span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">enable_wireless_metrics true</span>
+<span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">pgw_zone_tracking true</span>
+<span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">subscriber_query_classification true</span>
+<span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">}</span> <span class="w"> </span><span class="l l-Scalar l-Scalar-Plain"># Wireless-specific plugins</span>
+<span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">wireless_pgw {</span>
+<span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">metrics_enabled true</span>
+<span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">zone_classification true</span>
+<span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">}</span> <span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">forward . 8.8.8.8 8.8.4.4 {</span>
+<span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">health_check 5s</span>
+<span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">max_fails 3</span>
+<span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">}</span> <span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">cache 300 {</span>
+<span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">success 9984 30</span>
+<span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">denial 9984 30</span>
+<span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">prefetch 1 60m 10%</span>
+<span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">}</span> <span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">log {</span>
+<span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">class denial error</span>
+<span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">}</span>
+<span class="l l-Scalar l-Scalar-Plain">}</span>
+</code></pre></div> <p><strong>Wireless-Specific Metrics:</strong></p>
+<div class="codehilite"><pre><span></span><code><span class="c1"># PGW zone query distribution</span>
+<span class="nv">coredns_wireless_pgw_queries_total</span><span class="p">{</span><span class="nl">zone</span><span class="o">=</span><span class="p">&quot;</span><span class="s">private-pgw-east</span><span class="p">&quot;}</span> <span class="c1"># Subscriber query classification</span>
+<span class="nv">coredns_wireless_subscriber_queries_total</span><span class="p">{</span><span class="nl">type</span><span class="o">=</span><span class="p">&quot;</span><span class="s">data</span><span class="p">&quot;,</span><span class="w"> </span><span class="nl">category</span><span class="o">=</span><span class="p">&quot;</span><span class="s">high_priority</span><span class="p">&quot;}</span> <span class="c1"># Zone health metrics</span>
+<span class="nv">coredns_wireless_zone_health</span><span class="p">{</span><span class="nl">zone</span><span class="o">=</span><span class="p">&quot;</span><span class="s">private-pgw-east</span><span class="p">&quot;,</span><span class="w"> </span><span class="nl">status</span><span class="o">=</span><span class="p">&quot;</span><span class="s">healthy</span><span class="p">&quot;}</span>
+</code></pre></div> <h3>Security Metrics</h3>
+<div class="codehilite"><pre><span></span><code><span class="c1"># DNS query anomaly detection</span>
+<span class="kr">rate</span><span class="o">(</span><span class="nv">coredns_dns_requests_total</span><span class="p">{</span><span class="nl">qtype</span><span class="o">!~</span><span class="p">&quot;</span><span class="s">A|AAAA|CNAME|MX</span><span class="p">&quot;}[</span><span class="s">5m</span><span class="p">]</span><span class="o">)</span> <span class="c1"># Query size distribution (potential DNS amplification)</span>
+<span class="kr">histogram_quantile</span><span class="o">(</span><span class="mf">0.95</span><span class="p">,</span><span class="w"> </span><span class="nv">coredns_dns_request_size_bytes_bucket</span><span class="p">{</span><span class="nl">job</span><span class="o">=</span><span class="p">&quot;</span><span class="s">project</span><span class="p">&quot;}</span><span class="o">)</span> <span class="c1"># Client query patterns (potential DDoS)</span>
+<span class="k">topk</span><span class="o">(</span><span class="mi">10</span><span class="p">,</span><span class="w"> </span><span class="kr">rate</span><span class="o">(</span><span class="nv">coredns_dns_requests_total</span><span class="p">{</span><span class="nl">job</span><span class="o">=</span><span class="p">&quot;</span><span class="s">project</span><span class="p">&quot;}[</span><span class="s">5m</span><span class="p">]</span><span class="o">)</span><span class="w"> </span><span class="k">by</span><span class="w"> </span><span class="o">(</span><span class="nv">client_ip</span><span class="o">))</span>
+</code></pre></div> <p><strong>Security Monitoring Capabilities:</strong>
+- <strong>Anomaly detection</strong>: Unusual query patterns or types
+- <strong>Attack pattern recognition</strong>: DNS amplification, DDoS indicators
+- <strong>Client behavior analysis</strong>: Suspicious query patterns
+- <strong>Threat intelligence</strong>: Integration with security feeds</p>
+<h2>Monitoring Dashboard Design</h2>
+<h3>Grafana Dashboard Configuration</h3>
+<div class="codehilite"><pre><span></span><code><span class="p">{</span>
+<span class="w"> </span><span class="nt">&quot;dashboard&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w"> </span><span class="nt">&quot;title&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Wireless PWG DNS Service&quot;</span><span class="p">,</span>
+<span class="w"> </span><span class="nt">&quot;panels&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+<span class="w"> </span><span class="p">{</span>
+<span class="w"> </span><span class="nt">&quot;title&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Query Rate&quot;</span><span class="p">,</span>
+<span class="w"> </span><span class="nt">&quot;type&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;graph&quot;</span><span class="p">,</span>
+<span class="w"> </span><span class="nt">&quot;targets&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+<span class="w"> </span><span class="p">{</span>
+<span class="w"> </span><span class="nt">&quot;expr&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;rate(coredns_dns_requests_total{job=\&quot;project\&quot;}[5m])&quot;</span><span class="p">,</span>
+<span class="w"> </span><span class="nt">&quot;legendFormat&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;{{qtype}} queries/sec&quot;</span>
+<span class="w"> </span><span class="p">}</span>
+<span class="w"> </span><span class="p">]</span>
+<span class="w"> </span><span class="p">},</span>
+<span class="w"> </span><span class="p">{</span>
+<span class="w"> </span><span class="nt">&quot;title&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Response Time Percentiles&quot;</span><span class="p">,</span>
+<span class="w"> </span><span class="nt">&quot;type&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;graph&quot;</span><span class="p">,</span><span class="w"> </span>
+<span class="w"> </span><span class="nt">&quot;targets&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+<span class="w"> </span><span class="p">{</span>
+<span class="w"> </span><span class="nt">&quot;expr&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;histogram_quantile(0.50, rate(coredns_dns_request_duration_seconds_bucket{job=\&quot;project\&quot;}[5m]))&quot;</span><span class="p">,</span>
+<span class="w"> </span><span class="nt">&quot;legendFormat&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;P50&quot;</span>
+<span class="w"> </span><span class="p">},</span>
+<span class="w"> </span><span class="p">{</span>
+<span class="w"> </span><span class="nt">&quot;expr&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;histogram_quantile(0.95, rate(coredns_dns_request_duration_seconds_bucket{job=\&quot;project\&quot;}[5m]))&quot;</span><span class="p">,</span>
+<span class="w"> </span><span class="nt">&quot;legendFormat&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;P95&quot;</span>
+<span class="w"> </span><span class="p">}</span>
+<span class="w"> </span><span class="p">]</span>
+<span class="w"> </span><span class="p">}</span>
+<span class="w"> </span><span class="p">]</span>
+<span class="w"> </span><span class="p">}</span>
+<span class="p">}</span>
+</code></pre></div> <h3>Key Dashboard Panels</h3>
+<p><strong>1. Service Health Overview</strong></p>
+<div class="codehilite"><pre><span></span><code><span class="c1"># Service uptime</span>
+<span class="nv">up</span><span class="p">{</span><span class="nl">job</span><span class="o">=</span><span class="p">&quot;</span><span class="s">project</span><span class="p">&quot;}</span> <span class="c1"># Error rate</span>
+<span class="o">(</span>
+<span class="w"> </span><span class="kr">rate</span><span class="o">(</span><span class="nv">coredns_dns_responses_total</span><span class="p">{</span><span class="nl">rcode</span><span class="o">!=</span><span class="p">&quot;</span><span class="s">NOERROR</span><span class="p">&quot;,</span><span class="nl">job</span><span class="o">=</span><span class="p">&quot;</span><span class="s">project</span><span class="p">&quot;}[</span><span class="s">5m</span><span class="p">]</span><span class="o">)</span><span class="w"> </span><span class="o">/</span>
+<span class="w"> </span><span class="kr">rate</span><span class="o">(</span><span class="nv">coredns_dns_responses_total</span><span class="p">{</span><span class="nl">job</span><span class="o">=</span><span class="p">&quot;</span><span class="s">project</span><span class="p">&quot;}[</span><span class="s">5m</span><span class="p">]</span><span class="o">)</span>
+<span class="o">)</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="mi">100</span>
+</code></pre></div> <p><strong>2. Performance Monitoring</strong></p>
+<div class="codehilite"><pre><span></span><code><span class="c1"># Query throughput</span>
+<span class="k">sum</span><span class="o">(</span><span class="kr">rate</span><span class="o">(</span><span class="nv">coredns_dns_requests_total</span><span class="p">{</span><span class="nl">job</span><span class="o">=</span><span class="p">&quot;</span><span class="s">project</span><span class="p">&quot;}[</span><span class="s">5m</span><span class="p">]</span><span class="o">))</span> <span class="c1"># Cache efficiency</span>
+<span class="o">(</span>
+<span class="w"> </span><span class="kr">rate</span><span class="o">(</span><span class="nv">coredns_cache_hits_total</span><span class="p">{</span><span class="nl">job</span><span class="o">=</span><span class="p">&quot;</span><span class="s">project</span><span class="p">&quot;}[</span><span class="s">5m</span><span class="p">]</span><span class="o">)</span><span class="w"> </span><span class="o">/</span>
+<span class="w"> </span><span class="o">(</span><span class="kr">rate</span><span class="o">(</span><span class="nv">coredns_cache_hits_total</span><span class="p">{</span><span class="nl">job</span><span class="o">=</span><span class="p">&quot;</span><span class="s">project</span><span class="p">&quot;}[</span><span class="s">5m</span><span class="p">]</span><span class="o">)</span><span class="w"> </span><span class="o">+</span><span class="w"> </span>
+<span class="w"> </span><span class="kr">rate</span><span class="o">(</span><span class="nv">coredns_cache_misses_total</span><span class="p">{</span><span class="nl">job</span><span class="o">=</span><span class="p">&quot;</span><span class="s">project</span><span class="p">&quot;}[</span><span class="s">5m</span><span class="p">]</span><span class="o">))</span>
+<span class="o">)</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="mi">100</span>
+</code></pre></div> <p><strong>3. Resource Utilization</strong></p>
+<div class="codehilite"><pre><span></span><code><span class="c1"># Memory usage</span>
+<span class="nv">container_memory_usage_bytes</span><span class="p">{</span><span class="nl">name</span><span class="o">=~</span><span class="p">&quot;</span><span class="s">.*project.*</span><span class="p">&quot;}</span> <span class="c1"># CPU utilization</span>
+<span class="kr">rate</span><span class="o">(</span><span class="nv">container_cpu_usage_seconds_total</span><span class="p">{</span><span class="nl">name</span><span class="o">=~</span><span class="p">&quot;</span><span class="s">.*project.*</span><span class="p">&quot;}[</span><span class="s">5m</span><span class="p">]</span><span class="o">)</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="mi">100</span>
+</code></pre></div> <h2>Alerting Strategy</h2>
+<h3>Critical Service Alerts</h3>
+<div class="codehilite"><pre><span></span><code><span class="c1"># Prometheus alerting rules</span>
+<span class="nt">groups</span><span class="p">:</span>
+<span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">wireless_dns_alerts</span>
+<span class="w"> </span><span class="nt">rules</span><span class="p">:</span>
+<span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">alert</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">DNSServiceDown</span>
+<span class="w"> </span><span class="nt">expr</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">up{job=&quot;project&quot;} == 0</span>
+<span class="w"> </span><span class="nt">for</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1m</span>
+<span class="w"> </span><span class="nt">labels</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">severity</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">critical</span>
+<span class="w"> </span><span class="nt">annotations</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">summary</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;DNS</span><span class="nv"> </span><span class="s">service</span><span class="nv"> </span><span class="s">is</span><span class="nv"> </span><span class="s">down&quot;</span>
+<span class="w"> </span><span class="nt">description</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;Wireless</span><span class="nv"> </span><span class="s">PWG</span><span class="nv"> </span><span class="s">DNS</span><span class="nv"> </span><span class="s">service</span><span class="nv"> </span><span class="s">has</span><span class="nv"> </span><span class="s">been</span><span class="nv"> </span><span class="s">down</span><span class="nv"> </span><span class="s">for</span><span class="nv"> </span><span class="s">more</span><span class="nv"> </span><span class="s">than</span><span class="nv"> </span><span class="s">1</span><span class="nv"> </span><span class="s">minute&quot;</span> <span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">alert</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">HighDNSErrorRate</span>
+<span class="w"> </span><span class="nt">expr</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">|</span>
+<span class="w"> </span><span class="no">(</span>
+<span class="w"> </span><span class="no">rate(coredns_dns_responses_total{rcode!=&quot;NOERROR&quot;,job=&quot;project&quot;}[5m]) /</span>
+<span class="w"> </span><span class="no">rate(coredns_dns_responses_total{job=&quot;project&quot;}[5m])</span>
+<span class="w"> </span><span class="no">) * 100 &gt; 5</span>
+<span class="w"> </span><span class="nt">for</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">2m</span>
+<span class="w"> </span><span class="nt">labels</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">severity</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">warning</span>
+<span class="w"> </span><span class="nt">annotations</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">summary</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;High</span><span class="nv"> </span><span class="s">DNS</span><span class="nv"> </span><span class="s">error</span><span class="nv"> </span><span class="s">rate</span><span class="nv"> </span><span class="s">detected&quot;</span> <span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">alert</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">DNSResponseTimeHigh</span>
+<span class="w"> </span><span class="nt">expr</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">|</span>
+<span class="w"> </span><span class="no">histogram_quantile(0.95, </span>
+<span class="w"> </span><span class="no">rate(coredns_dns_request_duration_seconds_bucket{job=&quot;project&quot;}[5m])</span>
+<span class="w"> </span><span class="no">) &gt; 0.1</span>
+<span class="w"> </span><span class="nt">for</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">5m</span>
+<span class="w"> </span><span class="nt">labels</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">severity</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">warning</span>
+<span class="w"> </span><span class="nt">annotations</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">summary</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;DNS</span><span class="nv"> </span><span class="s">response</span><span class="nv"> </span><span class="s">time</span><span class="nv"> </span><span class="s">P95</span><span class="nv"> </span><span class="s">&gt;</span><span class="nv"> </span><span class="s">100ms&quot;</span>
+</code></pre></div> <h3>Performance Degradation Alerts</h3>
+<div class="codehilite"><pre><span></span><code><span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">alert</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">CacheHitRateLow</span>
+<span class="w"> </span><span class="nt">expr</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">|</span>
+<span class="w"> </span><span class="no">(</span>
+<span class="w"> </span><span class="no">rate(coredns_cache_hits_total{job=&quot;project&quot;}[10m]) /</span>
+<span class="w"> </span><span class="no">rate(coredns_cache_requests_total{job=&quot;project&quot;}[10m])</span>
+<span class="w"> </span><span class="no">) * 100 &lt; 80</span>
+<span class="w"> </span><span class="nt">for</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">5m</span>
+<span class="w"> </span><span class="nt">labels</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">severity</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">info</span>
+<span class="w"> </span><span class="nt">annotations</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">summary</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;DNS</span><span class="nv"> </span><span class="s">cache</span><span class="nv"> </span><span class="s">hit</span><span class="nv"> </span><span class="s">ratio</span><span class="nv"> </span><span class="s">below</span><span class="nv"> </span><span class="s">80%&quot;</span> <span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">alert</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">UpstreamResolverDown</span>
+<span class="w"> </span><span class="nt">expr</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">|</span>
+<span class="w"> </span><span class="no">coredns_forward_healthcheck_failures_total{job=&quot;project&quot;} &gt; 3</span>
+<span class="w"> </span><span class="nt">for</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1m</span>
+<span class="w"> </span><span class="nt">labels</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">severity</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">warning</span>
+<span class="w"> </span><span class="nt">annotations</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">summary</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;Upstream</span><span class="nv"> </span><span class="s">DNS</span><span class="nv"> </span><span class="s">resolver</span><span class="nv"> </span><span class="s">failing</span><span class="nv"> </span><span class="s">health</span><span class="nv"> </span><span class="s">checks&quot;</span>
+</code></pre></div> <h2>Metrics Collection Architecture</h2>
+<h3>Prometheus Configuration</h3>
+<div class="codehilite"><pre><span></span><code><span class="c1"># prometheus.yml configuration for DNS metrics</span>
+<span class="nt">global</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">scrape_interval</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">15s</span>
+<span class="w"> </span><span class="nt">evaluation_interval</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">15s</span> <span class="nt">scrape_configs</span><span class="p">:</span>
+<span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">job_name</span><span class="p">:</span><span class="w"> </span><span class="s">&#39;project&#39;</span>
+<span class="w"> </span><span class="nt">static_configs</span><span class="p">:</span>
+<span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">targets</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="s">&#39;dns-service:11915&#39;</span><span class="p p-Indicator">]</span>
+<span class="w"> </span><span class="nt">scrape_interval</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">5s</span>
+<span class="w"> </span><span class="nt">scrape_timeout</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">4s</span>
+<span class="w"> </span><span class="nt">metrics_path</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">/metrics</span> <span class="w"> </span><span class="c1"># Additional labels for service identification</span>
+<span class="w"> </span><span class="nt">relabel_configs</span><span class="p">:</span>
+<span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">source_labels</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">__address__</span><span class="p p-Indicator">]</span>
+<span class="w"> </span><span class="nt">target_label</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">__param_target</span>
+<span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">source_labels</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">__param_target</span><span class="p p-Indicator">]</span>
+<span class="w"> </span><span class="nt">target_label</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">instance</span>
+<span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">target_label</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">__address__</span>
+<span class="w"> </span><span class="nt">replacement</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">dns-service:11915</span> <span class="w"> </span><span class="c1"># Metric filtering for performance</span>
+<span class="w"> </span><span class="nt">metric_relabel_configs</span><span class="p">:</span>
+<span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">source_labels</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">__name__</span><span class="p p-Indicator">]</span>
+<span class="w"> </span><span class="nt">regex</span><span class="p">:</span><span class="w"> </span><span class="s">&#39;coredns_dns_.*&#39;</span>
+<span class="w"> </span><span class="nt">action</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">keep</span>
+</code></pre></div> <h3>Service Discovery Integration</h3>
+<div class="codehilite"><pre><span></span><code><span class="c1"># Kubernetes service discovery for dynamic environments</span>
+<span class="nt">scrape_configs</span><span class="p">:</span>
+<span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">job_name</span><span class="p">:</span><span class="w"> </span><span class="s">&#39;kubernetes-dns-services&#39;</span>
+<span class="w"> </span><span class="nt">kubernetes_sd_configs</span><span class="p">:</span>
+<span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">role</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">service</span>
+<span class="w"> </span><span class="nt">namespaces</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">names</span><span class="p">:</span>
+<span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">wireless-infrastructure</span> <span class="w"> </span><span class="nt">relabel_configs</span><span class="p">:</span>
+<span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">source_labels</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">__meta_kubernetes_service_annotation_prometheus_io_scrape</span><span class="p p-Indicator">]</span>
+<span class="w"> </span><span class="nt">action</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">keep</span>
+<span class="w"> </span><span class="nt">regex</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
+<span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">source_labels</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">__meta_kubernetes_service_annotation_prometheus_io_path</span><span class="p p-Indicator">]</span>
+<span class="w"> </span><span class="nt">action</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">replace</span>
+<span class="w"> </span><span class="nt">target_label</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">__metrics_path__</span>
+<span class="w"> </span><span class="nt">regex</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">(.+)</span>
+</code></pre></div> <h2>Performance Optimization</h2>
+<h3>Metrics Collection Efficiency</h3>
+<div class="codehilite"><pre><span></span><code><span class="c1"># Optimized metrics collection</span>
+<span class="nt">prometheus</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">retention</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;30d&quot;</span>
+<span class="w"> </span><span class="nt">storage</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">local</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">path</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;/prometheus/data&quot;</span>
+<span class="w"> </span><span class="nt">retention</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;30d&quot;</span> <span class="w"> </span><span class="c1"># Reduce cardinality for high-volume metrics</span>
+<span class="w"> </span><span class="nt">metric_relabel_configs</span><span class="p">:</span>
+<span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">source_labels</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">client_ip</span><span class="p p-Indicator">]</span>
+<span class="w"> </span><span class="nt">regex</span><span class="p">:</span><span class="w"> </span><span class="s">&#39;.*&#39;</span>
+<span class="w"> </span><span class="nt">replacement</span><span class="p">:</span><span class="w"> </span><span class="s">&#39;aggregated&#39;</span>
+<span class="w"> </span><span class="nt">target_label</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">client_ip</span> <span class="w"> </span><span class="c1"># Sample reduction for detailed metrics</span>
+<span class="w"> </span><span class="nt">sample_limit</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">10000</span>
+<span class="w"> </span><span class="nt">target_limit</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">100</span>
+</code></pre></div> <h3>High-Cardinality Metric Management</h3>
+<div class="codehilite"><pre><span></span><code><span class="c1"># Use recording rules for expensive queries</span>
+<span class="nv">groups</span><span class="err">:</span>
+<span class="w"> </span><span class="o">-</span><span class="w"> </span><span class="nv">name</span><span class="err">:</span><span class="w"> </span><span class="nv">dns_recording_rules</span>
+<span class="w"> </span><span class="nv">interval</span><span class="err">:</span><span class="w"> </span><span class="s">30s</span>
+<span class="w"> </span><span class="nv">rules</span><span class="err">:</span>
+<span class="w"> </span><span class="o">-</span><span class="w"> </span><span class="nv">record</span><span class="err">:</span><span class="w"> </span><span class="nv">wireless_dns</span><span class="err">:</span><span class="nv">query_rate_5m</span>
+<span class="w"> </span><span class="nv">expr</span><span class="err">:</span><span class="w"> </span><span class="kr">rate</span><span class="o">(</span><span class="nv">coredns_dns_requests_total</span><span class="p">{</span><span class="nl">job</span><span class="o">=</span><span class="p">&quot;</span><span class="s">project</span><span class="p">&quot;}[</span><span class="s">5m</span><span class="p">]</span><span class="o">)</span> <span class="w"> </span><span class="o">-</span><span class="w"> </span><span class="nv">record</span><span class="err">:</span><span class="w"> </span><span class="nv">wireless_dns</span><span class="err">:</span><span class="nv">error_rate_5m</span>
+<span class="w"> </span><span class="nv">expr</span><span class="err">:</span><span class="w"> </span><span class="err">|</span>
+<span class="w"> </span><span class="kr">rate</span><span class="o">(</span><span class="nv">coredns_dns_responses_total</span><span class="p">{</span><span class="nl">rcode</span><span class="o">!=</span><span class="p">&quot;</span><span class="s">NOERROR</span><span class="p">&quot;,</span><span class="nl">job</span><span class="o">=</span><span class="p">&quot;</span><span class="s">project</span><span class="p">&quot;}[</span><span class="s">5m</span><span class="p">]</span><span class="o">)</span><span class="w"> </span><span class="o">/</span>
+<span class="w"> </span><span class="kr">rate</span><span class="o">(</span><span class="nv">coredns_dns_responses_total</span><span class="p">{</span><span class="nl">job</span><span class="o">=</span><span class="p">&quot;</span><span class="s">project</span><span class="p">&quot;}[</span><span class="s">5m</span><span class="p">]</span><span class="o">)</span> <span class="w"> </span><span class="o">-</span><span class="w"> </span><span class="nv">record</span><span class="err">:</span><span class="w"> </span><span class="nv">wireless_dns</span><span class="err">:</span><span class="nv">cache_hit_ratio_10m</span>
+<span class="w"> </span><span class="nv">expr</span><span class="err">:</span><span class="w"> </span><span class="err">|</span>
+<span class="w"> </span><span class="kr">rate</span><span class="o">(</span><span class="nv">coredns_cache_hits_total</span><span class="p">{</span><span class="nl">job</span><span class="o">=</span><span class="p">&quot;</span><span class="s">project</span><span class="p">&quot;}[</span><span class="s">10m</span><span class="p">]</span><span class="o">)</span><span class="w"> </span><span class="o">/</span>
+<span class="w"> </span><span class="kr">rate</span><span class="o">(</span><span class="nv">coredns_cache_requests_total</span><span class="p">{</span><span class="nl">job</span><span class="o">=</span><span class="p">&quot;</span><span class="s">project</span><span class="p">&quot;}[</span><span class="s">10m</span><span class="p">]</span><span class="o">)</span>
+</code></pre></div> <h2>Integration with External Systems</h2>
+<h3>Consul Service Discovery Metrics</h3>
+<div class="codehilite"><pre><span></span><code><span class="c1"># CoreDNS configuration with Consul integration</span>
+<span class="l l-Scalar l-Scalar-Plain">.:53 {</span>
+<span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">consul {</span>
+<span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">endpoint http://consul.service.consul:8500</span>
+<span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">}</span> <span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">prometheus :11915 {</span>
+<span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">enable_consul_metrics true</span>
+<span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">}</span>
+<span class="l l-Scalar l-Scalar-Plain">}</span>
+</code></pre></div> <p><strong>Consul Integration Metrics:</strong></p>
+<div class="codehilite"><pre><span></span><code><span class="c1"># Service discovery health</span>
+<span class="nv">coredns_consul_services_discovered</span><span class="p">{</span><span class="nl">job</span><span class="o">=</span><span class="p">&quot;</span><span class="s">project</span><span class="p">&quot;}</span> <span class="c1"># Consul query performance</span>
+<span class="nv">coredns_consul_query_duration_seconds</span><span class="p">{</span><span class="nl">job</span><span class="o">=</span><span class="p">&quot;</span><span class="s">project</span><span class="p">&quot;}</span>
+</code></pre></div> <h3>Log Correlation</h3>
+<div class="codehilite"><pre><span></span><code><span class="c1"># Structured logging with metrics correlation</span>
+<span class="l l-Scalar l-Scalar-Plain">log {</span>
+<span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">format combined</span>
+<span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">correlation_id_header &quot;X-Request-ID&quot;</span>
+<span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">include_metrics_labels true</span>
+<span class="l l-Scalar l-Scalar-Plain">}</span>
+</code></pre></div> <h2>Capacity Planning and Scaling</h2>
+<h3>Predictive Metrics</h3>
+<div class="codehilite"><pre><span></span><code><span class="c1"># Query volume trend analysis</span>
+<span class="kr">predict_linear</span><span class="o">(</span><span class="nv">wireless_dns</span><span class="err">:</span><span class="nv">query_rate_5m</span><span class="p">[</span><span class="s">6h</span><span class="p">],</span><span class="w"> </span><span class="mi">86400</span><span class="o">)</span> <span class="c1"># Memory usage growth prediction</span>
+<span class="kr">predict_linear</span><span class="o">(</span><span class="nv">container_memory_usage_bytes</span><span class="p">{</span><span class="nl">name</span><span class="o">=~</span><span class="p">&quot;</span><span class="s">.*project.*</span><span class="p">&quot;}[</span><span class="s">2h</span><span class="p">],</span><span class="w"> </span><span class="mi">3600</span><span class="o">)</span> <span class="c1"># Cache utilization trending</span>
+<span class="kr">deriv</span><span class="o">(</span><span class="nv">coredns_cache_entries</span><span class="p">{</span><span class="nl">job</span><span class="o">=</span><span class="p">&quot;</span><span class="s">project</span><span class="p">&quot;}[</span><span class="s">1h</span><span class="p">]</span><span class="o">)</span>
+</code></pre></div> <h3>Auto-scaling Integration</h3>
+<div class="codehilite"><pre><span></span><code><span class="c1"># Kubernetes HPA based on custom metrics</span>
+<span class="nt">apiVersion</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">autoscaling/v2</span>
+<span class="nt">kind</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">HorizontalPodAutoscaler</span>
+<span class="nt">metadata</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">wireless-dns-hpa</span>
+<span class="nt">spec</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">scaleTargetRef</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">apiVersion</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">apps/v1</span>
+<span class="w"> </span><span class="nt">kind</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Deployment</span>
+<span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">project</span>
+<span class="w"> </span><span class="nt">minReplicas</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">3</span>
+<span class="w"> </span><span class="nt">maxReplicas</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">10</span>
+<span class="w"> </span><span class="nt">metrics</span><span class="p">:</span>
+<span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Pods</span>
+<span class="w"> </span><span class="nt">pods</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">metric</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">dns_queries_per_second</span>
+<span class="w"> </span><span class="nt">target</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">AverageValue</span>
+<span class="w"> </span><span class="nt">averageValue</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;1000&quot;</span>
+</code></pre></div> <h2>Troubleshooting with Metrics</h2>
+<h3>Common DNS Issues and Metrics</h3>
+<p><strong>1. High Response Times</strong></p>
+<div class="codehilite"><pre><span></span><code><span class="c1"># Identify slow query types</span>
+<span class="k">topk</span><span class="o">(</span><span class="mi">5</span><span class="p">,</span><span class="w"> </span>
+<span class="w"> </span><span class="kr">histogram_quantile</span><span class="o">(</span><span class="mf">0.95</span><span class="p">,</span><span class="w"> </span>
+<span class="w"> </span><span class="kr">rate</span><span class="o">(</span><span class="nv">coredns_dns_request_duration_seconds_bucket</span><span class="p">{</span><span class="nl">job</span><span class="o">=</span><span class="p">&quot;</span><span class="s">project</span><span class="p">&quot;}[</span><span class="s">5m</span><span class="p">]</span><span class="o">)</span>
+<span class="w"> </span><span class="o">)</span><span class="w"> </span><span class="k">by</span><span class="w"> </span><span class="o">(</span><span class="nv">qtype</span><span class="o">)</span>
+<span class="o">)</span>
+</code></pre></div> <p><strong>2. Cache Inefficiency</strong></p>
+<div class="codehilite"><pre><span></span><code><span class="c1"># Cache miss rate by query type</span>
+<span class="o">(</span>
+<span class="w"> </span><span class="kr">rate</span><span class="o">(</span><span class="nv">coredns_cache_misses_total</span><span class="p">{</span><span class="nl">job</span><span class="o">=</span><span class="p">&quot;</span><span class="s">project</span><span class="p">&quot;}[</span><span class="s">5m</span><span class="p">]</span><span class="o">)</span><span class="w"> </span><span class="o">/</span>
+<span class="w"> </span><span class="kr">rate</span><span class="o">(</span><span class="nv">coredns_cache_requests_total</span><span class="p">{</span><span class="nl">job</span><span class="o">=</span><span class="p">&quot;</span><span class="s">project</span><span class="p">&quot;}[</span><span class="s">5m</span><span class="p">]</span><span class="o">)</span>
+<span class="o">)</span><span class="w"> </span><span class="k">by</span><span class="w"> </span><span class="o">(</span><span class="nv">qtype</span><span class="o">)</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="mi">100</span>
+</code></pre></div> <p><strong>3. Upstream Resolver Issues</strong></p>
+<div class="codehilite"><pre><span></span><code><span class="c1"># Upstream resolver response time comparison</span>
+<span class="k">avg</span><span class="o">(</span><span class="nv">coredns_forward_request_duration_seconds</span><span class="p">{</span><span class="nl">job</span><span class="o">=</span><span class="p">&quot;</span><span class="s">project</span><span class="p">&quot;}</span><span class="o">)</span><span class="w"> </span><span class="k">by</span><span class="w"> </span><span class="o">(</span><span class="nv">to</span><span class="o">)</span>
+</code></pre></div> <h3>Debug Metrics</h3>
+<div class="codehilite"><pre><span></span><code><span class="c1"># Enhanced debugging configuration</span>
+<span class="l l-Scalar l-Scalar-Plain">.:53 {</span>
+<span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">debug {</span>
+<span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">enable_metrics true</span>
+<span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">detailed_timing true</span>
+<span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">}</span> <span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">prometheus :11915 {</span>
+<span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">enable_debug_metrics true</span>
+<span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">histogram_buckets 0.001,0.01,0.1,1,10</span>
+<span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">}</span>
+<span class="l l-Scalar l-Scalar-Plain">}</span>
+</code></pre></div> <h2>Security and Compliance</h2>
+<h3>Metrics Security</h3>
+<div class="codehilite"><pre><span></span><code><span class="c1"># Secure metrics endpoint</span>
+<span class="l l-Scalar l-Scalar-Plain">prometheus :11915 {</span>
+<span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">path /metrics</span>
+<span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">allowed_ips 10.0.0.0/8,172.16.0.0/12,192.168.0.0/16</span>
+<span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">basic_auth {</span>
+<span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">username prometheus</span>
+<span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">password_file /etc/secrets/metrics-password</span>
+<span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">}</span>
+<span class="l l-Scalar l-Scalar-Plain">}</span>
+</code></pre></div> <h3>Audit Metrics</h3>
+<div class="codehilite"><pre><span></span><code><span class="c1"># Security-focused metrics queries</span>
+<span class="c1"># Unusual query patterns</span>
+<span class="kr">rate</span><span class="o">(</span><span class="nv">coredns_dns_requests_total</span><span class="p">{</span><span class="nl">qtype</span><span class="o">=~</span><span class="p">&quot;</span><span class="s">TXT|ANY</span><span class="p">&quot;}[</span><span class="s">5m</span><span class="p">]</span><span class="o">)</span> <span class="c1"># High-volume clients (potential DDoS)</span>
+<span class="k">topk</span><span class="o">(</span><span class="mi">10</span><span class="p">,</span><span class="w"> </span><span class="k">sum</span><span class="o">(</span><span class="kr">rate</span><span class="o">(</span><span class="nv">coredns_dns_requests_total</span><span class="p">{</span><span class="nl">job</span><span class="o">=</span><span class="p">&quot;</span><span class="s">project</span><span class="p">&quot;}[</span><span class="s">5m</span><span class="p">]</span><span class="o">))</span><span class="w"> </span><span class="k">by</span><span class="w"> </span><span class="o">(</span><span class="nv">client</span><span class="o">))</span> <span class="c1"># Failed authentication attempts</span>
+<span class="kr">rate</span><span class="o">(</span><span class="nv">coredns_auth_failures_total</span><span class="p">{</span><span class="nl">job</span><span class="o">=</span><span class="p">&quot;</span><span class="s">project</span><span class="p">&quot;}[</span><span class="s">5m</span><span class="p">]</span><span class="o">)</span>
+</code></pre></div> <h2>Future Enhancements</h2>
+<h3>AI-Powered Analytics</h3>
+<ul>
+<li><strong>Anomaly detection</strong>: Machine learning for unusual pattern recognition</li>
+<li><strong>Predictive scaling</strong>: AI-driven capacity planning</li>
+<li><strong>Intelligent alerting</strong>: Context-aware alert prioritization</li>
+<li><strong>Performance optimization</strong>: Automated tuning recommendations</li>
+</ul>
+<h3>Enhanced Observability</h3>
+<ul>
+<li><strong>Distributed tracing</strong>: Request flow visualization across services</li>
+<li><strong>Custom metrics</strong>: Business-specific KPIs and measurements</li>
+<li><strong>Real-time analytics</strong>: Stream processing for immediate insights</li>
+<li><strong>Correlation analysis</strong>: Cross-service impact analysis</li>
+</ul>
+<h2>Conclusion</h2>
+<p>Implementing comprehensive Prometheus metrics for DNS services transforms operational visibility from reactive troubleshooting to proactive optimization. The key success factors include:</p>
+<ol>
+<li><strong>Comprehensive coverage</strong>: Monitor all aspects from queries to infrastructure</li>
+<li><strong>Actionable alerts</strong>: Focus on metrics that drive operational decisions</li>
+<li><strong>Performance optimization</strong>: Balance detail with collection efficiency</li>
+<li><strong>Integration strategy</strong>: Connect metrics with logs, traces, and external systems</li>
+<li><strong>Security awareness</strong>: Monitor for both performance and security implications</li>
+</ol>
+<p>The investment in robust DNS metrics pays dividends through:
+- <strong>Improved reliability</strong>: Proactive issue identification and resolution
+- <strong>Better performance</strong>: Data-driven optimization opportunities
+- <strong>Enhanced security</strong>: Real-time threat detection and response
+- <strong>Capacity planning</strong>: Accurate forecasting for resource requirements
+- <strong>Operational excellence</strong>: Complete visibility into service behavior</p>
+<p>As network infrastructure becomes increasingly complex, metrics-driven observability becomes not just beneficial but essential for maintaining reliable, secure, and performant DNS services in production environments.</p>
+<hr />
+<p><strong>About the Author</strong>: Jagannath S specializes in implementing comprehensive monitoring solutions for telecommunications infrastructure. Connect to discuss Prometheus metrics, DNS monitoring strategies, or network service observability.</p></div> <footer><ul class="stats"><li><a href="../index.html">Back to posts</a></li></ul></footer> </article> </div> <section id="sidebar"> <section> <div class="mini-posts"> <header><h3>Recent</h3></header> <ul>
+<li><a href="../posts/wireless-prober--docker-containerization-blog.html">Mastering Multi-Stage Docker Builds: Extending CloudProber with Custom Tools</a> <span class=\"published\">Containers</span></li>
+<li><a href="../posts/wireless-prober--network-monitoring-blog.html">Beyond ICMP: Extending Network Monitoring with GTP Protocol Support</a> <span class=\"published\">Monitoring</span></li>
+<li><a href="../posts/project--cicd-pipeline-blog.html">Building Robust CI/CD Pipelines for Network Infrastructure Services</a> <span class=\"published\">DevOps</span></li>
+<li><a href="../posts/project--coredns-custom-implementation-blog.html">Building Custom CoreDNS Solutions for Enterprise Infrastructure</a> <span class=\"published\">Infra</span></li>
+<li><a href="../posts/project--docker-infrastructure-blog.html">Containerizing DNS Services: Docker Infrastructure for Enterprise Networks</a> <span class=\"published\">Containers</span></li> </ul> </div> </section> <section> <header><h3>About</h3></header> <p>Notes on telecom, infra, and automation.</p> </section> </section> <section id="footer"><p class="copyright">&copy; 2025</p></section> </div> <script src="../assets/js/jquery.min.js"></script> <script src="../assets/js/browser.min.js"></script> <script src="../assets/js/breakpoints.min.js"></script> <script src="../assets/js/util.js"></script> <script src="../assets/js/main.js"></script> </body>
+</html>

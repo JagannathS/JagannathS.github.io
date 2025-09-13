@@ -1,0 +1,115 @@
+<!DOCTYPE HTML>
+<html> <head> <title>Building Production-Ready Prometheus Monitoring for Wireless Infrastructure - Future Imperfect</title> <meta charset="utf-8" /> <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no" /> <link rel="stylesheet" href="../assets/css/main.css" /> <link rel="stylesheet" href="../assets/css/codehilite.css" /> </head> <body class="single is-preload"> <div id="wrapper"> <header id="header"> <h1><a href="../index.html">Future Imperfect</a></h1> <nav class="links"></nav> </header> <div id="main"> <article class="post"> <header> <div class="title"><h2>Building Production-Ready Prometheus Monitoring for Wireless Infrastructure</h2><p>In today&#x27;s telecommunications landscape, monitoring wireless infrastructure is critical for maintaining service quality and operational efficiency. This blog post details the development of a specialized Prometheus metrics exporter designed specifically for wireless infrastructure monitoring at scale.</p></div> <div class="meta"><span class="published">Monitoring</span></div> </header> <div class="content markdown"><h1>Building Production-Ready Prometheus Monitoring for Wireless Infrastructure</h1>
+<h2>Introduction</h2>
+<p>In today's telecommunications landscape, monitoring wireless infrastructure is critical for maintaining service quality and operational efficiency. This blog post details the development of a specialized Prometheus metrics exporter designed specifically for wireless infrastructure monitoring at scale.</p>
+<h2>The Challenge</h2>
+<p>When managing thousands of SIM cards, wireless orders, and billing processes, traditional monitoring approaches fall short. We needed a solution that could:</p>
+<ul>
+<li>Monitor wireless-specific metrics like MRC tracking, SIM card inventory, and public IP allocation</li>
+<li>Handle dual database connections (management and billing systems)</li>
+<li>Provide real-time visibility into order statuses and inventory levels</li>
+<li>Scale efficiently without impacting production databases</li>
+</ul>
+<h2>Technical Architecture</h2>
+<h3>Core Components</h3>
+<p>The solution is built around a custom Python application that extends the base <code>QueryExporterScript</code> to add wireless-specific functionality:</p>
+<div class="codehilite"><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">HealthQueryExporterScript</span><span class="p">(</span><span class="n">QueryExporterScript</span><span class="p">):</span> <span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">on_application_startup</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">application</span><span class="p">:</span> <span class="n">Application</span><span class="p">):</span> <span class="n">application</span><span class="o">.</span><span class="n">router</span><span class="o">.</span><span class="n">add_get</span><span class="p">(</span><span class="s2">&quot;/health&quot;</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_handle_health</span><span class="p">)</span> <span class="k">await</span> <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="n">on_application_startup</span><span class="p">(</span><span class="n">application</span><span class="p">)</span> <span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">_handle_health</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">request</span><span class="p">:</span> <span class="n">Request</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Response</span><span class="p">:</span> <span class="k">return</span> <span class="n">json_response</span><span class="p">({</span><span class="s2">&quot;status&quot;</span><span class="p">:</span> <span class="s2">&quot;OK&quot;</span><span class="p">})</span>
+</code></pre></div> <h3>Database Strategy</h3>
+<p>The system connects to two primary databases:
+- <strong>wireless_manager</strong>: Core management database containing SIM cards, orders, and gateway information
+- <strong>wireless_billing</strong>: Billing database with Oban job queue monitoring</p>
+<p>Using replica connections ensures zero impact on production systems while maintaining real-time monitoring capabilities.</p>
+<h3>Key Metrics Delivered</h3>
+<p>The system provides 15+ critical wireless metrics:</p>
+<p><strong>Inventory Management:</strong>
+- <code>wireless_total_sim_cards</code>: Total SIM cards by region and allocation status
+- <code>wireless_v4_sim_in_stock</code>: v4 SIM cards remaining in stock
+- <code>wireless_v3_sim_in_stock</code>: v3 SIM cards remaining in stock</p>
+<p><strong>Order Tracking:</strong>
+- <code>wireless_sim_card_orders_transient_status</code>: Orders in pending/allocated/dispatched states
+- <code>wireless_sim_card_orders_delivered_total</code>: Total delivered orders
+- <code>wireless_total_ordered_sim_cards</code>: Current order pipeline</p>
+<p><strong>Resource Management:</strong>
+- <code>wireless_total_sim_card_public_ips</code>: Public IP allocation by region
+- <code>wireless_available_sim_card_public_ips</code>: Available IP pool monitoring</p>
+<h2>Implementation Highlights</h2>
+<h3>Configuration Management</h3>
+<p>Using YAML-based configuration for maintainability:</p>
+<div class="codehilite"><pre><span></span><code><span class="c1"># queries.yaml</span>
+<span class="nt">wireless_mrcs</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">interval</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">300</span>
+<span class="w"> </span><span class="nt">databases</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">wireless_manager</span><span class="p p-Indicator">]</span>
+<span class="w"> </span><span class="nt">query</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">|</span>
+<span class="w"> </span><span class="no">SELECT mrc_type, COUNT(*) as count </span>
+<span class="w"> </span><span class="no">FROM wireless_mrcs </span>
+<span class="w"> </span><span class="no">WHERE status = &#39;active&#39;</span>
+<span class="w"> </span><span class="no">GROUP BY mrc_type</span>
+</code></pre></div> <h3>Security &amp; Secrets Management</h3>
+<p>Integrated with HashiCorp Vault for secure credential management:
+- Environment-based configuration
+- Automated secret rotation capabilities
+- Development and production secret separation</p>
+<h3>Deployment Strategy</h3>
+<p>The system uses a hybrid deployment approach:
+- Containerized with Docker for consistency
+- CI/CD pipeline deployment for reliability
+- Kubernetes configurations for scalability
+- Strategic single-datacenter deployment for non-critical services</p>
+<h2>Performance Optimizations</h2>
+<h3>Query Efficiency</h3>
+<ul>
+<li>Optimized query intervals (300-600 seconds) based on metric criticality</li>
+<li>Replica database usage to prevent production impact</li>
+<li>Careful metric cardinality management to prevent explosion</li>
+</ul>
+<h3>Resource Management</h3>
+<ul>
+<li>Single replica deployment for non-critical service classification</li>
+<li>Memory-optimized query result handling</li>
+<li>Efficient connection pooling</li>
+</ul>
+<h2>Operational Excellence</h2>
+<h3>Monitoring &amp; Alerting</h3>
+<ul>
+<li>Health endpoint (<code>/health</code>) for service monitoring</li>
+<li>Comprehensive metrics endpoint (<code>/metrics</code>) for Prometheus scraping</li>
+<li>Integration with Grafana for visualization</li>
+</ul>
+<h3>Documentation &amp; Maintenance</h3>
+<ul>
+<li>Comprehensive README with troubleshooting guides</li>
+<li>Schema validation for configuration changes</li>
+<li>Local development setup with docker-compose</li>
+</ul>
+<h2>Lessons Learned</h2>
+<h3>1. <strong>Infrastructure Decisions Matter</strong></h3>
+<p>Migrating from Kubernetes to CI pipeline deployment improved reliability and simplified operations for this specific use case.</p>
+<h3>2. <strong>Security First</strong></h3>
+<p>Implementing Vault integration from the start prevented security technical debt and enabled proper credential lifecycle management.</p>
+<h3>3. <strong>Monitoring Strategy</strong></h3>
+<p>Balancing monitoring coverage with performance impact requires careful query optimization and interval tuning.</p>
+<h3>4. <strong>Development Experience</strong></h3>
+<p>Investing in local development setup and comprehensive documentation pays dividends in team velocity and maintenance.</p>
+<h2>Results &amp; Impact</h2>
+<p>The wireless monitoring system now provides:
+- <strong>Real-time visibility</strong> into 15+ critical wireless infrastructure metrics
+- <strong>Proactive alerting</strong> for inventory levels, order processing, and billing health
+- <strong>Zero production impact</strong> through replica database usage
+- <strong>Operational efficiency</strong> through automated monitoring and alerting</p>
+<h2>Future Enhancements</h2>
+<p>Looking ahead, planned improvements include:
+- Additional wireless-specific metrics based on operational feedback
+- Enhanced Grafana dashboard templates
+- Automated anomaly detection for critical metrics
+- Integration with incident management systems</p>
+<h2>Conclusion</h2>
+<p>Building production-ready monitoring for wireless infrastructure requires careful consideration of performance, security, and operational requirements. By leveraging Prometheus, custom Python extensions, and modern DevOps practices, we created a solution that provides critical visibility while maintaining system reliability.</p>
+<p>The key to success was focusing on wireless-specific requirements while building on proven monitoring foundations. This approach delivered a monitoring solution that truly serves the needs of telecommunications operations teams.</p>
+<hr />
+<p><em>This implementation represents 25 hours of development work across 22 commits, resulting in a production-ready monitoring solution that provides crucial visibility into wireless infrastructure operations.</em></p></div> <footer><ul class="stats"><li><a href="../index.html">Back to posts</a></li></ul></footer> </article> </div> <section id="sidebar"> <section> <div class="mini-posts"> <header><h3>Recent</h3></header> <ul>
+<li><a href="../posts/project--docker-infrastructure-blog.html">Containerizing DNS Services: Docker Infrastructure for Enterprise Networks</a> <span class=\"published\">Containers</span></li>
+<li><a href="../posts/project--prometheus-metrics-blog.html">Implementing Prometheus Metrics for DNS Services: A Complete Observability Strategy</a> <span class=\"published\">Monitoring</span></li>
+<li><a href="../posts/project--wireless-infrastructure-blog.html">DNS Infrastructure for Wireless Networks: Building Reliable Services for Private PGW Environments</a> <span class=\"published\">Infra</span></li>
+<li><a href="../posts/project--devops-secrets-management-blog.html">DevOps Security: From Hardcoded Secrets to Vault Integration</a> <span class=\"published\">DevOps</span></li>
+<li><a href="../posts/project--kubernetes-deployment-blog.html">From Kubernetes to CI Pipeline: A Strategic Infrastructure Migration</a> <span class=\"published\">Containers</span></li> </ul> </div> </section> <section> <header><h3>About</h3></header> <p>Notes on telecom, infra, and automation.</p> </section> </section> <section id="footer"><p class="copyright">&copy; 2025</p></section> </div> <script src="../assets/js/jquery.min.js"></script> <script src="../assets/js/browser.min.js"></script> <script src="../assets/js/breakpoints.min.js"></script> <script src="../assets/js/util.js"></script> <script src="../assets/js/main.js"></script> </body>
+</html>

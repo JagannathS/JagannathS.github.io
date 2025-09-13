@@ -1,0 +1,241 @@
+<!DOCTYPE HTML>
+<html> <head> <title>Infrastructure as Code: Scaling Kubernetes Deployments with Helm and GitOps - Future Imperfect</title> <meta charset="utf-8" /> <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no" /> <link rel="stylesheet" href="../assets/css/main.css" /> <link rel="stylesheet" href="../assets/css/codehilite.css" /> </head> <body class="single is-preload"> <div id="wrapper"> <header id="header"> <h1><a href="../index.html">Future Imperfect</a></h1> <nav class="links"></nav> </header> <div id="main"> <article class="post"> <header> <div class="title"><h2>Infrastructure as Code: Scaling Kubernetes Deployments with Helm and GitOps</h2><p>Infrastructure as Code (IaC) has transformed how we manage complex systems, but implementing it effectively at scale requires more than just writing YAML files. Over the past year, I&#x27;ve been working with a sophisticated IaC setup that manages Prometheus monitoring infrastructure across multiple datacenters and environments. This experience has taught me invaluable lessons about building maintainable, scalable, and reliable infrastructure automation.</p></div> <div class="meta"><span class="published">Infra</span></div> </header> <div class="content markdown"><h1>Infrastructure as Code: Scaling Kubernetes Deployments with Helm and GitOps</h1>
+<h2>Introduction</h2>
+<p>Infrastructure as Code (IaC) has transformed how we manage complex systems, but implementing it effectively at scale requires more than just writing YAML files. Over the past year, I've been working with a sophisticated IaC setup that manages Prometheus monitoring infrastructure across multiple datacenters and environments. This experience has taught me invaluable lessons about building maintainable, scalable, and reliable infrastructure automation.</p>
+<h2>The Architecture: A Template-Driven Approach</h2>
+<p>When managing infrastructure across multiple environments (development, staging, production) and datacenters, traditional copy-paste approaches quickly become unmaintainable. The solution I worked with uses a sophisticated template-driven architecture that exemplifies modern IaC best practices.</p>
+<h3>Repository Structure That Scales</h3>
+<div class="codehilite"><pre><span></span><code><span class="n">infrastructure</span><span class="o">/</span>
+<span class="err">├──</span><span class="w"> </span><span class="n">bases</span><span class="o">/</span>
+<span class="err">│</span><span class="w"> </span><span class="err">├──</span><span class="w"> </span><span class="n">environments</span><span class="p">.</span><span class="n">yaml</span><span class="w"> </span><span class="err">#</span><span class="w"> </span><span class="n">Environment</span><span class="w"> </span><span class="n">definitions</span>
+<span class="err">│</span><span class="w"> </span><span class="err">└──</span><span class="w"> </span><span class="n">repos</span><span class="p">.</span><span class="n">yaml</span><span class="w"> </span><span class="err">#</span><span class="w"> </span><span class="n">Repository</span><span class="w"> </span><span class="n">configurations</span>
+<span class="err">├──</span><span class="w"> </span><span class="n">releases</span><span class="o">/</span>
+<span class="err">│</span><span class="w"> </span><span class="err">├──</span><span class="w"> </span><span class="n">common</span><span class="o">/</span><span class="w"> </span><span class="err">#</span><span class="w"> </span><span class="n">Shared</span><span class="w"> </span><span class="n">configurations</span>
+<span class="err">│</span><span class="w"> </span><span class="err">│</span><span class="w"> </span><span class="err">└──</span><span class="w"> </span><span class="n">prometheus</span><span class="p">.</span><span class="n">yaml</span><span class="w"> </span><span class="err">#</span><span class="w"> </span><span class="n">Base</span><span class="w"> </span><span class="n">Prometheus</span><span class="w"> </span><span class="n">config</span>
+<span class="err">│</span><span class="w"> </span><span class="err">├──</span><span class="w"> </span><span class="n">prometheus</span><span class="o">-</span><span class="n">main</span><span class="o">/</span><span class="w"> </span><span class="err">#</span><span class="w"> </span><span class="n">Instance</span><span class="o">-</span><span class="k">specific</span><span class="w"> </span><span class="n">configs</span>
+<span class="err">│</span><span class="w"> </span><span class="err">│</span><span class="w"> </span><span class="err">├──</span><span class="w"> </span><span class="n">aws</span><span class="o">-</span><span class="n">backend</span><span class="o">-</span><span class="n">ch1</span><span class="o">-</span><span class="n">prod</span><span class="o">/</span>
+<span class="err">│</span><span class="w"> </span><span class="err">│</span><span class="w"> </span><span class="err">│</span><span class="w"> </span><span class="err">└──</span><span class="w"> </span><span class="n">prometheus</span><span class="p">.</span><span class="n">yaml</span><span class="p">.</span><span class="k">go</span><span class="p">.</span><span class="n">tmpl</span>
+<span class="err">│</span><span class="w"> </span><span class="err">│</span><span class="w"> </span><span class="err">└──</span><span class="w"> </span><span class="n">aws</span><span class="o">-</span><span class="n">backend</span><span class="o">-</span><span class="n">dc2</span><span class="o">-</span><span class="n">prod</span><span class="o">/</span>
+<span class="err">│</span><span class="w"> </span><span class="err">│</span><span class="w"> </span><span class="err">└──</span><span class="w"> </span><span class="n">prometheus</span><span class="p">.</span><span class="n">yaml</span><span class="p">.</span><span class="k">go</span><span class="p">.</span><span class="n">tmpl</span>
+<span class="err">│</span><span class="w"> </span><span class="err">└──</span><span class="w"> </span><span class="n">releases</span><span class="p">.</span><span class="n">yaml</span><span class="w"> </span><span class="err">#</span><span class="w"> </span><span class="k">Release</span><span class="w"> </span><span class="n">definitions</span>
+<span class="err">└──</span><span class="w"> </span><span class="n">helmfile</span><span class="p">.</span><span class="n">yaml</span><span class="w"> </span><span class="err">#</span><span class="w"> </span><span class="n">Orchestration</span>
+</code></pre></div> <p>This structure demonstrates several key IaC principles:
+- <strong>Separation of Concerns</strong>: Base configurations separate from environment-specific overrides
+- <strong>DRY Principle</strong>: Common configurations defined once and reused
+- <strong>Template-Driven</strong>: Go templates enable dynamic configuration generation
+- <strong>Environment Parity</strong>: Same structure across all environments</p>
+<h2>Go Templates: The Power of Dynamic Configuration</h2>
+<p>One of the most powerful aspects of this approach is the use of Go templates for dynamic configuration generation. Here's how it works in practice:</p>
+<h3>Base Configuration Template</h3>
+<div class="codehilite"><pre><span></span><code><span class="c1"># common/prometheus.yaml</span>
+<span class="nt">prometheus</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">prometheusSpec</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">retention</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;30d&quot;</span>
+<span class="w"> </span><span class="nt">scrapeInterval</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;30s&quot;</span>
+<span class="w"> </span><span class="nt">evaluationInterval</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;30s&quot;</span>
+</code></pre></div> <h3>Environment-Specific Override</h3>
+<div class="codehilite"><pre><span></span><code><span class="c1"># prometheus-main/aws-backend-ch1-prod/prometheus.yaml.go.tmpl</span>
+<span class="nt">prometheus</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">prometheusSpec</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">retention</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;90d&quot;</span><span class="w"> </span><span class="c1"># Override for production</span>
+<span class="w"> </span><span class="nt">replicas</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">2</span><span class="w"> </span><span class="c1"># HA setup for prod</span>
+<span class="w"> </span><span class="nt">resources</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">requests</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">memory</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;4Gi&quot;</span>
+<span class="w"> </span><span class="nt">cpu</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;2&quot;</span>
+<span class="w"> </span><span class="nt">additionalScrapeConfigs</span><span class="p">:</span>
+<span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">job_name</span><span class="p">:</span><span class="w"> </span><span class="s">&#39;hydeco-metrics&#39;</span>
+<span class="w"> </span><span class="nt">static_configs</span><span class="p">:</span>
+<span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">targets</span><span class="p">:</span>
+<span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">hydeco-service.{{.Environment.Name}}.svc.cluster.local:9090</span>
+</code></pre></div> <h3>The Template Magic</h3>
+<p>The real power comes from the templating system:
+- <code>{{.Environment.Name}}</code> dynamically injects environment-specific values
+- <code>{{.Release.Name}}</code> allows instance-specific naming
+- Complex logic can be embedded for conditional configurations</p>
+<h2>Helmfile: Orchestrating Complex Deployments</h2>
+<p>While Helm manages individual applications, Helmfile orchestrates multiple Helm releases together. This is crucial for complex systems with interdependencies.</p>
+<h3>Release Definition Pattern</h3>
+<div class="codehilite"><pre><span></span><code><span class="c1"># releases.yaml</span>
+<span class="nt">releases</span><span class="p">:</span>
+<span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;prometheus-{{.Environment.Name}}&quot;</span>
+<span class="w"> </span><span class="nt">namespace</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;monitoring&quot;</span>
+<span class="w"> </span><span class="nt">chart</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;prometheus-community/kube-prometheus-stack&quot;</span>
+<span class="w"> </span><span class="nt">version</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;45.8.1&quot;</span>
+<span class="w"> </span><span class="nt">values</span><span class="p">:</span>
+<span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="s">&quot;./common/prometheus.yaml&quot;</span>
+<span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="s">&quot;./prometheus-main/{{.Environment.Name}}/prometheus.yaml.go.tmpl&quot;</span> <span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;prometheus-{{.Environment.Name}}-deployment&quot;</span>
+<span class="w"> </span><span class="nt">chart</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;raw/raw&quot;</span>
+<span class="w"> </span><span class="nt">values</span><span class="p">:</span>
+<span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="s">&quot;./prometheus-main/{{.Environment.Name}}/deployment.yaml.go.tmpl&quot;</span>
+</code></pre></div> <p>This pattern enables:
+- <strong>Consistent Versioning</strong>: Same chart versions across environments
+- <strong>Layered Configuration</strong>: Base + environment-specific overlays
+- <strong>Dependency Management</strong>: Controlled deployment order</p>
+<h2>Real-World Configuration Management</h2>
+<h3>Multi-Environment Strategy</h3>
+<p>Working across multiple environments taught me the importance of the <strong>Base + Override</strong> pattern:</p>
+<ol>
+<li><strong>Base Configuration</strong>: Define sensible defaults in <code>common/</code></li>
+<li><strong>Environment Overrides</strong>: Minimal, specific changes in environment folders</li>
+<li><strong>Instance Customization</strong>: Additional customization through templates</li>
+</ol>
+<h3>Example: Scrape Configuration Management</h3>
+<div class="codehilite"><pre><span></span><code><span class="c1"># In common/scrapeconfigs.yaml.go.tmpl</span>
+<span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">job_name</span><span class="p">:</span><span class="w"> </span><span class="s">&#39;kubernetes-pods&#39;</span>
+<span class="w"> </span><span class="nt">kubernetes_sd_configs</span><span class="p">:</span>
+<span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">role</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">pod</span>
+<span class="w"> </span><span class="nt">scrape_interval</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">{{</span><span class="nv">default &quot;30s&quot; .Values.scrapeInterval</span><span class="p p-Indicator">}}</span> <span class="c1"># In production override</span>
+<span class="nt">scrapeInterval</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;15s&quot;</span><span class="w"> </span><span class="c1"># More frequent for production monitoring</span>
+</code></pre></div> <h3>Configuration Validation</h3>
+<p>The template approach enables built-in validation:</p>
+<div class="codehilite"><pre><span></span><code><span class="p p-Indicator">{{</span><span class="nv">- if not .Values.environment</span><span class="w"> </span><span class="p p-Indicator">}}</span>
+<span class="p p-Indicator">{{</span><span class="nv">- fail &quot;Environment must be specified&quot;</span><span class="w"> </span><span class="p p-Indicator">}}</span>
+<span class="p p-Indicator">{{</span><span class="nv">- end</span><span class="w"> </span><span class="p p-Indicator">}}</span> <span class="p p-Indicator">{{</span><span class="nv">- if eq .Values.environment &quot;prod&quot;</span><span class="w"> </span><span class="p p-Indicator">}}</span>
+<span class="w"> </span><span class="p p-Indicator">{{</span><span class="nv">- if lt .Values.replicas 2</span><span class="w"> </span><span class="p p-Indicator">}}</span>
+<span class="w"> </span><span class="p p-Indicator">{{</span><span class="nv">- fail &quot;Production requires at least 2 replicas&quot;</span><span class="w"> </span><span class="p p-Indicator">}}</span>
+<span class="w"> </span><span class="p p-Indicator">{{</span><span class="nv">- end</span><span class="w"> </span><span class="p p-Indicator">}}</span>
+<span class="p p-Indicator">{{</span><span class="nv">- end</span><span class="w"> </span><span class="p p-Indicator">}}</span>
+</code></pre></div> <h2>GitOps Workflow: From Commit to Deployment</h2>
+<p>The IaC approach shines when combined with GitOps workflows:</p>
+<h3>Development Workflow</h3>
+<ol>
+<li><strong>Feature Branch</strong>: Create branch for infrastructure changes</li>
+<li><strong>Template Updates</strong>: Modify base configurations or environment overrides</li>
+<li><strong>Validation</strong>: Automated tests validate template rendering</li>
+<li><strong>Pull Request</strong>: Peer review of infrastructure changes</li>
+<li><strong>Merge</strong>: Changes automatically deployed via CI/CD</li>
+</ol>
+<h3>Deployment Commands</h3>
+<div class="codehilite"><pre><span></span><code><span class="c1"># Deploy to specific environment</span>
+helmfile<span class="w"> </span>--environment<span class="w"> </span>aws-backend-ch1-prod<span class="w"> </span>sync <span class="c1"># Deploy specific releases</span>
+helmfile<span class="w"> </span>-l<span class="w"> </span><span class="nv">name</span><span class="o">=</span>prometheus-main<span class="w"> </span>-l<span class="w"> </span><span class="nv">name</span><span class="o">=</span>prometheus-main-deployment<span class="w"> </span>apply <span class="c1"># Dry run to see changes</span>
+helmfile<span class="w"> </span>--environment<span class="w"> </span>aws-backend-ch1-prod<span class="w"> </span>diff
+</code></pre></div> <h2>Lessons Learned: Best Practices for IaC at Scale</h2>
+<h3>1. <strong>Start with Strong Foundations</strong></h3>
+<ul>
+<li>Establish clear directory structures early</li>
+<li>Define naming conventions and stick to them</li>
+<li>Create template libraries for common patterns</li>
+</ul>
+<h3>2. <strong>Embrace the DRY Principle</strong></h3>
+<ul>
+<li>Use base configurations for shared settings</li>
+<li>Create reusable template functions</li>
+<li>Avoid copy-paste configurations</li>
+</ul>
+<h3>3. <strong>Environment Parity with Flexibility</strong></h3>
+<ul>
+<li>Keep environments as similar as possible</li>
+<li>Use templates to handle necessary differences</li>
+<li>Document when and why environments diverge</li>
+</ul>
+<h3>4. <strong>Version Everything</strong></h3>
+<ul>
+<li>Pin chart versions for reproducibility</li>
+<li>Use semantic versioning for your templates</li>
+<li>Maintain upgrade paths between versions</li>
+</ul>
+<h3>5. <strong>Test and Validate</strong></h3>
+<div class="codehilite"><pre><span></span><code><span class="c1"># Template rendering tests</span>
+helmfile<span class="w"> </span>--environment<span class="w"> </span><span class="nb">test</span><span class="w"> </span>template<span class="w"> </span>&gt;<span class="w"> </span>rendered.yaml
+kubectl<span class="w"> </span>apply<span class="w"> </span>--dry-run<span class="o">=</span>client<span class="w"> </span>-f<span class="w"> </span>rendered.yaml <span class="c1"># Resource validation</span>
+kubeval<span class="w"> </span>rendered.yaml
+</code></pre></div> <h3>6. <strong>Documentation as Code</strong></h3>
+<ul>
+<li>Maintain changelogs for infrastructure changes</li>
+<li>Document template parameters and their purposes</li>
+<li>Include deployment runbooks in the repository</li>
+</ul>
+<h2>Advanced Patterns: Secrets and External Dependencies</h2>
+<h3>Vault Integration</h3>
+<div class="codehilite"><pre><span></span><code><span class="c1"># deployment.yaml.go.tmpl</span>
+<span class="nt">metadata</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">annotations</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">vault.hashicorp.com/agent-inject</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;true&quot;</span>
+<span class="w"> </span><span class="nt">vault.hashicorp.com/role</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;prometheus-{{.Environment.Name}}&quot;</span>
+<span class="w"> </span><span class="nt">vault.hashicorp.com/agent-inject-secret-config</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;secret/prometheus/{{.Environment.Name}}&quot;</span>
+</code></pre></div> <h3>External Service Discovery</h3>
+<div class="codehilite"><pre><span></span><code><span class="c1"># Dynamic target discovery</span>
+<span class="nt">consul_sd_configs</span><span class="p">:</span>
+<span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">server</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;consul.{{.Environment.Name}}.internal&quot;</span>
+<span class="w"> </span><span class="nt">datacenter</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;{{.Environment.Name}}&quot;</span>
+<span class="w"> </span><span class="nt">services</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="s">&#39;prometheus-targets&#39;</span><span class="p p-Indicator">]</span>
+</code></pre></div> <h2>Performance and Scalability Considerations</h2>
+<h3>Template Complexity</h3>
+<ul>
+<li>Keep templates readable and maintainable</li>
+<li>Use helper templates for complex logic</li>
+<li>Comment complex template constructs</li>
+</ul>
+<h3>Deployment Performance</h3>
+<ul>
+<li>Use <code>helmfile --concurrency</code> for parallel deployments</li>
+<li>Implement health checks for deployment validation</li>
+<li>Plan for rollback scenarios</li>
+</ul>
+<h2>Security Best Practices</h2>
+<h3>1. <strong>Secrets Management</strong></h3>
+<ul>
+<li>Never commit secrets to version control</li>
+<li>Use external secret management (Vault, AWS Secrets Manager)</li>
+<li>Inject secrets at deployment time</li>
+</ul>
+<h3>2. <strong>Access Control</strong></h3>
+<ul>
+<li>Implement RBAC for Kubernetes deployments</li>
+<li>Use service accounts with minimal permissions</li>
+<li>Audit and rotate credentials regularly</li>
+</ul>
+<h3>3. <strong>Network Security</strong></h3>
+<ul>
+<li>Define network policies in templates</li>
+<li>Use encrypted communication between components</li>
+<li>Implement proper ingress controls</li>
+</ul>
+<h2>Measuring Success: KPIs for IaC</h2>
+<h3>Operational Metrics</h3>
+<ul>
+<li><strong>Deployment Frequency</strong>: How often you can safely deploy</li>
+<li><strong>Lead Time</strong>: Time from code commit to production</li>
+<li><strong>Mean Time to Recovery</strong>: How quickly you can fix issues</li>
+<li><strong>Change Failure Rate</strong>: Percentage of deployments causing issues</li>
+</ul>
+<h3>Technical Metrics</h3>
+<ul>
+<li><strong>Configuration Drift</strong>: Differences between intended and actual state</li>
+<li><strong>Template Reuse</strong>: Percentage of configuration shared vs. duplicated</li>
+<li><strong>Deployment Success Rate</strong>: Percentage of successful automated deployments</li>
+</ul>
+<h2>Future Directions: The Evolution of IaC</h2>
+<h3>Emerging Trends</h3>
+<ul>
+<li><strong>Policy as Code</strong>: Using Open Policy Agent for governance</li>
+<li><strong>Progressive Delivery</strong>: Canary and blue-green deployments</li>
+<li><strong>Multi-Cloud Templates</strong>: Cloud-agnostic infrastructure definitions</li>
+<li><strong>AI-Assisted Configuration</strong>: Automated optimization and validation</li>
+</ul>
+<h3>Technology Evolution</h3>
+<ul>
+<li><strong>Kubernetes Operators</strong>: Custom resources for complex applications</li>
+<li><strong>GitOps 2.0</strong>: Enhanced automation and observability </li>
+<li><strong>WebAssembly</strong>: Portable configuration validation</li>
+<li><strong>Declarative APIs</strong>: More sophisticated configuration management</li>
+</ul>
+<h2>Conclusion</h2>
+<p>Infrastructure as Code is more than just automation—it's a fundamental shift in how we think about system management. The template-driven approach I've worked with demonstrates how to build scalable, maintainable infrastructure that can grow with your organization.</p>
+<p>The key lessons I've learned:
+- <strong>Structure matters</strong>: Good organization pays dividends at scale
+- <strong>Templates are powerful</strong>: But they require discipline to remain maintainable<br />
+- <strong>Environment parity</strong>: Reduces surprises and increases confidence
+- <strong>GitOps workflows</strong>: Enable safe, auditable infrastructure changes
+- <strong>Continuous validation</strong>: Catch issues before they reach production</p>
+<p>When implemented thoughtfully, IaC becomes not just a tool for managing infrastructure, but a catalyst for organizational transformation—enabling teams to move faster while maintaining reliability and security.</p>
+<hr />
+<p><em>What's your experience with Infrastructure as Code at scale? I'd love to hear about the patterns and practices that have worked well for your team. Let's connect and share insights about building better infrastructure automation.</em></p></div> <footer><ul class="stats"><li><a href="../index.html">Back to posts</a></li></ul></footer> </article> </div> <section id="sidebar"> <section> <div class="mini-posts"> <header><h3>Recent</h3></header> <ul>
+<li><a href="../posts/project--ims-infrastructure-blog.html">Modernizing IMS Infrastructure: From Legacy Systems to Cloud-Native Excellence</a> <span class=\"published\">Infra</span></li>
+<li><a href="../posts/project--kubernetes-deployment-blog.html">Scaling Telecommunications Infrastructure: A Journey Through Kubernetes Deployments in Wireless Networks</a> <span class=\"published\">Containers</span></li>
+<li><a href="../posts/project--network-monitoring-blog.html">Building Robust Network Monitoring for Telecommunications: A CloudProber Journey</a> <span class=\"published\">Monitoring</span></li>
+<li><a href="../posts/project--telecommunications-security-blog.html">Securing Critical Telecommunications Infrastructure: A Defense-in-Depth Approach</a> <span class=\"published\">Telecom</span></li>
+<li><a href="../posts/project--devops-sre-blog.html">DevOps and SRE: Building Reliable Systems Through Production Engineering</a> <span class=\"published\">DevOps</span></li> </ul> </div> </section> <section> <header><h3>About</h3></header> <p>Notes on telecom, infra, and automation.</p> </section> </section> <section id="footer"><p class="copyright">&copy; 2025</p></section> </div> <script src="../assets/js/jquery.min.js"></script> <script src="../assets/js/browser.min.js"></script> <script src="../assets/js/breakpoints.min.js"></script> <script src="../assets/js/util.js"></script> <script src="../assets/js/main.js"></script> </body>
+</html>

@@ -1,0 +1,173 @@
+<!DOCTYPE HTML>
+<html> <head> <title>Building a Hybrid DNS-Routing Container: Combining FRR and CoreDNS for Telecom Infrastructure - Future Imperfect</title> <meta charset="utf-8" /> <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no" /> <link rel="stylesheet" href="../assets/css/main.css" /> <link rel="stylesheet" href="../assets/css/codehilite.css" /> </head> <body class="single is-preload"> <div id="wrapper"> <header id="header"> <h1><a href="../index.html">Future Imperfect</a></h1> <nav class="links"></nav> </header> <div id="main"> <article class="post"> <header> <div class="title"><h2>Building a Hybrid DNS-Routing Container: Combining FRR and CoreDNS for Telecom Infrastructure</h2><p>In the ever-evolving landscape of telecom infrastructure, the need for specialized, high-performance DNS solutions that can seamlessly integrate with routing protocols has become paramount. Recently, I had the opportunity to architect and implement a hybrid container solution that combines Free Range Routing (FRR) with CoreDNS to create a powerful, scalable DNS service for wireless APN (Access Point Name) management.</p></div> <div class="meta"><span class="published">Containers</span></div> </header> <div class="content markdown"><h1>Building a Hybrid DNS-Routing Container: Combining FRR and CoreDNS for Telecom Infrastructure</h1>
+<h2>Introduction</h2>
+<p>In the ever-evolving landscape of telecom infrastructure, the need for specialized, high-performance DNS solutions that can seamlessly integrate with routing protocols has become paramount. Recently, I had the opportunity to architect and implement a hybrid container solution that combines Free Range Routing (FRR) with CoreDNS to create a powerful, scalable DNS service for wireless APN (Access Point Name) management.</p>
+<h2>The Challenge</h2>
+<p>Our telecom infrastructure required replacing legacy Expeto DNS containers with a more modern, maintainable solution that could:</p>
+<ul>
+<li>Provide external-facing DNS services for telecom partners (Comfone, Sparkle, and future partners)</li>
+<li>Integrate seamlessly with BGP routing for optimal network path management</li>
+<li>Support dynamic configuration based on deployment environments</li>
+<li>Maintain high availability and performance standards required for telecom operations</li>
+</ul>
+<h2>Architecture Overview</h2>
+<h3>The Foundation: FRR Base Image</h3>
+<p>The solution starts with a solid foundation using the FRR (Free Range Routing) base image:</p>
+<div class="codehilite"><pre><span></span><code><span class="k">ARG</span><span class="w"> </span><span class="nv">BASE_IMAGE</span><span class="o">=</span>registry.internal..com/infra/cr-frr:frr-stable-jammy@sha256:5e23a0dc827124ea04dce819a2fb336e9c368c61164cbac0d176d5548bda99f0
+<span class="k">FROM</span><span class="w"> </span><span class="s">${BASE_IMAGE}</span><span class="w"> </span><span class="k">AS</span><span class="w"> </span><span class="s">prod</span>
+</code></pre></div> <p>FRR provides enterprise-grade routing capabilities, supporting protocols like BGP, OSPF, and IS-IS. By using it as our base, we get:
+- Proven stability in production telecom environments
+- BGP neighbor management for partner connectivity
+- Dynamic route advertisement capabilities
+- Comprehensive logging and monitoring</p>
+<h3>Layer 2: CoreDNS Integration</h3>
+<p>On top of the routing foundation, we integrate CoreDNS v1.11.3:</p>
+<div class="codehilite"><pre><span></span><code><span class="k">ARG</span><span class="w"> </span><span class="nv">VERSION</span><span class="o">=</span><span class="s2">&quot;1.11.3&quot;</span>
+<span class="k">ENV</span><span class="w"> </span><span class="nv">COREDNS_VERSION</span><span class="o">=</span><span class="si">${</span><span class="nv">VERSION</span><span class="si">}</span> <span class="k">RUN</span><span class="w"> </span>apt-get<span class="w"> </span>update<span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span><span class="se">\</span>
+<span class="w"> </span>curl<span class="w"> </span>-L<span class="w"> </span>https://github.com/coredns/coredns/releases/download/v<span class="nv">$COREDNS_VERSION</span>/coredns_<span class="si">${</span><span class="nv">VERSION</span><span class="si">}</span>_linux_amd64.tgz<span class="w"> </span>-o<span class="w"> </span>coredns.tgz<span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span><span class="se">\</span>
+<span class="w"> </span>tar<span class="w"> </span>xf<span class="w"> </span>coredns.tgz<span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span><span class="se">\</span>
+<span class="w"> </span>rm<span class="w"> </span>coredns.tgz<span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span><span class="se">\</span>
+<span class="w"> </span>mv<span class="w"> </span>coredns<span class="w"> </span>/usr/local/bin/
+</code></pre></div> <p>CoreDNS brings modern DNS capabilities:
+- Plugin-based architecture for extensibility
+- Built-in metrics and health checking
+- High performance with minimal resource footprint
+- Kubernetes-ready design patterns</p>
+<h2>Service Orchestration with S6</h2>
+<p>The magic happens in the service orchestration layer using S6 supervision:</p>
+<h3>CoreDNS Service Runner</h3>
+<div class="codehilite"><pre><span></span><code><span class="ch">#!/usr/bin/with-contenv sh</span>
+<span class="nb">set</span><span class="w"> </span>-o<span class="w"> </span>nounset<span class="w"> </span>-o<span class="w"> </span>errexit<span class="w"> </span>-x <span class="c1"># Wait for rsyslog to start so we won&#39;t lose messages</span>
+<span class="k">if</span><span class="w"> </span><span class="o">[</span><span class="w"> </span>-d<span class="w"> </span>/var/run/s6/services/rsyslog<span class="w"> </span><span class="o">]</span><span class="w"> </span><span class="p">;</span><span class="w"> </span><span class="k">then</span>
+<span class="w"> </span><span class="nb">echo</span><span class="w"> </span><span class="s2">&quot;Waiting for rsyslog to start so we won&#39;t lose messages&quot;</span>
+<span class="w"> </span>s6-svc<span class="w"> </span>-wu<span class="w"> </span>/var/run/s6/services/rsyslog
+<span class="w"> </span>sleep<span class="w"> </span><span class="m">1</span>
+<span class="k">fi</span> <span class="nb">exec</span><span class="w"> </span>/usr/local/bin/coredns<span class="w"> </span><span class="se">\</span>
+<span class="w"> </span>-conf<span class="w"> </span>/etc/coredns/Corefile
+</code></pre></div> <p>This approach ensures:
+- <strong>Service Dependency Management</strong>: CoreDNS waits for logging services
+- <strong>Process Supervision</strong>: Automatic restart on failure
+- <strong>Clean Shutdown</strong>: Proper signal handling for graceful termination
+- <strong>Resource Management</strong>: Efficient resource utilization</p>
+<h2>Dynamic Configuration Management</h2>
+<h3>BGP Configuration Template</h3>
+<p>The FRR configuration uses template-based dynamic configuration:</p>
+<div class="codehilite"><pre><span></span><code><span class="nx">hostname</span><span class="w"> </span><span class="p">{{</span><span class="w"> </span><span class="p">.</span><span class="nx">SERVER_HOSTNAME</span><span class="w"> </span><span class="p">}}</span>
+<span class="p">!</span>
+<span class="nx">router</span><span class="w"> </span><span class="nx">bgp</span><span class="w"> </span><span class="p">{{</span><span class="w"> </span><span class="p">.</span><span class="nx">SITE_ASN</span><span class="w"> </span><span class="p">}}</span>
+<span class="w"> </span><span class="nx">neighbor</span><span class="w"> </span><span class="p">{{</span><span class="w"> </span><span class="p">.</span><span class="nx">SIGNALLING_ROUTER_IP</span><span class="w"> </span><span class="p">}}</span><span class="w"> </span><span class="nx">remote</span><span class="o">-</span><span class="k">as</span><span class="w"> </span><span class="p">{{</span><span class="w"> </span><span class="p">.</span><span class="nx">SITE_ASN</span><span class="w"> </span><span class="p">}}</span>
+<span class="w"> </span><span class="nx">neighbor</span><span class="w"> </span><span class="p">{{</span><span class="w"> </span><span class="p">.</span><span class="nx">SIGNALLING_ROUTER_IP</span><span class="w"> </span><span class="p">}}</span><span class="w"> </span><span class="nx">advertisement</span><span class="o">-</span><span class="nx">interval</span><span class="w"> </span><span class="mi">1</span>
+<span class="w"> </span><span class="nx">neighbor</span><span class="w"> </span><span class="p">{{</span><span class="w"> </span><span class="p">.</span><span class="nx">SIGNALLING_ROUTER_IP</span><span class="w"> </span><span class="p">}}</span><span class="w"> </span><span class="nx">timers</span><span class="w"> </span><span class="mi">3</span><span class="w"> </span><span class="mi">12</span>
+<span class="w"> </span><span class="p">!</span>
+<span class="w"> </span><span class="nx">address</span><span class="o">-</span><span class="nx">family</span><span class="w"> </span><span class="nx">ipv4</span><span class="w"> </span><span class="nx">unicast</span>
+<span class="w"> </span><span class="nx">network</span><span class="w"> </span><span class="p">{{</span><span class="w"> </span><span class="p">.</span><span class="nx">EXTERNAL_SIGNALLING_IP</span><span class="w"> </span><span class="p">}}</span><span class="o">/</span><span class="mi">32</span>
+<span class="w"> </span><span class="nx">exit</span><span class="o">-</span><span class="nx">address</span><span class="o">-</span><span class="nx">family</span>
+<span class="p">!</span>
+<span class="nx">ip</span><span class="w"> </span><span class="nx">route</span><span class="w"> </span><span class="m m-Double">10.0.0.0</span><span class="o">/</span><span class="mi">8</span><span class="w"> </span><span class="p">{{</span><span class="w"> </span><span class="p">.</span><span class="nx">_ROUTER_IP</span><span class="w"> </span><span class="p">}}</span>
+<span class="nx">ip</span><span class="w"> </span><span class="nx">route</span><span class="w"> </span><span class="m m-Double">172.16.0.0</span><span class="o">/</span><span class="mi">12</span><span class="w"> </span><span class="p">{{</span><span class="w"> </span><span class="p">.</span><span class="nx">_ROUTER_IP</span><span class="w"> </span><span class="p">}}</span>
+<span class="nx">ip</span><span class="w"> </span><span class="nx">route</span><span class="w"> </span><span class="m m-Double">192.168.0.0</span><span class="o">/</span><span class="mi">16</span><span class="w"> </span><span class="p">{{</span><span class="w"> </span><span class="p">.</span><span class="nx">_ROUTER_IP</span><span class="w"> </span><span class="p">}}</span>
+</code></pre></div> <h3>Environment-Driven Configuration</h3>
+<p>The container accepts these environment variables:
+- <code>SERVER_HOSTNAME</code> - Dynamic hostname assignment
+- <code>SITE_ASN</code> - BGP Autonomous System Number
+- <code>SIGNALLING_ROUTER_IP</code> - Partner router IP for BGP peering
+- <code>EXTERNAL_SIGNALLING_IP</code> - Public IP for route advertisement
+- <code>_ROUTER_IP</code> - Internal routing bridge IP</p>
+<h2>Network Architecture Considerations</h2>
+<h3>Port Strategy</h3>
+<div class="codehilite"><pre><span></span><code><span class="k">EXPOSE</span><span class="w"> </span><span class="s">11915/tcp # Metrics endpoint</span>
+<span class="k">EXPOSE</span><span class="w"> </span><span class="s">53 53/udp # DNS service</span>
+</code></pre></div> <p>The dual-port approach provides:
+- <strong>DNS Service</strong> (Port 53): Standard DNS resolution
+- <strong>Metrics Endpoint</strong> (Port 11915): Prometheus-compatible metrics for monitoring</p>
+<h3>BGP Integration Benefits</h3>
+<ol>
+<li><strong>Dynamic Route Management</strong>: Automatic failover and load balancing</li>
+<li><strong>Partner Integration</strong>: Seamless connectivity with telecom partners</li>
+<li><strong>Traffic Engineering</strong>: Optimal path selection based on network conditions</li>
+<li><strong>Scalability</strong>: Easy addition of new partners and routes</li>
+</ol>
+<h2>Performance and Monitoring</h2>
+<h3>Built-in Observability</h3>
+<p>The architecture includes comprehensive monitoring:
+- CoreDNS metrics for DNS query performance
+- FRR routing table monitoring
+- Service health checks through S6 supervision
+- Structured logging for troubleshooting</p>
+<h3>Resource Optimization</h3>
+<ul>
+<li><strong>Minimal Base Image</strong>: Ubuntu Jammy with only necessary components</li>
+<li><strong>Single Binary Approach</strong>: CoreDNS as a single, efficient binary</li>
+<li><strong>Process Supervision</strong>: Efficient resource management with S6</li>
+</ul>
+<h2>Deployment and CI/CD Integration</h2>
+<h3>Jenkins Pipeline Integration</h3>
+<p>The solution integrates with Jenkins for automated building:</p>
+<div class="codehilite"><pre><span></span><code><span class="c1"># Jenkinsfile optimizations for Docker image building</span>
+<span class="c1"># Automated testing and deployment pipeline</span>
+<span class="c1"># Environment-specific configuration management</span>
+</code></pre></div> <h3>Container Registry Strategy</h3>
+<ul>
+<li>Automated image building and tagging</li>
+<li>Environment-specific image variants</li>
+<li>Secure image storage and distribution</li>
+</ul>
+<h2>Key Technical Achievements</h2>
+<h3>Code Efficiency Metrics</h3>
+<ul>
+<li><strong>Added</strong>: 105+ lines of production-ready code</li>
+<li><strong>Removed</strong>: 115 lines of obsolete code</li>
+<li><strong>Net Result</strong>: Improved functionality with cleaner, more maintainable codebase</li>
+</ul>
+<h3>Architecture Benefits</h3>
+<ol>
+<li><strong>Modularity</strong>: Clear separation between routing and DNS concerns</li>
+<li><strong>Scalability</strong>: Template-driven configuration for easy scaling</li>
+<li><strong>Maintainability</strong>: Standard containerization practices</li>
+<li><strong>Observability</strong>: Built-in metrics and logging</li>
+<li><strong>Reliability</strong>: Process supervision and automatic recovery</li>
+</ol>
+<h2>Lessons Learned</h2>
+<h3>Container Design Patterns</h3>
+<ol>
+<li><strong>Single Responsibility with Composition</strong>: Each service (FRR, CoreDNS) maintains its primary responsibility while working together</li>
+<li><strong>Environment-Driven Configuration</strong>: Template-based configuration allows for flexible deployment across environments</li>
+<li><strong>Health-First Design</strong>: Built-in health checking and metrics from day one</li>
+<li><strong>Process Supervision</strong>: S6 provides robust process management without the overhead of full orchestration</li>
+</ol>
+<h3>Network Service Architecture</h3>
+<ol>
+<li><strong>Protocol Layering</strong>: Proper separation between L3 routing (BGP) and L7 services (DNS)</li>
+<li><strong>Partner Integration</strong>: Design for external connectivity from the beginning</li>
+<li><strong>Monitoring Integration</strong>: Metrics and logging as first-class citizens</li>
+<li><strong>Configuration Management</strong>: Dynamic configuration reduces operational overhead</li>
+</ol>
+<h2>Future Considerations</h2>
+<h3>Scalability Enhancements</h3>
+<ul>
+<li>Horizontal scaling with service mesh integration</li>
+<li>Advanced load balancing with BGP ECMP</li>
+<li>Geographic distribution for latency optimization</li>
+</ul>
+<h3>Feature Extensions</h3>
+<ul>
+<li>Additional CoreDNS plugins for advanced DNS features</li>
+<li>Integration with service discovery systems</li>
+<li>Enhanced security with DNS-over-HTTPS/TLS</li>
+</ul>
+<h2>Conclusion</h2>
+<p>Building a hybrid DNS-routing container requires careful consideration of both network protocols and container orchestration patterns. By combining the routing expertise of FRR with the modern DNS capabilities of CoreDNS, we created a solution that not only meets current telecom infrastructure needs but provides a foundation for future growth and innovation.</p>
+<p>The key to success in such architectures lies in:
+- Understanding the unique requirements of each component
+- Designing for observability from the ground up<br />
+- Implementing robust configuration management
+- Planning for operational excellence</p>
+<p>This architecture demonstrates how modern containerization techniques can be applied to traditional telecom infrastructure challenges, resulting in more maintainable, scalable, and reliable systems.</p>
+<hr />
+<p><em>This solution showcases the intersection of container technology, network engineering, and telecom infrastructure - a powerful combination for building next-generation network services.</em></p></div> <footer><ul class="stats"><li><a href="../index.html">Back to posts</a></li></ul></footer> </article> </div> <section id="sidebar"> <section> <div class="mini-posts"> <header><h3>Recent</h3></header> <ul>
+<li><a href="../posts/project--multi-region-networking-blog.html">Multi-Region Network Architecture: Building Resilient Telecommunications Infrastructure Across Global AWS Regions</a> <span class=\"published\">Infra</span></li>
+<li><a href="../posts/wireless-alerts--devops-best-practices-blog.html">DevOps Excellence: Infrastructure-as-Code for Monitoring Systems</a> <span class=\"published\">DevOps</span></li>
+<li><a href="../posts/wireless-alerts--infrastructure-reliability-blog.html">Infrastructure Reliability Engineering: Building Bulletproof Wireless Systems</a> <span class=\"published\">Infra</span></li>
+<li><a href="../posts/wireless-alerts--monitoring-observability-blog.html">Building Resilient Monitoring Systems: Lessons from Managing Wireless Infrastructure Alerts</a> <span class=\"published\">Monitoring</span></li>
+<li><a href="../posts/wireless-apn-dns--cicd-pipeline-blog.html">Modern CI/CD Pipeline Architecture: Jenkins-Based Docker Containerization for Telecom Infrastructure</a> <span class=\"published\">DevOps</span></li> </ul> </div> </section> <section> <header><h3>About</h3></header> <p>Notes on telecom, infra, and automation.</p> </section> </section> <section id="footer"><p class="copyright">&copy; 2025</p></section> </div> <script src="../assets/js/jquery.min.js"></script> <script src="../assets/js/browser.min.js"></script> <script src="../assets/js/breakpoints.min.js"></script> <script src="../assets/js/util.js"></script> <script src="../assets/js/main.js"></script> </body>
+</html>

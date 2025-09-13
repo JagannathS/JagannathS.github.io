@@ -1,0 +1,154 @@
+<!DOCTYPE HTML>
+<html> <head> <title>Building Custom CoreDNS Solutions for Enterprise Infrastructure - Future Imperfect</title> <meta charset="utf-8" /> <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no" /> <link rel="stylesheet" href="../assets/css/main.css" /> <link rel="stylesheet" href="../assets/css/codehilite.css" /> </head> <body class="single is-preload"> <div id="wrapper"> <header id="header"> <h1><a href="../index.html">Future Imperfect</a></h1> <nav class="links"></nav> </header> <div id="main"> <article class="post"> <header> <div class="title"><h2>Building Custom CoreDNS Solutions for Enterprise Infrastructure</h2><p>CoreDNS has revolutionized DNS services with its plugin-based architecture and cloud-native design. However, enterprise environments often require specialized configurations that go beyond standard deployments. In this post, I&#x27;ll walk through implementing a custom CoreDNS solution designed specifically for wireless infrastructure, focusing on Private PGW (Packet Gateway) environments.</p></div> <div class="meta"><span class="published">Infra</span></div> </header> <div class="content markdown"><h1>Building Custom CoreDNS Solutions for Enterprise Infrastructure</h1>
+<h2>Introduction</h2>
+<p>CoreDNS has revolutionized DNS services with its plugin-based architecture and cloud-native design. However, enterprise environments often require specialized configurations that go beyond standard deployments. In this post, I'll walk through implementing a custom CoreDNS solution designed specifically for wireless infrastructure, focusing on Private PGW (Packet Gateway) environments.</p>
+<h2>The Challenge</h2>
+<p>When working with telecommunications infrastructure, particularly in wireless networks, DNS services need to be more than just domain name resolution. They require:</p>
+<ul>
+<li><strong>Prometheus metrics integration</strong> for comprehensive monitoring</li>
+<li><strong>Service discovery capabilities</strong> for dynamic network topologies</li>
+<li><strong>High availability</strong> and low latency for real-time communications</li>
+<li><strong>Integration with internal services</strong> like Consul for service mesh architectures</li>
+</ul>
+<h2>Why Custom Build Over Standard Deployment?</h2>
+<p>While CoreDNS offers extensive plugin support, our wireless infrastructure presented unique requirements:</p>
+<div class="codehilite"><pre><span></span><code><span class="c1"># Standard CoreDNS might not easily integrate with:</span>
+<span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Internal Prometheus metrics collection</span>
+<span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Private network service discovery</span>
+<span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Telecom-specific monitoring requirements</span>
+<span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Corporate registry and security policies</span>
+</code></pre></div> <p>The solution was to create a <strong>custom Docker image</strong> based on CoreDNS 1.11.1 that could be tailored to our specific needs while maintaining the stability and performance of the upstream project.</p>
+<h2>Implementation Architecture</h2>
+<h3>Base Image Selection</h3>
+<div class="codehilite"><pre><span></span><code><span class="k">FROM</span><span class="w"> </span><span class="s">coredns/coredns:1.11.1</span>
+<span class="k">EXPOSE</span><span class="w"> </span><span class="s">11915/tcp</span>
+</code></pre></div> <p><strong>Why CoreDNS 1.11.1?</strong>
+- Proven stability in production environments
+- Comprehensive plugin ecosystem
+- Active community support
+- Security updates and patches</p>
+<h3>Build System Design</h3>
+<p>The build system was designed for both development agility and production reliability:</p>
+<div class="codehilite"><pre><span></span><code><span class="nv">SERVICE_NAME</span><span class="o">:=</span><span class="k">$(</span>shell<span class="w"> </span>cat<span class="w"> </span>meta-dev.yml<span class="w"> </span><span class="p">|</span><span class="w"> </span>grep<span class="w"> </span>service:<span class="w"> </span>-m1<span class="w"> </span><span class="p">|</span><span class="w"> </span>cut<span class="w"> </span>-d<span class="w"> </span><span class="s1">&#39;:&#39;</span><span class="w"> </span>-f2<span class="w"> </span><span class="p">|</span><span class="w"> </span>xargs<span class="k">)</span>
+<span class="nv">VERSION</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="k">$(</span>shell<span class="w"> </span>cat<span class="w"> </span>VERSION<span class="k">)</span>
+<span class="nv">IMAGE</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span>registry.internal..com/jenkins/<span class="k">$(</span>SERVICE_NAME<span class="k">)</span>:<span class="si">${</span><span class="nv">VERSION</span><span class="si">}</span> <span class="nf">build</span><span class="o">:</span>
+<span class="w"> </span>docker<span class="w"> </span>build<span class="w"> </span>--cache-from<span class="w"> </span><span class="si">${</span><span class="nv">IMAGE</span><span class="si">}</span>:red<span class="w"> </span><span class="se">\</span>
+<span class="w"> </span>--build-arg<span class="w"> </span><span class="nv">BUILDKIT_INLINE_CACHE</span><span class="o">=</span><span class="m">1</span><span class="w"> </span><span class="se">\</span>
+<span class="w"> </span>-t<span class="w"> </span><span class="si">${</span><span class="nv">IMAGE</span><span class="si">}</span><span class="w"> </span>.
+</code></pre></div> <p><strong>Key Design Principles:</strong>
+1. <strong>Dynamic Configuration</strong>: Service names and versions extracted from YAML files
+2. <strong>Build Optimization</strong>: Docker layer caching for faster builds
+3. <strong>Registry Integration</strong>: Internal registry for security and compliance
+4. <strong>Version Management</strong>: Semantic versioning aligned with CoreDNS releases</p>
+<h2>Configuration Management Strategy</h2>
+<h3>Environment Separation</h3>
+<div class="codehilite"><pre><span></span><code><span class="c1"># meta-dev.yml - Development Configuration</span>
+<span class="nt">names</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">service</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">project</span>
+<span class="w"> </span><span class="nt">github</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">project</span>
+<span class="w"> </span><span class="nt">bugsnag</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">project</span> <span class="nt">build</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">promote_to_dev</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">mode</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">always</span>
+<span class="w"> </span><span class="nt">branch_pattern</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;main|master|deploy-dev/.*&quot;</span> <span class="nt">project</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">squad</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">core.wireless.squad</span>
+<span class="w"> </span><span class="nt">primary_maintainer</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">jagannath</span>
+<span class="w"> </span><span class="nt">secondary_maintainer</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">sergii</span>
+</code></pre></div> <p>This configuration approach provides:
+- <strong>Clear ownership</strong> and responsibility assignment
+- <strong>Automated promotion</strong> based on branch patterns
+- <strong>Environment-specific</strong> service configurations
+- <strong>Integration points</strong> for monitoring and error tracking</p>
+<h3>Version Management</h3>
+<div class="codehilite"><pre><span></span><code><span class="c1"># VERSION file contains: 1.11.1</span>
+<span class="c1"># Aligned with CoreDNS upstream for compatibility</span>
+</code></pre></div> <h2>Integration with Prometheus Metrics</h2>
+<p>One of the key requirements was exposing detailed DNS metrics for monitoring. The custom build enables:</p>
+<div class="codehilite"><pre><span></span><code><span class="c1"># Potential CoreDNS configuration for metrics</span>
+<span class="l l-Scalar l-Scalar-Plain">.:53 {</span>
+<span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">prometheus :11915</span>
+<span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">forward . 8.8.8.8</span>
+<span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">log</span>
+<span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">errors</span>
+<span class="l l-Scalar l-Scalar-Plain">}</span>
+</code></pre></div> <p><strong>Benefits:</strong>
+- Real-time DNS query monitoring
+- Performance metrics collection
+- Integration with existing monitoring stack
+- Custom wireless-specific metrics</p>
+<h2>Service Discovery Integration</h2>
+<p>For wireless infrastructure, DNS services need to integrate with service discovery:</p>
+<div class="codehilite"><pre><span></span><code><span class="c1"># Consul integration possibilities</span>
+<span class="l l-Scalar l-Scalar-Plain">consul {</span>
+<span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">endpoint consul.service.consul:8500</span>
+<span class="l l-Scalar l-Scalar-Plain">}</span>
+</code></pre></div> <p><strong>Use Cases:</strong>
+- Dynamic service registration for PGW components
+- Health check integration
+- Load balancer backend updates
+- Network topology awareness</p>
+<h2>CI/CD Pipeline Integration</h2>
+<p>The Jenkins pipeline integration ensures reliable deployments:</p>
+<div class="codehilite"><pre><span></span><code><span class="nd">@Library</span><span class="o">(</span><span class="s2">&quot;github.com/team-/infra-ci-pipelines@latest&quot;</span><span class="o">)</span><span class="w"> </span><span class="n">_</span>
+<span class="n">dockerImage</span><span class="w"> </span><span class="o">{</span>
+<span class="w"> </span><span class="c1">// Automated build, test, and deployment</span>
+<span class="o">}</span>
+</code></pre></div> <p><strong>Pipeline Features:</strong>
+- Automated builds on code changes
+- Integration with internal CI/CD infrastructure
+- Security scanning and compliance checks
+- Multi-environment deployment support</p>
+<h2>Security Considerations</h2>
+<p>Working with telecommunications infrastructure requires strict security:</p>
+<ol>
+<li><strong>Internal Registry</strong>: All images stored in corporate registry</li>
+<li><strong>Network Isolation</strong>: DNS service runs in isolated network segments</li>
+<li><strong>Access Control</strong>: Limited exposure with specific port configurations</li>
+<li><strong>Audit Trail</strong>: Complete build and deployment logging</li>
+</ol>
+<h2>Performance Optimization</h2>
+<h3>Docker Build Optimization</h3>
+<div class="codehilite"><pre><span></span><code><span class="c"># Build cache utilization</span>
+<span class="nf">--cache-from ${IMAGE}</span><span class="o">:</span><span class="n">red</span> --<span class="n">build</span>-<span class="n">arg</span> <span class="n">BUILDKIT_INLINE_CACHE</span>=1
+</code></pre></div> <h3>Resource Management</h3>
+<ul>
+<li>Lightweight base image for minimal attack surface</li>
+<li>Optimized for DNS query latency</li>
+<li>Memory-efficient configuration</li>
+<li>CPU usage monitoring through Prometheus</li>
+</ul>
+<h2>Lessons Learned</h2>
+<ol>
+<li><strong>Start with Stable Versions</strong>: Using CoreDNS 1.11.1 provided a reliable foundation</li>
+<li><strong>Automate Everything</strong>: Build, test, and deployment automation saves time and reduces errors</li>
+<li><strong>Configuration Management</strong>: YAML-based configuration provides flexibility and maintainability</li>
+<li><strong>Monitoring is Crucial</strong>: Prometheus integration was essential for operational visibility</li>
+<li><strong>Security First</strong>: Internal registries and network isolation are non-negotiable</li>
+</ol>
+<h2>Future Enhancements</h2>
+<p>The current implementation provides a solid foundation for future enhancements:</p>
+<ol>
+<li><strong>Advanced Metrics</strong>: Custom wireless-specific metrics</li>
+<li><strong>Health Checks</strong>: Kubernetes-native health check endpoints</li>
+<li><strong>Configuration Hot-Reload</strong>: Dynamic configuration updates without restarts</li>
+<li><strong>Multi-Region Support</strong>: Geographic distribution for global wireless networks</li>
+<li><strong>Enhanced Security</strong>: mTLS integration for service-to-service communication</li>
+</ol>
+<h2>Conclusion</h2>
+<p>Building custom CoreDNS solutions requires balancing standard practices with specific infrastructure requirements. By focusing on:</p>
+<ul>
+<li><strong>Stable foundation</strong> (CoreDNS 1.11.1)</li>
+<li><strong>Automated workflows</strong> (CI/CD integration)</li>
+<li><strong>Comprehensive monitoring</strong> (Prometheus metrics)</li>
+<li><strong>Security best practices</strong> (internal registries)</li>
+<li><strong>Flexible configuration</strong> (YAML-based management)</li>
+</ul>
+<p>We created a DNS service that meets the demanding requirements of wireless telecommunications infrastructure while maintaining the reliability and performance expected in production environments.</p>
+<p>The key to success was not just the technical implementation, but also the operational considerations: proper documentation, clear ownership, automated testing, and comprehensive monitoring. These elements together create a maintainable and scalable DNS service that can evolve with changing infrastructure requirements.</p>
+<hr />
+<p><strong>About the Author</strong>: Jagannath S is a software engineer specializing in telecommunications infrastructure and wireless network services. Connect with me to discuss CoreDNS implementations, wireless infrastructure, or DNS service optimization.</p></div> <footer><ul class="stats"><li><a href="../index.html">Back to posts</a></li></ul></footer> </article> </div> <section id="sidebar"> <section> <div class="mini-posts"> <header><h3>Recent</h3></header> <ul>
+<li><a href="../posts/wireless-prober--bug-fixing-blog.html">Debugging Segmentation Faults: A Case Study in Network Interface Enumeration</a> <span class=\"published\">Other</span></li>
+<li><a href="../posts/wireless-prober--devops-automation-blog.html">Building CI/CD Pipelines for Specialized Monitoring Tools: A DevOps Case Study</a> <span class=\"published\">DevOps</span></li>
+<li><a href="../posts/wireless-prober--docker-containerization-blog.html">Mastering Multi-Stage Docker Builds: Extending CloudProber with Custom Tools</a> <span class=\"published\">Containers</span></li>
+<li><a href="../posts/wireless-prober--network-monitoring-blog.html">Beyond ICMP: Extending Network Monitoring with GTP Protocol Support</a> <span class=\"published\">Monitoring</span></li>
+<li><a href="../posts/project--cicd-pipeline-blog.html">Building Robust CI/CD Pipelines for Network Infrastructure Services</a> <span class=\"published\">DevOps</span></li> </ul> </div> </section> <section> <header><h3>About</h3></header> <p>Notes on telecom, infra, and automation.</p> </section> </section> <section id="footer"><p class="copyright">&copy; 2025</p></section> </div> <script src="../assets/js/jquery.min.js"></script> <script src="../assets/js/browser.min.js"></script> <script src="../assets/js/breakpoints.min.js"></script> <script src="../assets/js/util.js"></script> <script src="../assets/js/main.js"></script> </body>
+</html>

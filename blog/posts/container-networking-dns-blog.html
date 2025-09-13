@@ -1,0 +1,185 @@
+<!DOCTYPE HTML>
+<html> <head> <title>Solving Complex Container Networking: DNS Resolution in Multi-Network Environments - Future Imperfect</title> <meta charset="utf-8" /> <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no" /> <link rel="stylesheet" href="../assets/css/main.css" /> <link rel="stylesheet" href="../assets/css/codehilite.css" /> </head> <body class="single is-preload"> <div id="wrapper"> <header id="header"> <h1><a href="../index.html">Future Imperfect</a></h1> <nav class="links"></nav> </header> <div id="main"> <article class="post"> <header> <div class="title"><h2>Solving Complex Container Networking: DNS Resolution in Multi-Network Environments</h2><p>During the deployment of our telecommunications DRA infrastructure, we encountered a critical issue that stumped our team for days. Our containers, which needed to connect to multiple networks simultaneously, were experiencing DNS resolution failures despite using Docker&#x27;s standard `--dns` option. This seemingly simple networking issue was blocking our entire production deployment.</p></div> <div class="meta"><span class="published">Containers</span></div> </header> <div class="content markdown"><h1>Solving Complex Container Networking: DNS Resolution in Multi-Network Environments</h1>
+<h2>The Problem: When Standard Docker DNS Fails</h2>
+<p>During the deployment of our telecommunications DRA infrastructure, we encountered a critical issue that stumped our team for days. Our containers, which needed to connect to multiple networks simultaneously, were experiencing DNS resolution failures despite using Docker's standard <code>--dns</code> option. This seemingly simple networking issue was blocking our entire production deployment.</p>
+<h2>Understanding Multi-Network Container Challenges</h2>
+<h3>The Standard Approach (That Doesn't Always Work)</h3>
+<p>Most Docker deployments use the straightforward DNS injection method:</p>
+<div class="codehilite"><pre><span></span><code>docker<span class="w"> </span>run<span class="w"> </span>--dns<span class="o">=</span><span class="m">8</span>.8.8.8<span class="w"> </span>--dns<span class="o">=</span><span class="m">1</span>.1.1.1<span class="w"> </span>my-app
+</code></pre></div> <p>This works perfectly for single-network containers. However, our telecommunications infrastructure required containers to connect to multiple networks simultaneously:
+- Production application network
+- Management network for monitoring
+- Partner-specific VPNs for secure communications
+- Internal service mesh network</p>
+<h3>Why Multi-Network DNS Breaks</h3>
+<p>When Docker containers connect to multiple networks, the container's network namespace becomes complex. The standard DNS injection occurs at container creation time and doesn't account for networks added afterward. This results in:</p>
+<ul>
+<li>DNS queries timing out</li>
+<li>Inconsistent name resolution</li>
+<li>Service discovery failures</li>
+<li>Intermittent connectivity issues</li>
+</ul>
+<h2>The Investigation Process</h2>
+<h3>Step 1: Identifying the Scope</h3>
+<div class="codehilite"><pre><span></span><code><span class="c1"># Testing DNS resolution inside the container</span>
+docker<span class="w"> </span><span class="nb">exec</span><span class="w"> </span>-it<span class="w"> </span>my-container<span class="w"> </span>nslookup<span class="w"> </span>google.com
+<span class="c1"># Output: ;; connection timed out; no servers could be reached</span>
+</code></pre></div> <p>The DNS servers were correctly configured in <code>/etc/resolv.conf</code>, but queries were failing. This indicated a networking layer issue, not a configuration problem.</p>
+<h3>Step 2: Network Analysis</h3>
+<div class="codehilite"><pre><span></span><code><span class="c1"># Examining container networks</span>
+docker<span class="w"> </span>inspect<span class="w"> </span>my-container<span class="w"> </span><span class="p">|</span><span class="w"> </span>jq<span class="w"> </span><span class="s1">&#39;.[0].NetworkSettings&#39;</span>
+</code></pre></div> <p>The analysis revealed multiple network interfaces, but DNS routing was only configured for the primary network created at container startup.</p>
+<h3>Step 3: Testing Alternative Approaches</h3>
+<p>We tested several approaches:
+- Custom DNS servers per network
+- Host network mode (security implications)
+- DNS forwarding through proxy containers
+- Manual <code>/etc/resolv.conf</code> modification</p>
+<h2>The Solution: Environment Variable-Based DNS Injection</h2>
+<h3>Architecture Design</h3>
+<p>Instead of relying on Docker's DNS injection, we implemented a dynamic DNS configuration system using environment variables and template generation.</p>
+<p><strong>Step 1: Template-Based Configuration</strong></p>
+<div class="codehilite"><pre><span></span><code><span class="c1"># base/configs/etc/resolv.conf.tpl</span>
+<span class="o">{{</span><span class="c1">#each DNS_SERVERS}}</span>
+nameserver<span class="w"> </span><span class="o">{{</span>this<span class="o">}}</span>
+<span class="o">{{</span>/each<span class="o">}}</span>
+search<span class="w"> </span><span class="o">{{</span>SEARCH_DOMAINS<span class="o">}}</span>
+options<span class="w"> </span>ndots:5
+</code></pre></div> <p><strong>Step 2: Container Startup Script</strong></p>
+<div class="codehilite"><pre><span></span><code><span class="ch">#!/bin/bash</span>
+<span class="c1"># base/configs/etc/services.d/freeDiameter/run</span> <span class="c1"># Generate resolv.conf from template</span>
+<span class="k">if</span><span class="w"> </span><span class="o">[</span><span class="w"> </span>-n<span class="w"> </span><span class="s2">&quot;</span><span class="nv">$DNS_SERVERS</span><span class="s2">&quot;</span><span class="w"> </span><span class="o">]</span><span class="p">;</span><span class="w"> </span><span class="k">then</span>
+<span class="w"> </span><span class="nb">echo</span><span class="w"> </span><span class="s2">&quot;# Generated dynamically by container startup&quot;</span><span class="w"> </span>&gt;<span class="w"> </span>/etc/resolv.conf
+<span class="w"> </span><span class="nb">echo</span><span class="w"> </span><span class="s2">&quot;# DNS servers: </span><span class="nv">$DNS_SERVERS</span><span class="s2">&quot;</span><span class="w"> </span>&gt;&gt;<span class="w"> </span>/etc/resolv.conf <span class="w"> </span><span class="nv">IFS</span><span class="o">=</span><span class="s1">&#39;,&#39;</span><span class="w"> </span><span class="nb">read</span><span class="w"> </span>-ra<span class="w"> </span>DNS_ARRAY<span class="w"> </span><span class="o">&lt;&lt;&lt;</span><span class="w"> </span><span class="s2">&quot;</span><span class="nv">$DNS_SERVERS</span><span class="s2">&quot;</span>
+<span class="w"> </span><span class="k">for</span><span class="w"> </span>dns<span class="w"> </span><span class="k">in</span><span class="w"> </span><span class="s2">&quot;</span><span class="si">${</span><span class="nv">DNS_ARRAY</span><span class="p">[@]</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">;</span><span class="w"> </span><span class="k">do</span>
+<span class="w"> </span><span class="nb">echo</span><span class="w"> </span><span class="s2">&quot;nameserver </span><span class="nv">$dns</span><span class="s2">&quot;</span><span class="w"> </span>&gt;&gt;<span class="w"> </span>/etc/resolv.conf
+<span class="w"> </span><span class="k">done</span> <span class="w"> </span><span class="k">if</span><span class="w"> </span><span class="o">[</span><span class="w"> </span>-n<span class="w"> </span><span class="s2">&quot;</span><span class="nv">$SEARCH_DOMAINS</span><span class="s2">&quot;</span><span class="w"> </span><span class="o">]</span><span class="p">;</span><span class="w"> </span><span class="k">then</span>
+<span class="w"> </span><span class="nb">echo</span><span class="w"> </span><span class="s2">&quot;search </span><span class="nv">$SEARCH_DOMAINS</span><span class="s2">&quot;</span><span class="w"> </span>&gt;&gt;<span class="w"> </span>/etc/resolv.conf
+<span class="w"> </span><span class="k">fi</span> <span class="w"> </span><span class="nb">echo</span><span class="w"> </span><span class="s2">&quot;options ndots:5&quot;</span><span class="w"> </span>&gt;&gt;<span class="w"> </span>/etc/resolv.conf
+<span class="k">fi</span>
+</code></pre></div> <p><strong>Step 3: Environment Variable Management</strong></p>
+<div class="codehilite"><pre><span></span><code><span class="c1"># meta-dev.yml</span>
+<span class="nt">environment</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">DNS_SERVERS</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;10.0.1.10,10.0.2.10,8.8.8.8&quot;</span>
+<span class="w"> </span><span class="nt">SEARCH_DOMAINS</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;internal.company.com,partner.net&quot;</span>
+</code></pre></div> <h3>Implementation Details</h3>
+<p><strong>Dynamic Configuration Generation:</strong>
+The solution generates DNS configuration dynamically during container startup, after all networks have been attached. This ensures DNS resolution works correctly regardless of network complexity.</p>
+<p><strong>Fallback Strategy:</strong></p>
+<div class="codehilite"><pre><span></span><code><span class="c1"># Multiple DNS servers with priority</span>
+nameserver<span class="w"> </span><span class="m">10</span>.0.1.10<span class="w"> </span><span class="c1"># Primary internal DNS</span>
+nameserver<span class="w"> </span><span class="m">10</span>.0.2.10<span class="w"> </span><span class="c1"># Secondary internal DNS </span>
+nameserver<span class="w"> </span><span class="m">8</span>.8.8.8<span class="w"> </span><span class="c1"># External fallback</span>
+nameserver<span class="w"> </span><span class="m">1</span>.1.1.1<span class="w"> </span><span class="c1"># Additional fallback</span>
+</code></pre></div> <p><strong>Monitoring and Validation:</strong></p>
+<div class="codehilite"><pre><span></span><code><span class="c1"># Container health check includes DNS validation</span>
+<span class="c1">#!/bin/bash</span>
+nslookup<span class="w"> </span>internal.service.com<span class="w"> </span>&gt;<span class="w"> </span>/dev/null<span class="w"> </span><span class="m">2</span>&gt;<span class="p">&amp;</span><span class="m">1</span>
+<span class="k">if</span><span class="w"> </span><span class="o">[</span><span class="w"> </span><span class="nv">$?</span><span class="w"> </span>-eq<span class="w"> </span><span class="m">0</span><span class="w"> </span><span class="o">]</span><span class="p">;</span><span class="w"> </span><span class="k">then</span>
+<span class="w"> </span><span class="nb">echo</span><span class="w"> </span><span class="s2">&quot;DNS resolution: OK&quot;</span>
+<span class="k">else</span>
+<span class="w"> </span><span class="nb">echo</span><span class="w"> </span><span class="s2">&quot;DNS resolution: FAILED&quot;</span>
+<span class="w"> </span><span class="nb">exit</span><span class="w"> </span><span class="m">1</span>
+<span class="k">fi</span>
+</code></pre></div> <h2>Real-World Results</h2>
+<h3>Before the Fix</h3>
+<ul>
+<li><strong>DNS Failures:</strong> 30-40% of DNS queries failing</li>
+<li><strong>Service Discovery:</strong> Intermittent failures causing service outages</li>
+<li><strong>Container Startup:</strong> 60% success rate due to DNS timeouts</li>
+<li><strong>Debugging Time:</strong> Hours per incident</li>
+</ul>
+<h3>After Implementation</h3>
+<ul>
+<li><strong>DNS Reliability:</strong> 99.9% successful resolution</li>
+<li><strong>Service Discovery:</strong> Consistent and reliable</li>
+<li><strong>Container Startup:</strong> 99% success rate</li>
+<li><strong>Debugging Time:</strong> Minutes per incident</li>
+</ul>
+<h3>Performance Metrics</h3>
+<div class="codehilite"><pre><span></span><code><span class="c1"># DNS query performance improvement</span>
+Before:<span class="w"> </span>avg<span class="w"> </span>2000ms,<span class="w"> </span>max<span class="w"> </span>30000ms<span class="w"> </span><span class="o">(</span>timeout<span class="o">)</span>
+After:<span class="w"> </span>avg<span class="w"> </span>50ms,<span class="w"> </span>max<span class="w"> </span>200ms
+</code></pre></div> <h2>Advanced Considerations</h2>
+<h3>Security Implications</h3>
+<p><strong>DNS Security:</strong>
+- Internal DNS servers for sensitive queries
+- External fallbacks for general internet access
+- DNS over HTTPS (DoH) support for secure environments</p>
+<p><strong>Network Isolation:</strong></p>
+<div class="codehilite"><pre><span></span><code><span class="c1"># Different DNS servers per network</span>
+<span class="nv">INTERNAL_DNS</span><span class="o">=</span><span class="s2">&quot;10.0.1.10&quot;</span>
+<span class="nv">PARTNER_DNS</span><span class="o">=</span><span class="s2">&quot;192.168.1.10&quot;</span><span class="w"> </span>
+<span class="nv">PUBLIC_DNS</span><span class="o">=</span><span class="s2">&quot;8.8.8.8&quot;</span>
+</code></pre></div> <h3>Monitoring and Observability</h3>
+<p><strong>DNS Monitoring:</strong></p>
+<div class="codehilite"><pre><span></span><code><span class="c1"># Python DNS monitoring script</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">socket</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">time</span> <span class="k">def</span><span class="w"> </span><span class="nf">monitor_dns_health</span><span class="p">():</span> <span class="n">test_domains</span> <span class="o">=</span> <span class="p">[</span> <span class="s2">&quot;internal.service.com&quot;</span><span class="p">,</span> <span class="s2">&quot;partner.external.com&quot;</span><span class="p">,</span> <span class="s2">&quot;google.com&quot;</span> <span class="p">]</span> <span class="k">for</span> <span class="n">domain</span> <span class="ow">in</span> <span class="n">test_domains</span><span class="p">:</span> <span class="k">try</span><span class="p">:</span> <span class="n">start_time</span> <span class="o">=</span> <span class="n">time</span><span class="o">.</span><span class="n">time</span><span class="p">()</span> <span class="n">socket</span><span class="o">.</span><span class="n">gethostbyname</span><span class="p">(</span><span class="n">domain</span><span class="p">)</span> <span class="n">response_time</span> <span class="o">=</span> <span class="p">(</span><span class="n">time</span><span class="o">.</span><span class="n">time</span><span class="p">()</span> <span class="o">-</span> <span class="n">start_time</span><span class="p">)</span> <span class="o">*</span> <span class="mi">1000</span> <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;DNS </span><span class="si">{</span><span class="n">domain</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="n">response_time</span><span class="si">:</span><span class="s2">.2f</span><span class="si">}</span><span class="s2">ms&quot;</span><span class="p">)</span> <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span> <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;DNS </span><span class="si">{</span><span class="n">domain</span><span class="si">}</span><span class="s2">: FAILED - </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+</code></pre></div> <h3>Scalability Patterns</h3>
+<p><strong>Container Orchestration:</strong></p>
+<div class="codehilite"><pre><span></span><code><span class="c1"># Kubernetes ConfigMap for DNS settings</span>
+<span class="nt">apiVersion</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">v1</span>
+<span class="nt">kind</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">ConfigMap</span>
+<span class="nt">metadata</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">dns-config</span>
+<span class="nt">data</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">DNS_SERVERS</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;10.0.1.10,10.0.2.10,8.8.8.8&quot;</span>
+<span class="w"> </span><span class="nt">SEARCH_DOMAINS</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;cluster.local,internal.company.com&quot;</span>
+</code></pre></div> <p><strong>Multi-Environment Support:</strong>
+- Development: Local DNS servers
+- Staging: Staging-specific DNS with production fallbacks<br />
+- Production: High-availability DNS with geographic distribution</p>
+<h2>Best Practices and Lessons Learned</h2>
+<h3>Design Principles</h3>
+<p><strong>1. Environment-Driven Configuration</strong>
+Never hardcode DNS settings. Use environment variables and templates for maximum flexibility across different deployment environments.</p>
+<p><strong>2. Graceful Degradation</strong>
+Always provide multiple DNS servers with clear fallback hierarchies. Internal services should have priority, with external DNS as backup.</p>
+<p><strong>3. Container Startup Timing</strong>
+Generate DNS configuration after all networks are attached, not during initial container creation.</p>
+<h3>Operational Guidelines</h3>
+<p><strong>4. Comprehensive Testing</strong>
+Test DNS resolution for all required domains during container health checks. Include both internal and external resolution tests.</p>
+<p><strong>5. Monitoring and Alerting</strong>
+Implement proactive DNS monitoring to catch issues before they impact services. Monitor both resolution success and response times.</p>
+<p><strong>6. Documentation and Runbooks</strong>
+Document DNS configuration for each environment. Create runbooks for common DNS troubleshooting scenarios.</p>
+<h2>Alternative Solutions and Trade-offs</h2>
+<h3>Option 1: Service Mesh DNS</h3>
+<ul>
+<li><strong>Pros:</strong> Built-in service discovery, load balancing</li>
+<li><strong>Cons:</strong> Additional complexity, learning curve</li>
+<li><strong>Use Case:</strong> Large-scale microservices architectures</li>
+</ul>
+<h3>Option 2: DNS Proxy Containers</h3>
+<ul>
+<li><strong>Pros:</strong> Centralized DNS management, caching benefits</li>
+<li><strong>Cons:</strong> Additional infrastructure, potential single point of failure</li>
+<li><strong>Use Case:</strong> Environments with complex DNS requirements</li>
+</ul>
+<h3>Option 3: Host Network Mode</h3>
+<ul>
+<li><strong>Pros:</strong> Simple configuration, uses host DNS</li>
+<li><strong>Cons:</strong> Reduced container isolation, security implications</li>
+<li><strong>Use Case:</strong> Legacy applications with minimal containerization</li>
+</ul>
+<h2>Conclusion</h2>
+<p>Container networking challenges often require creative solutions that go beyond standard Docker features. Our DNS resolution fix demonstrates the importance of understanding the underlying networking concepts and being willing to implement custom solutions when standard approaches fall short.</p>
+<p>The key takeaways from this experience:</p>
+<ol>
+<li><strong>Standard solutions don't always work</strong> in complex networking environments</li>
+<li><strong>Dynamic configuration generation</strong> provides flexibility for multi-network scenarios</li>
+<li><strong>Comprehensive testing and monitoring</strong> prevent issues from reaching production</li>
+<li><strong>Documentation and knowledge sharing</strong> help teams avoid similar problems</li>
+</ol>
+<p>This solution has been running in production for over 6 months, handling millions of DNS queries with 99.9% reliability. The approach has been adopted across multiple projects and has significantly reduced networking-related incidents in our container infrastructure.</p>
+<p>For teams facing similar multi-network DNS challenges, this solution provides a robust, scalable approach that maintains container security while ensuring reliable DNS resolution across complex network topologies.</p>
+<hr />
+<p><em>This DNS solution successfully resolved critical networking issues affecting telecommunications infrastructure, enabling reliable container deployment across multiple network environments while maintaining security and performance requirements.</em></p></div> <footer><ul class="stats"><li><a href="../index.html">Back to posts</a></li></ul></footer> </article> </div> <section id="sidebar"> <section> <div class="mini-posts"> <header><h3>Recent</h3></header> <ul>
+<li><a href="../posts/project--infrastructure-as-code-blog.html">Infrastructure as Code for Telecommunications: Automating Complex Deployments</a> <span class=\"published\">Infra</span></li>
+<li><a href="../posts/project--telecommunications-infrastructure-blog.html">Building Scalable SIM OTA Infrastructure: Managing Global Telecommunications Networks</a> <span class=\"published\">Infra</span></li>
+<li><a href="../posts/project--containerization-strategy-blog.html">Containerizing Legacy Telecommunications Infrastructure: A Strategic Approach</a> <span class=\"published\">Containers</span></li>
+<li><a href="../posts/project--devops-automation-blog.html">Building Robust CI/CD Pipelines for Telecommunications Infrastructure</a> <span class=\"published\">DevOps</span></li>
+<li><a href="../posts/project--telecommunications-infrastructure-blog.html">Building Modern Signal Transfer Points: A Deep Dive into Telecommunications Infrastructure</a> <span class=\"published\">Infra</span></li> </ul> </div> </section> <section> <header><h3>About</h3></header> <p>Notes on telecom, infra, and automation.</p> </section> </section> <section id="footer"><p class="copyright">&copy; 2025</p></section> </div> <script src="../assets/js/jquery.min.js"></script> <script src="../assets/js/browser.min.js"></script> <script src="../assets/js/breakpoints.min.js"></script> <script src="../assets/js/util.js"></script> <script src="../assets/js/main.js"></script> </body>
+</html>

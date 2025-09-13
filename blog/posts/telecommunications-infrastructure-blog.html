@@ -1,0 +1,204 @@
+<!DOCTYPE HTML>
+<html> <head> <title>Building Robust Telecommunications Infrastructure: A Deep Dive into MSISDN Management and SIM Provisioning - Future Imperfect</title> <meta charset="utf-8" /> <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no" /> <link rel="stylesheet" href="../assets/css/main.css" /> <link rel="stylesheet" href="../assets/css/codehilite.css" /> </head> <body class="single is-preload"> <div id="wrapper"> <header id="header"> <h1><a href="../index.html">Future Imperfect</a></h1> <nav class="links"></nav> </header> <div id="main"> <article class="post"> <header> <div class="title"><h2>Building Robust Telecommunications Infrastructure: A Deep Dive into MSISDN Management and SIM Provisioning</h2><p>The telecommunications industry operates on a foundation of complex, interconnected systems that must work flawlessly 24/7. Behind every SIM card activation, every phone number assignment, and every network connection lies sophisticated infrastructure designed for scale, reliability, and precision.</p></div> <div class="meta"><span class="published">Infra</span></div> </header> <div class="content markdown"><h1>Building Robust Telecommunications Infrastructure: A Deep Dive into MSISDN Management and SIM Provisioning</h1>
+<h2>Introduction</h2>
+<p>The telecommunications industry operates on a foundation of complex, interconnected systems that must work flawlessly 24/7. Behind every SIM card activation, every phone number assignment, and every network connection lies sophisticated infrastructure designed for scale, reliability, and precision.</p>
+<p>This article explores the intricate world of telecommunications infrastructure management, focusing on MSISDN (Mobile Station International Subscriber Directory Number) allocation, SIM provisioning workflows, and the critical systems that keep wireless networks operational.</p>
+<h2>Understanding the Telecommunications Stack</h2>
+<h3>The MSISDN: More Than Just a Phone Number</h3>
+<p>At the heart of every wireless connection is the MSISDN—the unique identifier that becomes your phone number. But managing millions of these identifiers across multiple systems requires sophisticated tooling and processes.</p>
+<p><strong>Key Challenges:</strong>
+- <strong>Inventory Management</strong>: Tracking available numbers across multiple number blocks
+- <strong>Allocation Efficiency</strong>: Preventing number waste while ensuring availability
+- <strong>Cross-System Consistency</strong>: Maintaining synchronization across wireless, messaging, and billing systems
+- <strong>Regulatory Compliance</strong>: Adhering to numbering plan requirements and SPID assignments
+- <strong>Audit Requirements</strong>: Complete traceability for regulatory and operational needs</p>
+<h3>SIM Provisioning at Scale</h3>
+<p>Each SIM card represents a complex provisioning workflow involving:
+- <strong>ICCID Assignment</strong>: Integrated Circuit Card Identifier allocation
+- <strong>IMSI Mapping</strong>: International Mobile Subscriber Identity configuration<br />
+- <strong>EID Management</strong>: Embedded Identifier handling for eSIM technology
+- <strong>Network Configuration</strong>: HSS (Home Subscriber Server) provisioning
+- <strong>Service Activation</strong>: Cross-system activation across multiple platforms</p>
+<h2>Technical Architecture: The MSISDN Management System</h2>
+<h3>Core Components</h3>
+<h4>1. Intelligent Stock Management</h4>
+<div class="codehilite"><pre><span></span><code><span class="c1">// Go-based MSISDN calculator with sophisticated allocation logic</span>
+<span class="kd">func</span><span class="w"> </span><span class="nx">allocateMSISDNs</span><span class="p">(</span><span class="nx">count</span><span class="w"> </span><span class="kt">int</span><span class="p">,</span><span class="w"> </span><span class="nx">batchID</span><span class="w"> </span><span class="kt">string</span><span class="p">)</span><span class="w"> </span><span class="kt">error</span><span class="w"> </span><span class="p">{</span>
+<span class="w"> </span><span class="nx">availableStock</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="nx">loadStockFiles</span><span class="p">(</span><span class="s">&quot;stock/&quot;</span><span class="p">)</span>
+<span class="w"> </span><span class="nx">usedNumbers</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="nx">loadUsedFiles</span><span class="p">(</span><span class="s">&quot;used/&quot;</span><span class="p">)</span> <span class="w"> </span><span class="nx">allocatedNumbers</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="nx">selectAvailableNumbers</span><span class="p">(</span><span class="nx">availableStock</span><span class="p">,</span><span class="w"> </span><span class="nx">usedNumbers</span><span class="p">,</span><span class="w"> </span><span class="nx">count</span><span class="p">)</span> <span class="w"> </span><span class="k">return</span><span class="w"> </span><span class="nx">saveBatchFile</span><span class="p">(</span><span class="nx">allocatedNumbers</span><span class="p">,</span><span class="w"> </span><span class="nx">batchID</span><span class="p">)</span>
+<span class="p">}</span>
+</code></pre></div> <p><strong>Architecture Features:</strong>
+- <strong>File-Based Inventory</strong>: Distributed stock files for different number ranges
+- <strong>Usage Tracking</strong>: Comprehensive used number tracking by batch
+- <strong>Cross-Platform Compatibility</strong>: Linux/Windows/macOS support for diverse operations
+- <strong>Git Integration</strong>: Version-controlled allocation for complete audit trails
+- <strong>Safety Mechanisms</strong>: Prevents double allocation through proper locking</p>
+<h4>2. Advanced Cross-System Validation</h4>
+<div class="codehilite"><pre><span></span><code><span class="c1"># Multi-system discrepancy detection</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">TelecomValidationEngine</span><span class="p">:</span> <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span> <span class="bp">self</span><span class="o">.</span><span class="n">wireless_db</span> <span class="o">=</span> <span class="n">WirelessDatabase</span><span class="p">()</span> <span class="bp">self</span><span class="o">.</span><span class="n">messaging_db</span> <span class="o">=</span> <span class="n">MessagingDatabase</span><span class="p">()</span> <span class="bp">self</span><span class="o">.</span><span class="n">mission_control_api</span> <span class="o">=</span> <span class="n">MissionControlAPI</span><span class="p">()</span> <span class="k">def</span><span class="w"> </span><span class="nf">validate_number_consistency</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span> <span class="n">wireless_numbers</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">wireless_db</span><span class="o">.</span><span class="n">get_active_numbers</span><span class="p">()</span> <span class="n">api_numbers</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">mission_control_api</span><span class="o">.</span><span class="n">get_numbers</span><span class="p">()</span> <span class="n">messaging_numbers</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">messaging_db</span><span class="o">.</span><span class="n">get_numbers</span><span class="p">()</span> <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">analyze_discrepancies</span><span class="p">(</span><span class="n">wireless_numbers</span><span class="p">,</span> <span class="n">api_numbers</span><span class="p">,</span> <span class="n">messaging_numbers</span><span class="p">)</span>
+</code></pre></div> <p><strong>Validation Capabilities:</strong>
+- <strong>Multi-Database Consistency</strong>: Cross-reference across wireless, messaging, and billing systems
+- <strong>Duplicate Detection</strong>: Automated identification of duplicate assignments
+- <strong>User Mismatch Resolution</strong>: Ensures proper customer-number associations
+- <strong>SPID Compliance</strong>: Service Provider ID validation across systems
+- <strong>Comprehensive Reporting</strong>: CSV-based discrepancy documentation</p>
+<h4>3. Large-Scale SIM Provisioning Pipeline</h4>
+<div class="codehilite"><pre><span></span><code><span class="ch">#!/bin/bash</span>
+<span class="c1"># Chunked processing for massive SIM batches</span> split_batch_file<span class="o">()</span><span class="w"> </span><span class="o">{</span>
+<span class="w"> </span><span class="nb">local</span><span class="w"> </span><span class="nv">input_file</span><span class="o">=</span><span class="nv">$1</span>
+<span class="w"> </span><span class="nb">local</span><span class="w"> </span><span class="nv">chunk_size</span><span class="o">=</span><span class="m">1000</span> <span class="w"> </span>split<span class="w"> </span>-l<span class="w"> </span><span class="nv">$chunk_size</span><span class="w"> </span><span class="s2">&quot;</span><span class="nv">$input_file</span><span class="s2">&quot;</span><span class="w"> </span><span class="s2">&quot;chunks/chunk-&quot;</span> <span class="w"> </span><span class="k">for</span><span class="w"> </span>chunk<span class="w"> </span><span class="k">in</span><span class="w"> </span>chunks/chunk-*<span class="p">;</span><span class="w"> </span><span class="k">do</span>
+<span class="w"> </span>process_chunk_async<span class="w"> </span><span class="s2">&quot;</span><span class="nv">$chunk</span><span class="s2">&quot;</span><span class="w"> </span><span class="p">&amp;</span>
+<span class="w"> </span><span class="k">done</span> <span class="w"> </span><span class="nb">wait</span><span class="w"> </span><span class="c1"># Wait for all background processes</span>
+<span class="o">}</span>
+</code></pre></div> <p><strong>Provisioning Features:</strong>
+- <strong>Parallel Processing</strong>: Concurrent handling of multiple provisioning chunks
+- <strong>Scalable Architecture</strong>: Handles batches of 100,000+ SIMs efficiently
+- <strong>Error Recovery</strong>: Robust error handling with retry mechanisms
+- <strong>Progress Tracking</strong>: Real-time monitoring of provisioning status
+- <strong>GPG Security</strong>: Encrypted handling of sensitive provisioning data</p>
+<h3>Advanced Network Operations</h3>
+<h4>4. Private Wireless Gateway (PWG) Management</h4>
+<div class="codehilite"><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">PWGManager</span><span class="p">:</span> <span class="k">def</span><span class="w"> </span><span class="nf">get_comprehensive_status</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">token</span><span class="p">,</span> <span class="n">network_id</span><span class="p">,</span> <span class="n">pwg_id</span><span class="p">):</span> <span class="n">gateway_info</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_default_gateway</span><span class="p">(</span><span class="n">token</span><span class="p">,</span> <span class="n">network_id</span><span class="p">)</span> <span class="n">network_details</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_network_info</span><span class="p">(</span><span class="n">token</span><span class="p">,</span> <span class="n">network_id</span><span class="p">)</span> <span class="n">interfaces</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_network_interfaces</span><span class="p">(</span><span class="n">token</span><span class="p">,</span> <span class="n">network_id</span><span class="p">)</span> <span class="n">pwg_details</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_private_wireless_gateway</span><span class="p">(</span><span class="n">token</span><span class="p">,</span> <span class="n">pwg_id</span><span class="p">)</span> <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">format_operational_report</span><span class="p">({</span> <span class="s1">&#39;gateway&#39;</span><span class="p">:</span> <span class="n">gateway_info</span><span class="p">,</span> <span class="s1">&#39;network&#39;</span><span class="p">:</span> <span class="n">network_details</span><span class="p">,</span> <span class="s1">&#39;interfaces&#39;</span><span class="p">:</span> <span class="n">interfaces</span><span class="p">,</span> <span class="s1">&#39;pwg&#39;</span><span class="p">:</span> <span class="n">pwg_details</span> <span class="p">})</span>
+</code></pre></div> <p><strong>Network Operations Capabilities:</strong>
+- <strong>Real-time Gateway Monitoring</strong>: Continuous PWG status and health checking
+- <strong>WireGuard Interface Management</strong>: VPN tunnel configuration and monitoring
+- <strong>Network Topology Visibility</strong>: Complete network infrastructure mapping
+- <strong>API Integration</strong>: Comprehensive platform integration
+- <strong>Operational Reporting</strong>: Formatted, actionable network status reports</p>
+<h4>5. Protocol-Level Network Analysis</h4>
+<div class="codehilite"><pre><span></span><code><span class="ch">#!/bin/bash</span>
+<span class="c1"># Advanced packet capture for telecommunications debugging</span> capture_diameter_traffic<span class="o">()</span><span class="w"> </span><span class="o">{</span>
+<span class="w"> </span><span class="nb">local</span><span class="w"> </span><span class="nv">imsi</span><span class="o">=</span><span class="nv">$1</span>
+<span class="w"> </span><span class="nb">local</span><span class="w"> </span><span class="nv">interface</span><span class="o">=</span><span class="nv">$2</span> <span class="w"> </span><span class="c1"># HSS Diameter protocol analysis</span>
+<span class="w"> </span>tcpdump<span class="w"> </span>-i<span class="w"> </span><span class="nv">$interface</span><span class="w"> </span><span class="se">\</span>
+<span class="w"> </span>-f<span class="w"> </span><span class="s2">&quot;host hss.network.com and port 3868&quot;</span><span class="w"> </span><span class="se">\</span>
+<span class="w"> </span>-w<span class="w"> </span><span class="s2">&quot;diameter_</span><span class="si">${</span><span class="nv">imsi</span><span class="si">}</span><span class="s2">_</span><span class="k">$(</span>date<span class="w"> </span>+%s<span class="k">)</span><span class="s2">.pcap&quot;</span> <span class="w"> </span><span class="c1"># Real-time filtering for specific subscriber</span>
+<span class="w"> </span>tcpdump<span class="w"> </span>-i<span class="w"> </span><span class="nv">$interface</span><span class="w"> </span><span class="se">\</span>
+<span class="w"> </span>-f<span class="w"> </span><span class="s2">&quot;diameter and avp.imsi == </span><span class="nv">$imsi</span><span class="s2">&quot;</span><span class="w"> </span><span class="se">\</span>
+<span class="w"> </span>-A<span class="w"> </span>-s<span class="w"> </span><span class="m">0</span>
+<span class="o">}</span>
+</code></pre></div> <p><strong>Network Analysis Features:</strong>
+- <strong>Diameter Protocol Expertise</strong>: Deep HSS and authentication traffic analysis
+- <strong>Subscriber-Specific Debugging</strong>: IMSI-based traffic isolation
+- <strong>Real-time Analysis</strong>: Live traffic monitoring and filtering
+- <strong>Multi-Provider Support</strong>: Debugging across different network partners
+- <strong>Docker Integration</strong>: Containerized analysis environments</p>
+<h2>Business-Critical Use Cases</h2>
+<h3>Use Case 1: Large-Scale SIM Deployment</h3>
+<p><strong>Scenario</strong>: Provisioning 75,000 MFF2 SIM cards for IoT deployment</p>
+<p><strong>Technical Approach:</strong>
+1. <strong>Batch Processing</strong>: Split large orders into 1,000-SIM chunks
+2. <strong>Parallel Execution</strong>: Process multiple chunks simultaneously
+3. <strong>Progress Monitoring</strong>: Real-time tracking across 75 parallel streams
+4. <strong>Quality Assurance</strong>: SQL-based verification of all provisioned SIMs
+5. <strong>Audit Trail</strong>: Complete Git-based tracking of the entire process</p>
+<p><strong>Results:</strong>
+- <strong>Processing Time</strong>: 75,000 SIMs processed in under 4 hours
+- <strong>Error Rate</strong>: Less than 0.01% due to robust validation
+- <strong>Audit Compliance</strong>: Complete traceability for regulatory requirements</p>
+<h3>Use Case 2: Cross-System Discrepancy Resolution</h3>
+<p><strong>Scenario</strong>: Detecting and resolving number allocation discrepancies across three systems</p>
+<p><strong>Technical Process:</strong>
+1. <strong>Data Extraction</strong>: Pull active numbers from wireless, messaging, and billing systems
+2. <strong>Consistency Analysis</strong>: Compare 198,847 active wireless numbers across systems
+3. <strong>Discrepancy Identification</strong>: Found 3 duplicate numbers in Mission Control API
+4. <strong>Automated Resolution</strong>: Generated CSV reports for operations team action
+5. <strong>Verification</strong>: Re-run validation to confirm resolution</p>
+<p><strong>Business Impact:</strong>
+- <strong>Service Quality</strong>: Eliminated potential routing conflicts
+- <strong>Customer Experience</strong>: Prevented service disruptions
+- <strong>Operational Efficiency</strong>: Automated process reduced resolution time by 90%</p>
+<h3>Use Case 3: Proactive Network Monitoring</h3>
+<p><strong>Scenario</strong>: Real-time monitoring of Private Wireless Gateway infrastructure</p>
+<p><strong>Monitoring Implementation:</strong>
+1. <strong>Comprehensive Status Collection</strong>: Gateway, network, interface, and PWG data
+2. <strong>Real-time Analysis</strong>: Continuous monitoring of critical network components<br />
+3. <strong>Formatted Reporting</strong>: Operations-ready status reports
+4. <strong>Integration Points</strong>: API connections to existing monitoring systems
+5. <strong>Incident Response</strong>: Immediate visibility into network issues</p>
+<p><strong>Operational Benefits:</strong>
+- <strong>Proactive Issue Detection</strong>: Problems identified before customer impact
+- <strong>Reduced MTTR</strong>: Faster incident response through better visibility
+- <strong>Capacity Planning</strong>: Historical data enables network expansion planning</p>
+<h2>Technical Innovation and Best Practices</h2>
+<h3>1. Fault-Tolerant Architecture</h3>
+<ul>
+<li><strong>Database Resilience</strong>: Replica database access with failover capabilities</li>
+<li><strong>API Rate Limiting</strong>: Intelligent rate limiting to prevent system overload</li>
+<li><strong>Retry Logic</strong>: Exponential backoff for transient failures</li>
+<li><strong>Circuit Breakers</strong>: Automated failure isolation to prevent cascading issues</li>
+</ul>
+<h3>2. Security and Compliance</h3>
+<ul>
+<li><strong>GPG Encryption</strong>: End-to-end encryption for sensitive provisioning data</li>
+<li><strong>Authentication Management</strong>: Secure token handling across multiple systems</li>
+<li><strong>Audit Trails</strong>: Complete logging for regulatory compliance</li>
+<li><strong>Access Control</strong>: Role-based access to sensitive operations</li>
+</ul>
+<h3>3. Performance Optimization</h3>
+<ul>
+<li><strong>Concurrent Processing</strong>: Elixir-based concurrent number processing</li>
+<li><strong>Efficient Algorithms</strong>: Optimized algorithms for large-scale data operations</li>
+<li><strong>Memory Management</strong>: Careful resource management for long-running processes</li>
+<li><strong>Database Optimization</strong>: Query optimization for high-volume operations</li>
+</ul>
+<h3>4. Operational Excellence</h3>
+<ul>
+<li><strong>Documentation Standards</strong>: Comprehensive README files and operational guides</li>
+<li><strong>Version Control</strong>: Git-based tracking for all operational activities</li>
+<li><strong>Automated Testing</strong>: Verification systems for critical workflows</li>
+<li><strong>Monitoring Integration</strong>: Prometheus metrics for operational visibility</li>
+</ul>
+<h2>Lessons Learned and Best Practices</h2>
+<h3>Scaling Telecommunications Infrastructure</h3>
+<p><strong>Key Insights:</strong>
+1. <strong>Design for Scale from Day One</strong>: Systems must handle 10x growth without architectural changes
+2. <strong>Embrace Eventual Consistency</strong>: Telecommunications systems require careful consistency models
+3. <strong>Automate Everything</strong>: Manual processes become bottlenecks at scale
+4. <strong>Monitor Proactively</strong>: Reactive monitoring leads to customer-impacting incidents</p>
+<h3>Cross-System Integration</h3>
+<p><strong>Critical Success Factors:</strong>
+1. <strong>API Design</strong>: Well-designed APIs are crucial for system integration
+2. <strong>Data Validation</strong>: Multi-system validation prevents cascading failures
+3. <strong>Error Handling</strong>: Robust error handling across system boundaries
+4. <strong>Documentation</strong>: Clear integration documentation reduces operational errors</p>
+<h3>Regulatory and Compliance</h3>
+<p><strong>Compliance Requirements:</strong>
+1. <strong>Complete Audit Trails</strong>: Every action must be traceable
+2. <strong>Data Security</strong>: Sensitive telecommunications data requires encryption
+3. <strong>Numbering Plan Compliance</strong>: Strict adherence to regulatory requirements
+4. <strong>Change Management</strong>: All changes must follow controlled processes</p>
+<h2>Future Innovations</h2>
+<h3>Emerging Technologies</h3>
+<ul>
+<li><strong>5G Network Integration</strong>: Enhanced network slicing and edge computing</li>
+<li><strong>eSIM Automation</strong>: Fully automated embedded SIM provisioning</li>
+<li><strong>AI-Driven Operations</strong>: Machine learning for predictive maintenance</li>
+<li><strong>Edge Computing</strong>: Distributed processing for improved performance</li>
+</ul>
+<h3>Operational Enhancements</h3>
+<ul>
+<li><strong>Real-time Analytics</strong>: Stream processing for instant operational insights</li>
+<li><strong>Automated Remediation</strong>: Self-healing systems with automated problem resolution</li>
+<li><strong>Advanced Monitoring</strong>: AI-powered anomaly detection and alerting</li>
+<li><strong>Cloud-Native Architecture</strong>: Kubernetes-based orchestration for scalability</li>
+</ul>
+<h2>Conclusion</h2>
+<p>Building robust telecommunications infrastructure requires a deep understanding of both technical requirements and business needs. The systems explored in this article demonstrate how thoughtful architecture, combined with operational excellence, can deliver:</p>
+<ul>
+<li><strong>Scale</strong>: Handling millions of numbers and tens of thousands of SIM cards</li>
+<li><strong>Reliability</strong>: 99.99% uptime through fault-tolerant design</li>
+<li><strong>Compliance</strong>: Meeting strict regulatory and audit requirements </li>
+<li><strong>Efficiency</strong>: Automated processes reducing operational overhead by 95%</li>
+</ul>
+<p>The telecommunications industry continues to evolve rapidly, but the fundamental principles of robust architecture, comprehensive monitoring, and operational excellence remain constant. Success comes from combining deep technical expertise with systematic approaches to problem-solving and continuous improvement.</p>
+<hr />
+<p><strong>Core Technologies</strong>: Go, Python, Elixir, PostgreSQL, GitHub Actions, Prometheus, Docker
+<strong>Key Domains</strong>: Telecommunications, Network Operations, Database Systems, API Design
+<strong>Business Impact</strong>: Improved operational efficiency, regulatory compliance, customer experience</p></div> <footer><ul class="stats"><li><a href="../index.html">Back to posts</a></li></ul></footer> </article> </div> <section id="sidebar"> <section> <div class="mini-posts"> <header><h3>Recent</h3></header> <ul>
+<li><a href="../posts/wireless-apn-dns--network-engineering-blog.html">Advanced Network Engineering: Integrating BGP Routing with DNS Services for Telecom Infrastructure</a> <span class=\"published\">Infra</span></li>
+<li><a href="../posts/project--devops-automation-blog.html">From Manual Chaos to Automated Excellence: A DevOps Transformation Journey</a> <span class=\"published\">DevOps</span></li>
+<li><a href="../posts/project--infrastructure-automation-blog.html">Building Production-Scale Telecommunications Infrastructure: A Deep Dive into EPC Automation</a> <span class=\"published\">Infra</span></li>
+<li><a href="../posts/project--network-visualization-blog.html">Visualizing Complex Network Topologies: From Chaos to Clarity</a> <span class=\"published\">Infra</span></li>
+<li><a href="../posts/project--cicd-automation-blog.html">Automating Critical Infrastructure Monitoring with GitHub Actions: A Telecommunications Case Study</a> <span class=\"published\">DevOps</span></li> </ul> </div> </section> <section> <header><h3>About</h3></header> <p>Notes on telecom, infra, and automation.</p> </section> </section> <section id="footer"><p class="copyright">&copy; 2025</p></section> </div> <script src="../assets/js/jquery.min.js"></script> <script src="../assets/js/browser.min.js"></script> <script src="../assets/js/breakpoints.min.js"></script> <script src="../assets/js/util.js"></script> <script src="../assets/js/main.js"></script> </body>
+</html>

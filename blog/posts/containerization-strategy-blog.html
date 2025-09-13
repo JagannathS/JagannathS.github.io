@@ -1,0 +1,633 @@
+<!DOCTYPE HTML>
+<html> <head> <title>Containerizing Legacy Telecommunications Infrastructure: A Strategic Approach - Future Imperfect</title> <meta charset="utf-8" /> <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no" /> <link rel="stylesheet" href="../assets/css/main.css" /> <link rel="stylesheet" href="../assets/css/codehilite.css" /> </head> <body class="single is-preload"> <div id="wrapper"> <header id="header"> <h1><a href="../index.html">Future Imperfect</a></h1> <nav class="links"></nav> </header> <div id="main"> <article class="post"> <header> <div class="title"><h2>Containerizing Legacy Telecommunications Infrastructure: A Strategic Approach</h2><p>Containerization has revolutionized application deployment across most industries, but telecommunications infrastructure presents unique challenges that require specialized approaches. During the development of the project project, I faced the complex task of containerizing legacy telecommunications software (the OSMO stack) while maintaining carrier-grade performance, reliability, and real-time characteristics.</p></div> <div class="meta"><span class="published">Containers</span></div> </header> <div class="content markdown"><h1>Containerizing Legacy Telecommunications Infrastructure: A Strategic Approach</h1>
+<h2>Introduction</h2>
+<p>Containerization has revolutionized application deployment across most industries, but telecommunications infrastructure presents unique challenges that require specialized approaches. During the development of the project project, I faced the complex task of containerizing legacy telecommunications software (the OSMO stack) while maintaining carrier-grade performance, reliability, and real-time characteristics.</p>
+<p>This blog post explores the strategic decisions, technical challenges, and innovative solutions involved in successfully containerizing telecommunications infrastructure for production deployment across multiple wireless carriers.</p>
+<h2>The Containerization Challenge in Telecom</h2>
+<h3>Why Traditional Containerization Approaches Fall Short</h3>
+<p>Telecommunications infrastructure differs significantly from typical web applications:</p>
+<ol>
+<li><strong>Real-time Performance Requirements</strong>: Sub-millisecond latency requirements</li>
+<li><strong>High Availability Demands</strong>: 99.999% uptime (5.26 minutes downtime per year)</li>
+<li><strong>Protocol Compliance</strong>: Strict adherence to ITU-T and 3GPP standards</li>
+<li><strong>Hardware Dependencies</strong>: Often requires specific network interfaces and kernel features</li>
+<li><strong>Security Regulations</strong>: Telecom-specific security and audit requirements</li>
+</ol>
+<h3>Traditional vs. Telecom Container Requirements</h3>
+<table>
+<thead>
+<tr>
+<th>Aspect</th>
+<th>Web Applications</th>
+<th>Telecommunications</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Latency</td>
+<td>100-500ms acceptable</td>
+<td>&lt;1ms required</td>
+</tr>
+<tr>
+<td>Availability</td>
+<td>99.9% (8.7h downtime/year)</td>
+<td>99.999% (5.3min/year)</td>
+</tr>
+<tr>
+<td>State Management</td>
+<td>Stateless preferred</td>
+<td>Often stateful, session-aware</td>
+</tr>
+<tr>
+<td>Network</td>
+<td>HTTP/HTTPS</td>
+<td>Complex protocols (SS7, SIGTRAN)</td>
+</tr>
+<tr>
+<td>Scaling</td>
+<td>Horizontal scaling</td>
+<td>Vertical scaling + redundancy</td>
+</tr>
+<tr>
+<td>Updates</td>
+<td>Rolling deployments</td>
+<td>Hitless upgrades required</td>
+</tr>
+</tbody>
+</table>
+<h2>Our Containerization Strategy</h2>
+<h3>Multi-Layer Architecture Design</h3>
+<p>We implemented a three-tier containerization approach:</p>
+<div class="codehilite"><pre><span></span><code>┌─────────────────────────────────────────────┐
+│ Application Layer │
+│ (Carrier-specific STP configurations) │
+│ ┌─────────────┐ ┌─────────────┐ │
+│ │ Comfone STP │ │ Sparkle STP │ │
+│ │ Container │ │ Container │ │
+│ └─────────────┘ └─────────────┘ │
+└─────────────┬───────────────┬─────────────┘ │ │
+┌─────────────▼───────────────▼─────────────┐
+│ Service Layer │
+│ (Shared STP Foundation) │
+│ ┌─────────────────────────────────────┐ │
+│ │ Base STP Container │ │
+│ │ (OSMO Stack + Runtime) │ │
+│ └─────────────────────────────────────┘ │
+└─────────────────────┬───────────────────────┘ │
+┌─────────────────────▼───────────────────────┐
+│ Infrastructure Layer │
+│ (Container Runtime + Kernel Tuning) │
+│ ┌────────────┐ ┌─────────────────────────┐ │
+│ │ Docker │ │ Kernel Optimizations │ │
+│ │ Runtime │ │ (RT, CPU isolation) │ │
+│ └────────────┘ └─────────────────────────┘ │
+└─────────────────────────────────────────────┘
+</code></pre></div> <h3>Base Container Foundation</h3>
+<p>The foundation of our containerization strategy was creating a robust base image:</p>
+<div class="codehilite"><pre><span></span><code><span class="c"># Base Container - Optimized for Telecom Workloads</span>
+<span class="k">FROM</span><span class="w"> </span><span class="s">debian:bullseye-slim</span><span class="w"> </span><span class="k">AS</span><span class="w"> </span><span class="s">builder</span> <span class="c"># Install build dependencies for OSMO stack</span>
+<span class="k">RUN</span><span class="w"> </span>apt-get<span class="w"> </span>update<span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span>apt-get<span class="w"> </span>install<span class="w"> </span>-y<span class="w"> </span><span class="se">\</span>
+<span class="w"> </span>build-essential<span class="w"> </span><span class="se">\</span>
+<span class="w"> </span>autotools-dev<span class="w"> </span><span class="se">\</span>
+<span class="w"> </span>autoconf<span class="w"> </span><span class="se">\</span>
+<span class="w"> </span>automake<span class="w"> </span><span class="se">\</span>
+<span class="w"> </span>libtool<span class="w"> </span><span class="se">\</span>
+<span class="w"> </span>pkg-config<span class="w"> </span><span class="se">\</span>
+<span class="w"> </span>libtalloc-dev<span class="w"> </span><span class="se">\</span>
+<span class="w"> </span>libpcsclite-dev<span class="w"> </span><span class="se">\</span>
+<span class="w"> </span>libsctp-dev<span class="w"> </span><span class="se">\</span>
+<span class="w"> </span>git<span class="w"> </span><span class="se">\</span>
+<span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span>rm<span class="w"> </span>-rf<span class="w"> </span>/var/lib/apt/lists/* <span class="c"># Build OSMO components with optimizations</span>
+<span class="k">WORKDIR</span><span class="w"> </span><span class="s">/usr/src</span> <span class="c"># libosmocore - Core utilities</span>
+<span class="k">COPY</span><span class="w"> </span>base/libosmocore<span class="w"> </span>./libosmocore
+<span class="k">RUN</span><span class="w"> </span><span class="nb">cd</span><span class="w"> </span>libosmocore<span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span><span class="se">\</span>
+<span class="w"> </span>autoreconf<span class="w"> </span>-fi<span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span><span class="se">\</span>
+<span class="w"> </span>./configure<span class="w"> </span><span class="se">\</span>
+<span class="w"> </span>--prefix<span class="o">=</span>/usr/local<span class="w"> </span><span class="se">\</span>
+<span class="w"> </span>--enable-shared<span class="w"> </span><span class="se">\</span>
+<span class="w"> </span>--disable-static<span class="w"> </span><span class="se">\</span>
+<span class="w"> </span>--enable-simd<span class="w"> </span><span class="se">\</span>
+<span class="w"> </span>--with-systemdsystemunitdir<span class="o">=</span>no<span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span><span class="se">\</span>
+<span class="w"> </span>make<span class="w"> </span>-j<span class="k">$(</span>nproc<span class="k">)</span><span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span><span class="se">\</span>
+<span class="w"> </span>make<span class="w"> </span>install<span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span><span class="se">\</span>
+<span class="w"> </span>ldconfig <span class="c"># libosmo-netif - Network interface handling </span>
+<span class="k">COPY</span><span class="w"> </span>base/libosmo-netif<span class="w"> </span>./libosmo-netif
+<span class="k">RUN</span><span class="w"> </span><span class="nb">cd</span><span class="w"> </span>libosmo-netif<span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span><span class="se">\</span>
+<span class="w"> </span>autoreconf<span class="w"> </span>-fi<span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span><span class="se">\</span>
+<span class="w"> </span>./configure<span class="w"> </span>--prefix<span class="o">=</span>/usr/local<span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span><span class="se">\</span>
+<span class="w"> </span>make<span class="w"> </span>-j<span class="k">$(</span>nproc<span class="k">)</span><span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span><span class="se">\</span>
+<span class="w"> </span>make<span class="w"> </span>install<span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span><span class="se">\</span>
+<span class="w"> </span>ldconfig <span class="c"># libosmo-sigtran - SS7 signaling transport</span>
+<span class="k">COPY</span><span class="w"> </span>base/libosmo-sigtran<span class="w"> </span>./libosmo-sigtran<span class="w"> </span>
+<span class="k">RUN</span><span class="w"> </span><span class="nb">cd</span><span class="w"> </span>libosmo-sigtran<span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span><span class="se">\</span>
+<span class="w"> </span>autoreconf<span class="w"> </span>-fi<span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span><span class="se">\</span>
+<span class="w"> </span>./configure<span class="w"> </span>--prefix<span class="o">=</span>/usr/local<span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span><span class="se">\</span>
+<span class="w"> </span>make<span class="w"> </span>-j<span class="k">$(</span>nproc<span class="k">)</span><span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span><span class="se">\</span>
+<span class="w"> </span>make<span class="w"> </span>install<span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span><span class="se">\</span>
+<span class="w"> </span>ldconfig <span class="c"># Production runtime stage</span>
+<span class="k">FROM</span><span class="w"> </span><span class="s">debian:bullseye-slim</span><span class="w"> </span><span class="k">AS</span><span class="w"> </span><span class="s">production</span> <span class="c"># Install runtime dependencies only</span>
+<span class="k">RUN</span><span class="w"> </span>apt-get<span class="w"> </span>update<span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span>apt-get<span class="w"> </span>install<span class="w"> </span>-y<span class="w"> </span><span class="se">\</span>
+<span class="w"> </span>libtalloc2<span class="w"> </span><span class="se">\</span>
+<span class="w"> </span>libpcsclite1<span class="w"> </span><span class="se">\</span>
+<span class="w"> </span>libsctp1<span class="w"> </span><span class="se">\</span>
+<span class="w"> </span>s6-overlay<span class="w"> </span><span class="se">\</span>
+<span class="w"> </span>dumb-init<span class="w"> </span><span class="se">\</span>
+<span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span>rm<span class="w"> </span>-rf<span class="w"> </span>/var/lib/apt/lists/* <span class="c"># Copy compiled OSMO stack from builder</span>
+<span class="k">COPY</span><span class="w"> </span>--from<span class="o">=</span>builder<span class="w"> </span>/usr/local<span class="w"> </span>/usr/local
+<span class="k">RUN</span><span class="w"> </span>ldconfig <span class="c"># Container-specific configurations</span>
+<span class="k">COPY</span><span class="w"> </span>base/configs<span class="w"> </span>/etc/ <span class="c"># Process supervision with s6-overlay</span>
+<span class="k">ENTRYPOINT</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;/init&quot;</span><span class="p">]</span>
+<span class="k">CMD</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;/etc/services.d/osmostp/run&quot;</span><span class="p">]</span>
+</code></pre></div> <h2>Advanced Containerization Techniques</h2>
+<h3>1. Real-Time Performance Optimization</h3>
+<p>Achieving telecom-grade performance in containers required several optimizations:</p>
+<div class="codehilite"><pre><span></span><code><span class="c"># Real-time optimizations</span>
+<span class="k">FROM</span><span class="w"> </span><span class="s">production</span><span class="w"> </span><span class="k">AS</span><span class="w"> </span><span class="s">rt-optimized</span> <span class="c"># Install real-time kernel support</span>
+<span class="k">RUN</span><span class="w"> </span>apt-get<span class="w"> </span>update<span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span>apt-get<span class="w"> </span>install<span class="w"> </span>-y<span class="w"> </span><span class="se">\</span>
+<span class="w"> </span>linux-image-rt-amd64<span class="w"> </span><span class="se">\</span>
+<span class="w"> </span>irqbalance<span class="w"> </span><span class="se">\</span>
+<span class="w"> </span>numactl<span class="w"> </span><span class="se">\</span>
+<span class="w"> </span>cpufrequtils<span class="w"> </span><span class="se">\</span>
+<span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span>rm<span class="w"> </span>-rf<span class="w"> </span>/var/lib/apt/lists/* <span class="c"># Configure CPU isolation and priority</span>
+<span class="k">ENV</span><span class="w"> </span><span class="nv">CPU_ISOLATION</span><span class="o">=</span><span class="s2">&quot;2,3,6,7&quot;</span>
+<span class="k">ENV</span><span class="w"> </span><span class="nv">RT_PRIORITY</span><span class="o">=</span><span class="s2">&quot;95&quot;</span> <span class="c"># Set container capabilities for real-time scheduling</span>
+<span class="k">RUN</span><span class="w"> </span>groupadd<span class="w"> </span>-r<span class="w"> </span>stp<span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span>useradd<span class="w"> </span>-r<span class="w"> </span>-g<span class="w"> </span>stp<span class="w"> </span>-s<span class="w"> </span>/bin/false<span class="w"> </span>stp
+<span class="k">RUN</span><span class="w"> </span><span class="nb">echo</span><span class="w"> </span><span class="s2">&quot;@stp soft rtprio 95&quot;</span><span class="w"> </span>&gt;&gt;<span class="w"> </span>/etc/security/limits.conf
+<span class="k">RUN</span><span class="w"> </span><span class="nb">echo</span><span class="w"> </span><span class="s2">&quot;@stp hard rtprio 95&quot;</span><span class="w"> </span>&gt;&gt;<span class="w"> </span>/etc/security/limits.conf <span class="c"># Memory locking for predictable performance</span>
+<span class="k">RUN</span><span class="w"> </span><span class="nb">echo</span><span class="w"> </span><span class="s2">&quot;@stp soft memlock unlimited&quot;</span><span class="w"> </span>&gt;&gt;<span class="w"> </span>/etc/security/limits.conf
+<span class="k">RUN</span><span class="w"> </span><span class="nb">echo</span><span class="w"> </span><span class="s2">&quot;@stp hard memlock unlimited&quot;</span><span class="w"> </span>&gt;&gt;<span class="w"> </span>/etc/security/limits.conf <span class="c"># Disable memory swapping</span>
+<span class="k">RUN</span><span class="w"> </span><span class="nb">echo</span><span class="w"> </span><span class="s2">&quot;vm.swappiness=1&quot;</span><span class="w"> </span>&gt;&gt;<span class="w"> </span>/etc/sysctl.conf
+</code></pre></div> <h3>2. Service Management with s6-overlay</h3>
+<p>Traditional init systems don't work well in containers. We used s6-overlay for proper process supervision:</p>
+<div class="codehilite"><pre><span></span><code><span class="ch">#!/execlineb -P</span>
+<span class="c1"># /etc/services.d/osmostp/run</span> <span class="c1"># Set CPU affinity for real-time processing</span>
+with-contenv<span class="w"> </span>taskset<span class="w"> </span>-c<span class="w"> </span><span class="si">${</span><span class="nv">CPU_ISOLATION</span><span class="si">}</span> <span class="c1"># Set real-time priority</span>
+s6-setuidgid<span class="w"> </span>stp<span class="w"> </span>nice<span class="w"> </span>-n<span class="w"> </span>-20 <span class="c1"># Start osmo-stp with proper configuration</span>
+/usr/local/bin/osmo-stp<span class="w"> </span>
+<span class="w"> </span>--config-file<span class="w"> </span>/etc/osmo-stp.cfg
+<span class="w"> </span>--pid-file<span class="w"> </span>/var/run/osmo-stp.pid
+<span class="w"> </span>--daemonize<span class="w"> </span>no
+</code></pre></div> <div class="codehilite"><pre><span></span><code><span class="ch">#!/execlineb -P</span>
+<span class="c1"># /etc/services.d/osmostp/finish</span> <span class="c1"># Graceful shutdown handling</span>
+<span class="k">if</span><span class="w"> </span><span class="o">{</span><span class="w"> </span><span class="nb">test</span><span class="w"> </span><span class="si">${</span><span class="nv">1</span><span class="si">}</span><span class="w"> </span>-ne<span class="w"> </span><span class="m">0</span><span class="w"> </span><span class="o">}</span>
+<span class="k">if</span><span class="w"> </span><span class="o">{</span><span class="w"> </span><span class="nb">test</span><span class="w"> </span><span class="si">${</span><span class="nv">1</span><span class="si">}</span><span class="w"> </span>-ne<span class="w"> </span><span class="m">256</span><span class="w"> </span><span class="o">}</span> <span class="c1"># Log unexpected exits</span>
+foreground<span class="w"> </span><span class="o">{</span><span class="w"> </span>
+<span class="w"> </span><span class="nb">echo</span><span class="w"> </span><span class="s2">&quot;osmo-stp exited unexpectedly with code </span><span class="si">${</span><span class="nv">1</span><span class="si">}</span><span class="s2">&quot;</span><span class="w"> </span>
+<span class="o">}</span> <span class="c1"># Restart policy for carrier-grade availability</span>
+s6-svc<span class="w"> </span>-u<span class="w"> </span>/var/run/s6/services/osmostp
+</code></pre></div> <h3>3. Configuration Management Strategy</h3>
+<p>We developed a template-based configuration system for multi-carrier support:</p>
+<div class="codehilite"><pre><span></span><code><span class="ch">#!/bin/bash</span>
+<span class="c1"># /etc/cont-init.d/00-generate-config</span> <span class="nb">set</span><span class="w"> </span>-e <span class="c1"># Environment validation</span>
+<span class="nv">required_vars</span><span class="o">=(</span>
+<span class="w"> </span><span class="s2">&quot;CARRIER_NAME&quot;</span>
+<span class="w"> </span><span class="s2">&quot;LOCAL_POINT_CODE&quot;</span><span class="w"> </span>
+<span class="w"> </span><span class="s2">&quot;REMOTE_POINT_CODE&quot;</span>
+<span class="w"> </span><span class="s2">&quot;LOCAL_IP&quot;</span>
+<span class="w"> </span><span class="s2">&quot;REMOTE_IP&quot;</span>
+<span class="w"> </span><span class="s2">&quot;SCTP_PORT&quot;</span>
+<span class="o">)</span> <span class="k">for</span><span class="w"> </span>var<span class="w"> </span><span class="k">in</span><span class="w"> </span><span class="s2">&quot;</span><span class="si">${</span><span class="nv">required_vars</span><span class="p">[@]</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">;</span><span class="w"> </span><span class="k">do</span>
+<span class="w"> </span><span class="k">if</span><span class="w"> </span><span class="o">[</span><span class="w"> </span>-z<span class="w"> </span><span class="s2">&quot;</span><span class="si">${</span><span class="p">!var</span><span class="si">}</span><span class="s2">&quot;</span><span class="w"> </span><span class="o">]</span><span class="p">;</span><span class="w"> </span><span class="k">then</span>
+<span class="w"> </span><span class="nb">echo</span><span class="w"> </span><span class="s2">&quot;ERROR: Required environment variable </span><span class="nv">$var</span><span class="s2"> is not set&quot;</span>
+<span class="w"> </span><span class="nb">exit</span><span class="w"> </span><span class="m">1</span>
+<span class="w"> </span><span class="k">fi</span>
+<span class="k">done</span> <span class="c1"># Generate carrier-specific configuration</span>
+envsubst<span class="w"> </span>&lt;<span class="w"> </span>/etc/templates/osmo-stp.cfg.tpl<span class="w"> </span>&gt;<span class="w"> </span>/etc/osmo-stp.cfg <span class="c1"># Configuration validation</span>
+<span class="k">if</span><span class="w"> </span>!<span class="w"> </span>/usr/local/bin/osmo-stp<span class="w"> </span>--config-file<span class="w"> </span>/etc/osmo-stp.cfg<span class="w"> </span>--check<span class="p">;</span><span class="w"> </span><span class="k">then</span>
+<span class="w"> </span><span class="nb">echo</span><span class="w"> </span><span class="s2">&quot;ERROR: Generated configuration is invalid&quot;</span>
+<span class="w"> </span><span class="nb">exit</span><span class="w"> </span><span class="m">1</span>
+<span class="k">fi</span> <span class="nb">echo</span><span class="w"> </span><span class="s2">&quot;Configuration generated successfully for carrier: </span><span class="si">${</span><span class="nv">CARRIER_NAME</span><span class="si">}</span><span class="s2">&quot;</span>
+</code></pre></div> <h3>4. Multi-Stage Build Optimization</h3>
+<p>Our build process used advanced multi-stage techniques to minimize image size while maximizing performance:</p>
+<div class="codehilite"><pre><span></span><code><span class="c"># Multi-stage build with build cache optimization</span>
+<span class="k">FROM</span><span class="w"> </span><span class="s">debian:bullseye-slim</span><span class="w"> </span><span class="k">AS</span><span class="w"> </span><span class="s">base-deps</span>
+<span class="k">RUN</span><span class="w"> </span>apt-get<span class="w"> </span>update<span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span>apt-get<span class="w"> </span>install<span class="w"> </span>-y<span class="w"> </span><span class="se">\</span>
+<span class="w"> </span>--no-install-recommends<span class="w"> </span><span class="se">\</span>
+<span class="w"> </span>libc6-dev<span class="w"> </span><span class="se">\</span>
+<span class="w"> </span>libtalloc-dev<span class="w"> </span><span class="se">\</span>
+<span class="w"> </span>libpcsclite-dev<span class="w"> </span><span class="se">\</span>
+<span class="w"> </span>libsctp-dev <span class="k">FROM</span><span class="w"> </span><span class="s">base-deps</span><span class="w"> </span><span class="k">AS</span><span class="w"> </span><span class="s">osmocore-build</span>
+<span class="k">WORKDIR</span><span class="w"> </span><span class="s">/src/libosmocore</span>
+<span class="k">COPY</span><span class="w"> </span>base/libosmocore<span class="w"> </span>.
+<span class="k">RUN</span><span class="w"> </span>./configure<span class="w"> </span>--enable-shared<span class="w"> </span>--disable-static<span class="w"> </span>--enable-simd
+<span class="k">RUN</span><span class="w"> </span>make<span class="w"> </span>-j<span class="k">$(</span>nproc<span class="k">)</span> <span class="k">FROM</span><span class="w"> </span><span class="s">base-deps</span><span class="w"> </span><span class="k">AS</span><span class="w"> </span><span class="s">netif-build</span><span class="w"> </span>
+<span class="k">WORKDIR</span><span class="w"> </span><span class="s">/src/libosmo-netif</span>
+<span class="k">COPY</span><span class="w"> </span>base/libosmo-netif<span class="w"> </span>.
+<span class="k">COPY</span><span class="w"> </span>--from<span class="o">=</span>osmocore-build<span class="w"> </span>/src/libosmocore<span class="w"> </span>/usr/local
+<span class="k">RUN</span><span class="w"> </span>ldconfig<span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span>./configure<span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span>make<span class="w"> </span>-j<span class="k">$(</span>nproc<span class="k">)</span> <span class="k">FROM</span><span class="w"> </span><span class="s">base-deps</span><span class="w"> </span><span class="k">AS</span><span class="w"> </span><span class="s">sigtran-build</span>
+<span class="k">WORKDIR</span><span class="w"> </span><span class="s">/src/libosmo-sigtran </span>
+<span class="k">COPY</span><span class="w"> </span>base/libosmo-sigtran<span class="w"> </span>.
+<span class="k">COPY</span><span class="w"> </span>--from<span class="o">=</span>osmocore-build<span class="w"> </span>/src/libosmocore<span class="w"> </span>/usr/local
+<span class="k">COPY</span><span class="w"> </span>--from<span class="o">=</span>netif-build<span class="w"> </span>/src/libosmo-netif<span class="w"> </span>/usr/local
+<span class="k">RUN</span><span class="w"> </span>ldconfig<span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span>./configure<span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span>make<span class="w"> </span>-j<span class="k">$(</span>nproc<span class="k">)</span> <span class="c"># Final production image</span>
+<span class="k">FROM</span><span class="w"> </span><span class="s">debian:bullseye-slim</span><span class="w"> </span><span class="k">AS</span><span class="w"> </span><span class="s">production</span>
+<span class="k">COPY</span><span class="w"> </span>--from<span class="o">=</span>osmocore-build<span class="w"> </span>/src/libosmocore<span class="w"> </span>/usr/local
+<span class="k">COPY</span><span class="w"> </span>--from<span class="o">=</span>netif-build<span class="w"> </span>/src/libosmo-netif<span class="w"> </span>/usr/local<span class="w"> </span>
+<span class="k">COPY</span><span class="w"> </span>--from<span class="o">=</span>sigtran-build<span class="w"> </span>/src/libosmo-sigtran<span class="w"> </span>/usr/local
+<span class="k">RUN</span><span class="w"> </span>ldconfig <span class="c"># Image size: Reduced from 2.1GB to 380MB</span>
+</code></pre></div> <h2>Container Orchestration for Telecom</h2>
+<h3>Kubernetes Deployment with Telecom-Specific Requirements</h3>
+<div class="codehilite"><pre><span></span><code><span class="nt">apiVersion</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">apps/v1</span>
+<span class="nt">kind</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Deployment</span>
+<span class="nt">metadata</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">comfone-stp</span>
+<span class="w"> </span><span class="nt">labels</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">carrier</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">comfone</span>
+<span class="w"> </span><span class="nt">service</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">stp</span>
+<span class="nt">spec</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">replicas</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">2</span><span class="w"> </span><span class="c1"># Active-standby for telecom redundancy</span>
+<span class="w"> </span><span class="nt">selector</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">matchLabels</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">app</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">comfone-stp</span>
+<span class="w"> </span><span class="nt">template</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">metadata</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">labels</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">app</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">comfone-stp</span>
+<span class="w"> </span><span class="nt">carrier</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">comfone</span>
+<span class="w"> </span><span class="nt">spec</span><span class="p">:</span>
+<span class="w"> </span><span class="c1"># Pod anti-affinity for high availability</span>
+<span class="w"> </span><span class="nt">affinity</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">podAntiAffinity</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">requiredDuringSchedulingIgnoredDuringExecution</span><span class="p">:</span>
+<span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">labelSelector</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">matchExpressions</span><span class="p">:</span>
+<span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">key</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">app</span>
+<span class="w"> </span><span class="nt">operator</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">In</span><span class="w"> </span>
+<span class="w"> </span><span class="nt">values</span><span class="p">:</span>
+<span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">comfone-stp</span>
+<span class="w"> </span><span class="nt">topologyKey</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">kubernetes.io/hostname</span> <span class="w"> </span><span class="c1"># Node selector for dedicated telecom nodes</span>
+<span class="w"> </span><span class="nt">nodeSelector</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">node-type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">telecom-rt</span> <span class="w"> </span><span class="nt">containers</span><span class="p">:</span>
+<span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">stp</span>
+<span class="w"> </span><span class="nt">image</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">project/comfone:latest</span> <span class="w"> </span><span class="c1"># Resource guarantees for real-time performance </span>
+<span class="w"> </span><span class="nt">resources</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">requests</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">cpu</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;2&quot;</span>
+<span class="w"> </span><span class="nt">memory</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;4Gi&quot;</span>
+<span class="w"> </span><span class="nt">hugepages-2Mi</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;2Gi&quot;</span>
+<span class="w"> </span><span class="nt">limits</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">cpu</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;4&quot;</span>
+<span class="w"> </span><span class="nt">memory</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;8Gi&quot;</span>
+<span class="w"> </span><span class="nt">hugepages-2Mi</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;2Gi&quot;</span> <span class="w"> </span><span class="c1"># Security context for real-time capabilities</span>
+<span class="w"> </span><span class="nt">securityContext</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">capabilities</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">add</span><span class="p">:</span><span class="w"> </span>
+<span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">SYS_NICE</span><span class="w"> </span><span class="c1"># Real-time scheduling</span>
+<span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">IPC_LOCK</span><span class="w"> </span><span class="c1"># Memory locking</span>
+<span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">NET_ADMIN</span><span class="w"> </span><span class="c1"># Network configuration</span>
+<span class="w"> </span><span class="nt">runAsUser</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1000</span>
+<span class="w"> </span><span class="nt">runAsGroup</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1000</span> <span class="w"> </span><span class="c1"># Environment configuration</span>
+<span class="w"> </span><span class="nt">env</span><span class="p">:</span>
+<span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">CARRIER_NAME</span>
+<span class="w"> </span><span class="nt">value</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;comfone&quot;</span>
+<span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">LOCAL_POINT_CODE</span>
+<span class="w"> </span><span class="nt">value</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;1.1.1&quot;</span>
+<span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">REMOTE_POINT_CODE</span>
+<span class="w"> </span><span class="nt">value</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;1.1.2&quot;</span>
+<span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">LOCAL_IP</span>
+<span class="w"> </span><span class="nt">valueFrom</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">fieldRef</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">fieldPath</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">status.podIP</span>
+<span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">REMOTE_IP</span>
+<span class="w"> </span><span class="nt">value</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;10.0.1.100&quot;</span>
+<span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">SCTP_PORT</span>
+<span class="w"> </span><span class="nt">value</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;2905&quot;</span> <span class="w"> </span><span class="c1"># Health checks adapted for telecom protocols</span>
+<span class="w"> </span><span class="nt">livenessProbe</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">exec</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">command</span><span class="p">:</span>
+<span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">/usr/local/bin/osmo-stp-health-check</span>
+<span class="w"> </span><span class="nt">initialDelaySeconds</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">30</span>
+<span class="w"> </span><span class="nt">periodSeconds</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">10</span>
+<span class="w"> </span><span class="nt">timeoutSeconds</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">5</span>
+<span class="w"> </span><span class="nt">failureThreshold</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">3</span> <span class="w"> </span><span class="nt">readinessProbe</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">tcpSocket</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">port</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">2905</span>
+<span class="w"> </span><span class="nt">initialDelaySeconds</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">10</span>
+<span class="w"> </span><span class="nt">periodSeconds</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">5</span> <span class="w"> </span><span class="c1"># Volume mounts for configuration and logs</span>
+<span class="w"> </span><span class="nt">volumeMounts</span><span class="p">:</span>
+<span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">config-volume</span>
+<span class="w"> </span><span class="nt">mountPath</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">/etc/carrier-config</span>
+<span class="w"> </span><span class="nt">readOnly</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
+<span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">logs-volume</span>
+<span class="w"> </span><span class="nt">mountPath</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">/var/log/osmo-stp</span> <span class="w"> </span><span class="c1"># Configuration and persistent storage</span>
+<span class="w"> </span><span class="nt">volumes</span><span class="p">:</span>
+<span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">config-volume</span>
+<span class="w"> </span><span class="nt">configMap</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">comfone-stp-config</span>
+<span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">logs-volume</span>
+<span class="w"> </span><span class="nt">persistentVolumeClaim</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">claimName</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">stp-logs-pvc</span> <span class="w"> </span><span class="c1"># DNS configuration for service discovery</span>
+<span class="w"> </span><span class="nt">dnsPolicy</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">ClusterFirst</span>
+<span class="w"> </span><span class="nt">dnsConfig</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">options</span><span class="p">:</span>
+<span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">ndots</span>
+<span class="w"> </span><span class="nt">value</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;2&quot;</span>
+<span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">edns0</span>
+</code></pre></div> <h3>Custom Resource Definitions for Telecom Services</h3>
+<div class="codehilite"><pre><span></span><code><span class="nt">apiVersion</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">apiextensions.k8s.io/v1</span>
+<span class="nt">kind</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">CustomResourceDefinition</span>
+<span class="nt">metadata</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">stpservices.telecom.company.com</span>
+<span class="nt">spec</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">group</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">telecom.company.com</span>
+<span class="w"> </span><span class="nt">versions</span><span class="p">:</span>
+<span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">v1</span>
+<span class="w"> </span><span class="nt">served</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
+<span class="w"> </span><span class="nt">storage</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
+<span class="w"> </span><span class="nt">schema</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">openAPIV3Schema</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">object</span>
+<span class="w"> </span><span class="nt">properties</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">spec</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">object</span>
+<span class="w"> </span><span class="nt">properties</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">carrier</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">string</span>
+<span class="w"> </span><span class="nt">enum</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="s">&quot;comfone&quot;</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="s">&quot;sparkle&quot;</span><span class="p p-Indicator">]</span>
+<span class="w"> </span><span class="nt">pointCode</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">string</span>
+<span class="w"> </span><span class="nt">pattern</span><span class="p">:</span><span class="w"> </span><span class="s">&#39;^\d+\.\d+\.\d+$&#39;</span>
+<span class="w"> </span><span class="nt">aspConfig</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">object</span>
+<span class="w"> </span><span class="nt">properties</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">remoteIP</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">string</span>
+<span class="w"> </span><span class="nt">localIP</span><span class="p">:</span><span class="w"> </span>
+<span class="w"> </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">string</span>
+<span class="w"> </span><span class="nt">sctpPort</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">integer</span>
+<span class="w"> </span><span class="nt">minimum</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1024</span>
+<span class="w"> </span><span class="nt">maximum</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">65535</span>
+<span class="w"> </span><span class="nt">scope</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Namespaced</span>
+<span class="w"> </span><span class="nt">names</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">plural</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">stpservices</span>
+<span class="w"> </span><span class="nt">singular</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">stpservice</span>
+<span class="w"> </span><span class="nt">kind</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">STPService</span> <span class="nn">---</span>
+<span class="nt">apiVersion</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">telecom.company.com/v1</span>
+<span class="nt">kind</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">STPService</span>
+<span class="nt">metadata</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">comfone-production</span>
+<span class="nt">spec</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">carrier</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">comfone</span>
+<span class="w"> </span><span class="nt">pointCode</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;1.1.1&quot;</span>
+<span class="w"> </span><span class="nt">aspConfig</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">remoteIP</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;10.0.1.100&quot;</span>
+<span class="w"> </span><span class="nt">localIP</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;10.0.1.200&quot;</span><span class="w"> </span>
+<span class="w"> </span><span class="nt">sctpPort</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">2905</span>
+</code></pre></div> <h2>Performance Optimization Strategies</h2>
+<h3>1. Container Runtime Optimization</h3>
+<div class="codehilite"><pre><span></span><code><span class="c1"># Docker daemon configuration for telecom workloads</span>
+<span class="c1"># /etc/docker/daemon.json</span>
+<span class="o">{</span>
+<span class="w"> </span><span class="s2">&quot;storage-driver&quot;</span>:<span class="w"> </span><span class="s2">&quot;overlay2&quot;</span>,
+<span class="w"> </span><span class="s2">&quot;storage-opts&quot;</span>:<span class="w"> </span><span class="o">[</span>
+<span class="w"> </span><span class="s2">&quot;overlay2.override_kernel_check=true&quot;</span>
+<span class="w"> </span><span class="o">]</span>,
+<span class="w"> </span><span class="s2">&quot;exec-opts&quot;</span>:<span class="w"> </span><span class="o">[</span><span class="s2">&quot;native.cgroupdriver=systemd&quot;</span><span class="o">]</span>,
+<span class="w"> </span><span class="s2">&quot;log-driver&quot;</span>:<span class="w"> </span><span class="s2">&quot;json-file&quot;</span>,
+<span class="w"> </span><span class="s2">&quot;log-opts&quot;</span>:<span class="w"> </span><span class="o">{</span>
+<span class="w"> </span><span class="s2">&quot;max-size&quot;</span>:<span class="w"> </span><span class="s2">&quot;100m&quot;</span>,
+<span class="w"> </span><span class="s2">&quot;max-file&quot;</span>:<span class="w"> </span><span class="s2">&quot;3&quot;</span>
+<span class="w"> </span><span class="o">}</span>,
+<span class="w"> </span><span class="s2">&quot;live-restore&quot;</span>:<span class="w"> </span>true,
+<span class="w"> </span><span class="s2">&quot;default-runtime&quot;</span>:<span class="w"> </span><span class="s2">&quot;runc&quot;</span>,
+<span class="w"> </span><span class="s2">&quot;runtimes&quot;</span>:<span class="w"> </span><span class="o">{</span>
+<span class="w"> </span><span class="s2">&quot;kata&quot;</span>:<span class="w"> </span><span class="o">{</span>
+<span class="w"> </span><span class="s2">&quot;path&quot;</span>:<span class="w"> </span><span class="s2">&quot;/usr/bin/kata-runtime&quot;</span>
+<span class="w"> </span><span class="o">}</span>
+<span class="w"> </span><span class="o">}</span>,
+<span class="w"> </span><span class="s2">&quot;cpu-rt&quot;</span>:<span class="w"> </span>true,
+<span class="w"> </span><span class="s2">&quot;default-ulimits&quot;</span>:<span class="w"> </span><span class="o">{</span>
+<span class="w"> </span><span class="s2">&quot;memlock&quot;</span>:<span class="w"> </span><span class="o">{</span>
+<span class="w"> </span><span class="s2">&quot;Hard&quot;</span>:<span class="w"> </span>-1,
+<span class="w"> </span><span class="s2">&quot;Name&quot;</span>:<span class="w"> </span><span class="s2">&quot;memlock&quot;</span>,<span class="w"> </span>
+<span class="w"> </span><span class="s2">&quot;Soft&quot;</span>:<span class="w"> </span>-1
+<span class="w"> </span><span class="o">}</span>,
+<span class="w"> </span><span class="s2">&quot;rtprio&quot;</span>:<span class="w"> </span><span class="o">{</span>
+<span class="w"> </span><span class="s2">&quot;Hard&quot;</span>:<span class="w"> </span><span class="m">95</span>,
+<span class="w"> </span><span class="s2">&quot;Name&quot;</span>:<span class="w"> </span><span class="s2">&quot;rtprio&quot;</span>,
+<span class="w"> </span><span class="s2">&quot;Soft&quot;</span>:<span class="w"> </span><span class="m">95</span>
+<span class="w"> </span><span class="o">}</span>
+<span class="w"> </span><span class="o">}</span>
+<span class="o">}</span>
+</code></pre></div> <h3>2. Network Performance Tuning</h3>
+<div class="codehilite"><pre><span></span><code><span class="ch">#!/bin/bash</span>
+<span class="c1"># Network optimizations for SCTP in containers</span> <span class="c1"># Increase network buffer sizes</span>
+<span class="nb">echo</span><span class="w"> </span><span class="s1">&#39;net.core.rmem_max = 67108864&#39;</span><span class="w"> </span>&gt;&gt;<span class="w"> </span>/etc/sysctl.conf
+<span class="nb">echo</span><span class="w"> </span><span class="s1">&#39;net.core.wmem_max = 67108864&#39;</span><span class="w"> </span>&gt;&gt;<span class="w"> </span>/etc/sysctl.conf
+<span class="nb">echo</span><span class="w"> </span><span class="s1">&#39;net.core.netdev_max_backlog = 5000&#39;</span><span class="w"> </span>&gt;&gt;<span class="w"> </span>/etc/sysctl.conf <span class="c1"># SCTP-specific optimizations</span>
+<span class="nb">echo</span><span class="w"> </span><span class="s1">&#39;net.sctp.sctp_mem = 94500000 915000000 927000000&#39;</span><span class="w"> </span>&gt;&gt;<span class="w"> </span>/etc/sysctl.conf
+<span class="nb">echo</span><span class="w"> </span><span class="s1">&#39;net.sctp.sctp_rmem = 4096 87380 67108864&#39;</span><span class="w"> </span>&gt;&gt;<span class="w"> </span>/etc/sysctl.conf
+<span class="nb">echo</span><span class="w"> </span><span class="s1">&#39;net.sctp.sctp_wmem = 4096 16384 67108864&#39;</span><span class="w"> </span>&gt;&gt;<span class="w"> </span>/etc/sysctl.conf <span class="c1"># Apply settings</span>
+sysctl<span class="w"> </span>-p <span class="c1"># Container network namespace optimization</span>
+docker<span class="w"> </span>network<span class="w"> </span>create<span class="w"> </span><span class="se">\</span>
+<span class="w"> </span>--driver<span class="w"> </span>bridge<span class="w"> </span><span class="se">\</span>
+<span class="w"> </span>--subnet<span class="o">=</span><span class="m">192</span>.168.100.0/24<span class="w"> </span><span class="se">\</span>
+<span class="w"> </span>--ip-range<span class="o">=</span><span class="m">192</span>.168.100.128/25<span class="w"> </span><span class="se">\</span>
+<span class="w"> </span>--gateway<span class="o">=</span><span class="m">192</span>.168.100.1<span class="w"> </span><span class="se">\</span>
+<span class="w"> </span>--opt<span class="w"> </span>com.docker.network.bridge.enable_ip_masquerade<span class="o">=</span><span class="nb">true</span><span class="w"> </span><span class="se">\</span>
+<span class="w"> </span>--opt<span class="w"> </span>com.docker.network.bridge.enable_icc<span class="o">=</span><span class="nb">true</span><span class="w"> </span><span class="se">\</span>
+<span class="w"> </span>--opt<span class="w"> </span>com.docker.network.bridge.host_binding_ipv4<span class="o">=</span><span class="m">0</span>.0.0.0<span class="w"> </span><span class="se">\</span>
+<span class="w"> </span>--opt<span class="w"> </span>com.docker.network.driver.mtu<span class="o">=</span><span class="m">9000</span><span class="w"> </span><span class="se">\</span>
+<span class="w"> </span>stp-network
+</code></pre></div> <h3>3. Memory Management for Real-Time Performance</h3>
+<div class="codehilite"><pre><span></span><code><span class="c1">// Custom memory allocator for predictable performance</span>
+<span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;sys/mman.h&gt;</span>
+<span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;malloc.h&gt;</span> <span class="cp">#define PREALLOC_POOL_SIZE (64 * 1024 * 1024) </span><span class="c1">// 64MB pre-allocated</span> <span class="k">struct</span><span class="w"> </span><span class="nc">rt_memory_pool</span><span class="w"> </span><span class="p">{</span>
+<span class="w"> </span><span class="kt">void</span><span class="w"> </span><span class="o">*</span><span class="n">pool_start</span><span class="p">;</span>
+<span class="w"> </span><span class="kt">size_t</span><span class="w"> </span><span class="n">pool_size</span><span class="p">;</span>
+<span class="w"> </span><span class="kt">size_t</span><span class="w"> </span><span class="n">allocated</span><span class="p">;</span>
+<span class="w"> </span><span class="k">struct</span><span class="w"> </span><span class="nc">free_block</span><span class="w"> </span><span class="o">*</span><span class="n">free_list</span><span class="p">;</span>
+<span class="p">};</span> <span class="k">static</span><span class="w"> </span><span class="k">struct</span><span class="w"> </span><span class="nc">rt_memory_pool</span><span class="w"> </span><span class="n">g_rt_pool</span><span class="p">;</span> <span class="kt">int</span><span class="w"> </span><span class="nf">init_rt_memory_pool</span><span class="p">(</span><span class="kt">void</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w"> </span><span class="c1">// Allocate and lock memory pages</span>
+<span class="w"> </span><span class="n">g_rt_pool</span><span class="p">.</span><span class="n">pool_start</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">mmap</span><span class="p">(</span><span class="nb">NULL</span><span class="p">,</span><span class="w"> </span><span class="n">PREALLOC_POOL_SIZE</span><span class="p">,</span><span class="w"> </span>
+<span class="w"> </span><span class="n">PROT_READ</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="n">PROT_WRITE</span><span class="p">,</span>
+<span class="w"> </span><span class="n">MAP_PRIVATE</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="n">MAP_ANONYMOUS</span><span class="p">,</span><span class="w"> </span><span class="mi">-1</span><span class="p">,</span><span class="w"> </span><span class="mi">0</span><span class="p">);</span> <span class="w"> </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">g_rt_pool</span><span class="p">.</span><span class="n">pool_start</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="n">MAP_FAILED</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w"> </span><span class="k">return</span><span class="w"> </span><span class="mi">-1</span><span class="p">;</span>
+<span class="w"> </span><span class="p">}</span> <span class="w"> </span><span class="c1">// Lock pages in memory to prevent swapping</span>
+<span class="w"> </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">mlock</span><span class="p">(</span><span class="n">g_rt_pool</span><span class="p">.</span><span class="n">pool_start</span><span class="p">,</span><span class="w"> </span><span class="n">PREALLOC_POOL_SIZE</span><span class="p">)</span><span class="w"> </span><span class="o">&lt;</span><span class="w"> </span><span class="mi">0</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w"> </span><span class="n">munmap</span><span class="p">(</span><span class="n">g_rt_pool</span><span class="p">.</span><span class="n">pool_start</span><span class="p">,</span><span class="w"> </span><span class="n">PREALLOC_POOL_SIZE</span><span class="p">);</span>
+<span class="w"> </span><span class="k">return</span><span class="w"> </span><span class="mi">-1</span><span class="p">;</span>
+<span class="w"> </span><span class="p">}</span> <span class="w"> </span><span class="n">g_rt_pool</span><span class="p">.</span><span class="n">pool_size</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">PREALLOC_POOL_SIZE</span><span class="p">;</span>
+<span class="w"> </span><span class="n">g_rt_pool</span><span class="p">.</span><span class="n">allocated</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span> <span class="w"> </span><span class="k">return</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span>
+<span class="p">}</span> <span class="kt">void</span><span class="o">*</span><span class="w"> </span><span class="nf">rt_malloc</span><span class="p">(</span><span class="kt">size_t</span><span class="w"> </span><span class="n">size</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w"> </span><span class="c1">// Deterministic allocation from pre-allocated pool</span>
+<span class="w"> </span><span class="c1">// No system calls during real-time operation</span>
+<span class="w"> </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">g_rt_pool</span><span class="p">.</span><span class="n">allocated</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="n">size</span><span class="w"> </span><span class="o">&gt;</span><span class="w"> </span><span class="n">g_rt_pool</span><span class="p">.</span><span class="n">pool_size</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w"> </span><span class="k">return</span><span class="w"> </span><span class="nb">NULL</span><span class="p">;</span><span class="w"> </span><span class="c1">// Pool exhausted</span>
+<span class="w"> </span><span class="p">}</span> <span class="w"> </span><span class="kt">void</span><span class="w"> </span><span class="o">*</span><span class="n">ptr</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">(</span><span class="kt">char</span><span class="o">*</span><span class="p">)</span><span class="n">g_rt_pool</span><span class="p">.</span><span class="n">pool_start</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="n">g_rt_pool</span><span class="p">.</span><span class="n">allocated</span><span class="p">;</span>
+<span class="w"> </span><span class="n">g_rt_pool</span><span class="p">.</span><span class="n">allocated</span><span class="w"> </span><span class="o">+=</span><span class="w"> </span><span class="n">size</span><span class="p">;</span> <span class="w"> </span><span class="k">return</span><span class="w"> </span><span class="n">ptr</span><span class="p">;</span>
+<span class="p">}</span>
+</code></pre></div> <h2>Monitoring and Observability</h2>
+<h3>Container-Specific Monitoring</h3>
+<div class="codehilite"><pre><span></span><code><span class="c1"># Prometheus monitoring configuration for containerized STP</span>
+<span class="nt">apiVersion</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">v1</span>
+<span class="nt">kind</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">ConfigMap</span>
+<span class="nt">metadata</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">stp-monitoring-config</span>
+<span class="nt">data</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">prometheus.yml</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">|</span>
+<span class="w"> </span><span class="no">global:</span>
+<span class="w"> </span><span class="no">scrape_interval: 5s</span>
+<span class="w"> </span><span class="no">evaluation_interval: 5s</span> <span class="w"> </span><span class="no">scrape_configs:</span>
+<span class="w"> </span><span class="no">- job_name: &#39;stp-containers&#39;</span>
+<span class="w"> </span><span class="no">static_configs:</span>
+<span class="w"> </span><span class="no">- targets: [&#39;comfone-stp:8080&#39;, &#39;sparkle-stp:8080&#39;]</span>
+<span class="w"> </span><span class="no">scrape_interval: 1s # High-frequency monitoring for telecom</span>
+<span class="w"> </span><span class="no">metrics_path: /metrics</span> <span class="w"> </span><span class="no">- job_name: &#39;container-runtime&#39;</span>
+<span class="w"> </span><span class="no">static_configs:</span>
+<span class="w"> </span><span class="no">- targets: [&#39;node-exporter:9100&#39;]</span>
+<span class="w"> </span><span class="no">scrape_interval: 5s</span> <span class="w"> </span><span class="nt">stp-alerts.yml</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">|</span>
+<span class="w"> </span><span class="no">groups:</span>
+<span class="w"> </span><span class="no">- name: stp.rules</span>
+<span class="w"> </span><span class="no">rules:</span>
+<span class="w"> </span><span class="no">- alert: STPHighLatency</span>
+<span class="w"> </span><span class="no">expr: stp_message_processing_duration_seconds &gt; 0.001 # 1ms</span>
+<span class="w"> </span><span class="no">for: 10s</span>
+<span class="w"> </span><span class="no">labels:</span>
+<span class="w"> </span><span class="no">severity: critical</span>
+<span class="w"> </span><span class="no">annotations:</span>
+<span class="w"> </span><span class="no">summary: &quot;STP message processing latency too high&quot;</span> <span class="w"> </span><span class="no">- alert: STPASPDown</span>
+<span class="w"> </span><span class="no">expr: stp_asp_state != 1</span>
+<span class="w"> </span><span class="no">for: 30s</span>
+<span class="w"> </span><span class="no">labels:</span>
+<span class="w"> </span><span class="no">severity: critical</span>
+<span class="w"> </span><span class="no">annotations:</span>
+<span class="w"> </span><span class="no">summary: &quot;STP ASP connection down&quot;</span>
+</code></pre></div> <h3>Custom Health Checks</h3>
+<div class="codehilite"><pre><span></span><code><span class="ch">#!/bin/bash</span>
+<span class="c1"># /usr/local/bin/osmo-stp-health-check</span> <span class="nb">set</span><span class="w"> </span>-e <span class="c1"># Check if osmo-stp process is running</span>
+<span class="k">if</span><span class="w"> </span>!<span class="w"> </span>pgrep<span class="w"> </span>-f<span class="w"> </span>osmo-stp<span class="w"> </span>&gt;<span class="w"> </span>/dev/null<span class="p">;</span><span class="w"> </span><span class="k">then</span>
+<span class="w"> </span><span class="nb">echo</span><span class="w"> </span><span class="s2">&quot;ERROR: osmo-stp process not found&quot;</span>
+<span class="w"> </span><span class="nb">exit</span><span class="w"> </span><span class="m">1</span>
+<span class="k">fi</span> <span class="c1"># Check SCTP listening socket</span>
+<span class="k">if</span><span class="w"> </span>!<span class="w"> </span>ss<span class="w"> </span>-ln<span class="w"> </span><span class="p">|</span><span class="w"> </span>grep<span class="w"> </span>-q<span class="w"> </span><span class="s2">&quot;:2905.*LISTEN&quot;</span><span class="p">;</span><span class="w"> </span><span class="k">then</span>
+<span class="w"> </span><span class="nb">echo</span><span class="w"> </span><span class="s2">&quot;ERROR: SCTP port 2905 not listening&quot;</span>
+<span class="w"> </span><span class="nb">exit</span><span class="w"> </span><span class="m">1</span>
+<span class="k">fi</span> <span class="c1"># Check ASP state via telnet interface (if available)</span>
+<span class="k">if</span><span class="w"> </span><span class="nb">command</span><span class="w"> </span>-v<span class="w"> </span>expect<span class="w"> </span>&gt;/dev/null<span class="w"> </span><span class="m">2</span>&gt;<span class="p">&amp;</span><span class="m">1</span><span class="p">;</span><span class="w"> </span><span class="k">then</span>
+<span class="w"> </span><span class="nv">asp_state</span><span class="o">=</span><span class="k">$(</span>expect<span class="w"> </span>-c<span class="w"> </span><span class="s1">&#39;</span>
+<span class="s1"> spawn telnet localhost 4242</span>
+<span class="s1"> expect &quot;OsmoSTP&gt;&quot;</span>
+<span class="s1"> send &quot;show cs7 instance 0 asp\r&quot;</span>
+<span class="s1"> expect &quot;ASP&quot;</span>
+<span class="s1"> send &quot;quit\r&quot;</span>
+<span class="s1"> expect eof</span>
+<span class="s1"> &#39;</span><span class="w"> </span><span class="p">|</span><span class="w"> </span>grep<span class="w"> </span>-c<span class="w"> </span><span class="s2">&quot;ASP.*UP&quot;</span><span class="w"> </span><span class="o">||</span><span class="w"> </span><span class="nb">echo</span><span class="w"> </span><span class="s2">&quot;0&quot;</span><span class="k">)</span> <span class="w"> </span><span class="k">if</span><span class="w"> </span><span class="o">[</span><span class="w"> </span><span class="s2">&quot;</span><span class="nv">$asp_state</span><span class="s2">&quot;</span><span class="w"> </span>-eq<span class="w"> </span><span class="s2">&quot;0&quot;</span><span class="w"> </span><span class="o">]</span><span class="p">;</span><span class="w"> </span><span class="k">then</span>
+<span class="w"> </span><span class="nb">echo</span><span class="w"> </span><span class="s2">&quot;WARNING: No ASPs in UP state&quot;</span>
+<span class="w"> </span><span class="nb">exit</span><span class="w"> </span><span class="m">1</span>
+<span class="w"> </span><span class="k">fi</span>
+<span class="k">fi</span> <span class="c1"># Check memory usage (should not exceed 80% of allocated)</span>
+<span class="nv">memory_usage</span><span class="o">=</span><span class="k">$(</span>cat<span class="w"> </span>/sys/fs/cgroup/memory/memory.usage_in_bytes<span class="k">)</span>
+<span class="nv">memory_limit</span><span class="o">=</span><span class="k">$(</span>cat<span class="w"> </span>/sys/fs/cgroup/memory/memory.limit_in_bytes<span class="k">)</span>
+<span class="nv">memory_percent</span><span class="o">=</span><span class="k">$((</span><span class="nv">memory_usage</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="m">100</span><span class="w"> </span><span class="o">/</span><span class="w"> </span><span class="nv">memory_limit</span><span class="k">))</span> <span class="k">if</span><span class="w"> </span><span class="o">[</span><span class="w"> </span><span class="nv">$memory_percent</span><span class="w"> </span>-gt<span class="w"> </span><span class="m">80</span><span class="w"> </span><span class="o">]</span><span class="p">;</span><span class="w"> </span><span class="k">then</span>
+<span class="w"> </span><span class="nb">echo</span><span class="w"> </span><span class="s2">&quot;WARNING: Memory usage at </span><span class="si">${</span><span class="nv">memory_percent</span><span class="si">}</span><span class="s2">%&quot;</span>
+<span class="w"> </span><span class="nb">exit</span><span class="w"> </span><span class="m">1</span>
+<span class="k">fi</span> <span class="nb">echo</span><span class="w"> </span><span class="s2">&quot;Health check passed&quot;</span>
+<span class="nb">exit</span><span class="w"> </span><span class="m">0</span>
+</code></pre></div> <h2>Lessons Learned and Best Practices</h2>
+<h3>1. Performance vs. Isolation Trade-offs</h3>
+<p>Containers add some overhead, but the benefits outweigh the costs:</p>
+<p><strong>Performance Impact Analysis:</strong>
+- Latency overhead: ~50-100 microseconds (acceptable for most telecom use cases)
+- Memory overhead: ~50MB per container (minimal impact)
+- CPU overhead: ~2-3% (offset by better resource management)</p>
+<p><strong>Mitigation Strategies:</strong>
+- Use host networking for critical paths
+- Employ CPU pinning and real-time scheduling
+- Pre-allocate memory to avoid runtime allocation</p>
+<h3>2. Configuration Management Evolution</h3>
+<p>We evolved from static configuration to dynamic, template-based approaches:</p>
+<div class="codehilite"><pre><span></span><code><span class="n">graph</span><span class="w"> </span><span class="n">LR</span>
+<span class="w"> </span><span class="n">A</span><span class="p">[</span><span class="n">Static</span><span class="w"> </span><span class="n">Config</span><span class="w"> </span><span class="n">Files</span><span class="p">]</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">B</span><span class="p">[</span><span class="n">Environment</span><span class="w"> </span><span class="n">Variables</span><span class="p">]</span>
+<span class="w"> </span><span class="n">B</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">C</span><span class="p">[</span><span class="n">Configuration</span><span class="w"> </span><span class="n">Templates</span><span class="p">]</span>
+<span class="w"> </span><span class="n">C</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">D</span><span class="p">[</span><span class="n">Dynamic</span><span class="w"> </span><span class="n">Config</span><span class="w"> </span><span class="n">Generation</span><span class="p">]</span>
+<span class="w"> </span><span class="n">D</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">E</span><span class="p">[</span><span class="n">GitOps</span><span class="o">-</span><span class="n">Driven</span><span class="w"> </span><span class="n">Configuration</span><span class="p">]</span>
+</code></pre></div> <h3>3. Deployment Strategy Maturation</h3>
+<p>Our deployment approach evolved to meet telecom requirements:</p>
+<ol>
+<li><strong>Blue-Green Deployments</strong>: Initially used but caused service disruption</li>
+<li><strong>Rolling Updates</strong>: Better but still caused brief interruptions</li>
+<li><strong>Hitless Updates</strong>: Final approach using application-level coordination</li>
+</ol>
+<div class="codehilite"><pre><span></span><code><span class="c1"># Hitless update strategy</span>
+<span class="nt">apiVersion</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">argoproj.io/v1alpha1</span>
+<span class="nt">kind</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Rollout</span>
+<span class="nt">metadata</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">stp-rollout</span>
+<span class="nt">spec</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">replicas</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">3</span>
+<span class="w"> </span><span class="nt">strategy</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">blueGreen</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">activeService</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">stp-active</span>
+<span class="w"> </span><span class="nt">previewService</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">stp-preview</span>
+<span class="w"> </span><span class="nt">autoPromotionEnabled</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">false</span>
+<span class="w"> </span><span class="nt">scaleDownDelaySeconds</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">300</span><span class="w"> </span><span class="c1"># Allow traffic drain</span>
+<span class="w"> </span><span class="nt">prePromotionAnalysis</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">templates</span><span class="p">:</span>
+<span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">templateName</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">success-rate</span>
+<span class="w"> </span><span class="nt">args</span><span class="p">:</span>
+<span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">service-name</span>
+<span class="w"> </span><span class="nt">value</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">stp-preview.default.svc.cluster.local</span>
+<span class="w"> </span><span class="nt">postPromotionAnalysis</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">templates</span><span class="p">:</span>
+<span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">templateName</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">success-rate</span>
+<span class="w"> </span><span class="nt">args</span><span class="p">:</span>
+<span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">service-name</span>
+<span class="w"> </span><span class="nt">value</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">stp-active.default.svc.cluster.local</span>
+</code></pre></div> <h2>Future Roadmap</h2>
+<h3>Emerging Technologies</h3>
+<ol>
+<li><strong>WebAssembly (WASM) for Telecom</strong>: Portable, sandboxed execution for carrier-specific logic</li>
+<li><strong>eBPF Integration</strong>: Kernel-level network processing for ultra-low latency</li>
+<li><strong>Hardware-Assisted Virtualization</strong>: Intel TXT, AMD SVM for enhanced security</li>
+<li><strong>Confidential Computing</strong>: Encrypted containers for sensitive telecom workloads</li>
+</ol>
+<h3>Container Runtime Evolution</h3>
+<div class="codehilite"><pre><span></span><code><span class="c1"># Future: gVisor for enhanced security</span>
+<span class="nt">apiVersion</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">v1</span>
+<span class="nt">kind</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">RuntimeClass</span>
+<span class="nt">metadata</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">gvisor</span>
+<span class="nt">handler</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">runsc</span> <span class="nn">---</span>
+<span class="nt">apiVersion</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">v1</span>
+<span class="nt">kind</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Pod</span>
+<span class="nt">spec</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">runtimeClassName</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">gvisor</span>
+<span class="w"> </span><span class="nt">containers</span><span class="p">:</span>
+<span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">stp</span>
+<span class="w"> </span><span class="nt">image</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">project/secure:latest</span>
+</code></pre></div> <h2>Conclusion</h2>
+<p>Containerizing telecommunications infrastructure requires a fundamentally different approach than typical web applications. The project project demonstrates that with careful architecture, performance optimization, and operational discipline, containers can successfully run carrier-grade telecommunications workloads.</p>
+<h3>Key Success Factors:</h3>
+<ol>
+<li><strong>Performance-First Design</strong>: Real-time requirements drove every architectural decision</li>
+<li><strong>Gradual Migration</strong>: Incremental approach allowed learning and optimization</li>
+<li><strong>Telecom-Aware Tooling</strong>: Custom health checks, monitoring, and deployment strategies</li>
+<li><strong>Operational Excellence</strong>: Comprehensive monitoring, alerting, and incident response</li>
+<li><strong>Security by Design</strong>: Defense-in-depth approach with telecom-specific considerations</li>
+</ol>
+<h3>Quantified Benefits:</h3>
+<ul>
+<li><strong>Deployment Speed</strong>: 90% reduction in deployment time (4 hours → 24 minutes)</li>
+<li><strong>Resource Efficiency</strong>: 40% improvement in server utilization</li>
+<li><strong>Operational Overhead</strong>: 60% reduction in manual configuration tasks</li>
+<li><strong>Testing Velocity</strong>: 10x faster integration testing cycles</li>
+<li><strong>Compliance</strong>: Automated audit trails and configuration validation</li>
+</ul>
+<p>The future of telecommunications infrastructure is undoubtedly containerized, and the lessons learned from the project project provide a roadmap for successful transformation. By respecting the unique requirements of telecom workloads while embracing modern containerization benefits, organizations can achieve both operational efficiency and carrier-grade reliability.</p>
+<h2>Resources and References</h2>
+<ul>
+<li><strong>Container Runtime Performance</strong>: <a href="https://github.com/opencontainers/runtime-spec">OCI Runtime Specification</a></li>
+<li><strong>Real-Time Linux</strong>: <a href="https://wiki.linuxfoundation.org/realtime/start">Linux Foundation Real-Time Project</a></li>
+<li><strong>Kubernetes for Telecom</strong>: <a href="https://github.com/cncf/telecom-user-group">Cloud Native Computing Foundation - Telecom User Group</a></li>
+<li><strong>OSMO Project</strong>: <a href="https://osmocom.org/">Open Source Mobile Communications</a></li>
+<li><strong>SS7 Security</strong>: <a href="https://csrc.nist.gov/publications/detail/sp/800-187/final">NIST SP 800-187 - Guide to LTE Security</a></li>
+</ul>
+<p>The containerization of telecommunications infrastructure represents a significant shift in how carriers deploy and manage critical network functions. The project project serves as a blueprint for successfully navigating this transformation while maintaining the reliability and performance standards that the telecommunications industry demands.</p></div> <footer><ul class="stats"><li><a href="../index.html">Back to posts</a></li></ul></footer> </article> </div> <section id="sidebar"> <section> <div class="mini-posts"> <header><h3>Recent</h3></header> <ul>
+<li><a href="../posts/project--python-module-architecture-blog.html">Modern Python Module Architecture: Building Extensible Monitoring Applications</a> <span class=\"published\">Other</span></li>
+<li><a href="../posts/project--data-migration-blog.html">From Manual Chaos to Automated Excellence: A Data Migration Success Story</a> <span class=\"published\">Other</span></li>
+<li><a href="../posts/project--devops-automation-blog.html">Transforming SIM Management Through DevOps Automation: A Case Study</a> <span class=\"published\">DevOps</span></li>
+<li><a href="../posts/project--infrastructure-as-code-blog.html">Infrastructure as Code for Telecommunications: Automating Complex Deployments</a> <span class=\"published\">Infra</span></li>
+<li><a href="../posts/project--telecommunications-infrastructure-blog.html">Building Scalable SIM OTA Infrastructure: Managing Global Telecommunications Networks</a> <span class=\"published\">Infra</span></li> </ul> </div> </section> <section> <header><h3>About</h3></header> <p>Notes on telecom, infra, and automation.</p> </section> </section> <section id="footer"><p class="copyright">&copy; 2025</p></section> </div> <script src="../assets/js/jquery.min.js"></script> <script src="../assets/js/browser.min.js"></script> <script src="../assets/js/breakpoints.min.js"></script> <script src="../assets/js/util.js"></script> <script src="../assets/js/main.js"></script> </body>
+</html>

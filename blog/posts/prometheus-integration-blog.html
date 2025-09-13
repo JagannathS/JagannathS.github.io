@@ -1,0 +1,291 @@
+<!DOCTYPE HTML>
+<html> <head> <title>Mastering Prometheus Integration: From Batch Jobs to Production Monitoring - Future Imperfect</title> <meta charset="utf-8" /> <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no" /> <link rel="stylesheet" href="../assets/css/main.css" /> <link rel="stylesheet" href="../assets/css/codehilite.css" /> </head> <body class="single is-preload"> <div id="wrapper"> <header id="header"> <h1><a href="../index.html">Future Imperfect</a></h1> <nav class="links"></nav> </header> <div id="main"> <article class="post"> <header> <div class="title"><h2>Mastering Prometheus Integration: From Batch Jobs to Production Monitoring</h2><p>Prometheus has become the de facto standard for monitoring modern infrastructure, but integrating batch jobs and scheduled workflows presents unique challenges. This blog post explores advanced Prometheus integration patterns, focusing on the Pushgateway pattern for batch job monitoring and best practices for production deployments.</p></div> <div class="meta"><span class="published">Monitoring</span></div> </header> <div class="content markdown"><h1>Mastering Prometheus Integration: From Batch Jobs to Production Monitoring</h1>
+<h2>Introduction</h2>
+<p>Prometheus has become the de facto standard for monitoring modern infrastructure, but integrating batch jobs and scheduled workflows presents unique challenges. This blog post explores advanced Prometheus integration patterns, focusing on the Pushgateway pattern for batch job monitoring and best practices for production deployments.</p>
+<h2>Understanding Prometheus Architecture Patterns</h2>
+<h3>Pull vs Push: When to Use Each</h3>
+<p>Prometheus traditionally operates on a pull model, where the Prometheus server scrapes metrics from target applications. However, batch jobs and short-lived processes require a different approach.</p>
+<h4>Pull Model Limitations for Batch Jobs</h4>
+<ul>
+<li><strong>Ephemeral Nature</strong>: Batch jobs may complete before Prometheus can scrape them</li>
+<li><strong>Network Topology</strong>: Jobs behind firewalls or NAT may not be directly accessible</li>
+<li><strong>Scheduling Conflicts</strong>: Scrape intervals may not align with job execution windows</li>
+</ul>
+<h4>Push Model Benefits</h4>
+<ul>
+<li><strong>Job Lifecycle Independence</strong>: Metrics persist after job completion</li>
+<li><strong>Network Flexibility</strong>: Works in complex network environments</li>
+<li><strong>Batch Compatibility</strong>: Perfect for scheduled and ad-hoc jobs</li>
+</ul>
+<h2>Implementing Pushgateway Integration</h2>
+<h3>Basic Pushgateway Setup</h3>
+<p>The Pushgateway acts as an intermediary, receiving pushed metrics and exposing them for Prometheus to scrape:</p>
+<div class="codehilite"><pre><span></span><code><span class="c1"># Push metrics to Pushgateway</span>
+curl<span class="w"> </span>-X<span class="w"> </span>POST<span class="w"> </span><span class="se">\</span>
+<span class="w"> </span>-H<span class="w"> </span><span class="s2">&quot;Content-Type: text/plain&quot;</span><span class="w"> </span><span class="se">\</span>
+<span class="w"> </span>--data-binary<span class="w"> </span><span class="s2">&quot;metric_name value&quot;</span><span class="w"> </span><span class="se">\</span>
+<span class="w"> </span><span class="s2">&quot;http://pushgateway:9091/metrics/job/job_name&quot;</span>
+</code></pre></div> <h3>Advanced Integration Patterns</h3>
+<h4>Structured Metric Formatting</h4>
+<div class="codehilite"><pre><span></span><code><span class="nv">METRIC_DATA</span><span class="o">=</span><span class="s2">&quot;msisdn_stock_available{job=\&quot;</span><span class="nv">$JOB_NAME</span><span class="s2">\&quot;,instance=\&quot;</span><span class="nv">$INSTANCE_NAME</span><span class="s2">\&quot;} </span><span class="nv">$MSISDN_COUNT</span>
+<span class="s2">msisdn_last_updated{job=\&quot;</span><span class="nv">$JOB_NAME</span><span class="s2">\&quot;,instance=\&quot;</span><span class="nv">$INSTANCE_NAME</span><span class="s2">\&quot;} </span><span class="k">$(</span>date<span class="w"> </span>+%s<span class="k">)</span>
+<span class="s2">&quot;</span>
+</code></pre></div> <p>This approach demonstrates:
+- <strong>Multi-metric Payloads</strong>: Sending multiple related metrics in a single request
+- <strong>Timestamp Integration</strong>: Including execution timestamps for correlation
+- <strong>Label Consistency</strong>: Maintaining consistent labeling across metrics</p>
+<h4>Error Handling and Reliability</h4>
+<div class="codehilite"><pre><span></span><code><span class="nv">curl_response</span><span class="o">=</span><span class="k">$(</span>curl<span class="w"> </span>-X<span class="w"> </span>POST<span class="w"> </span><span class="se">\</span>
+<span class="w"> </span>-H<span class="w"> </span><span class="s2">&quot;Content-Type: text/plain&quot;</span><span class="w"> </span><span class="se">\</span>
+<span class="w"> </span>--data-binary<span class="w"> </span><span class="s2">&quot;</span><span class="nv">$METRIC_DATA</span><span class="s2">&quot;</span><span class="w"> </span><span class="se">\</span>
+<span class="w"> </span>--write-out<span class="w"> </span><span class="s2">&quot;%{http_code}&quot;</span><span class="w"> </span><span class="se">\</span>
+<span class="w"> </span>--silent<span class="w"> </span><span class="se">\</span>
+<span class="w"> </span>--output<span class="w"> </span>/dev/null<span class="w"> </span><span class="se">\</span>
+<span class="w"> </span><span class="s2">&quot;</span><span class="nv">$PUSHGATEWAY_URL</span><span class="s2">/metrics/job/</span><span class="nv">$JOB_NAME</span><span class="s2">/instance/</span><span class="nv">$INSTANCE_NAME</span><span class="s2">&quot;</span><span class="k">)</span> <span class="k">if</span><span class="w"> </span><span class="o">[</span><span class="w"> </span><span class="s2">&quot;</span><span class="nv">$curl_response</span><span class="s2">&quot;</span><span class="w"> </span>-eq<span class="w"> </span><span class="m">200</span><span class="w"> </span><span class="o">]</span><span class="p">;</span><span class="w"> </span><span class="k">then</span>
+<span class="w"> </span><span class="nb">echo</span><span class="w"> </span><span class="s2">&quot;✅ Successfully pushed metrics to Prometheus Gateway&quot;</span>
+<span class="k">else</span>
+<span class="w"> </span><span class="nb">echo</span><span class="w"> </span><span class="s2">&quot;❌ Failed to push metrics (HTTP </span><span class="nv">$curl_response</span><span class="s2">)&quot;</span>
+<span class="w"> </span><span class="nb">exit</span><span class="w"> </span><span class="m">1</span>
+<span class="k">fi</span>
+</code></pre></div> <p>Robust error handling ensures:
+- <strong>HTTP Status Validation</strong>: Verifying successful metric delivery
+- <strong>Graceful Failure</strong>: Appropriate error messages and exit codes
+- <strong>Monitoring Health</strong>: Ability to monitor the monitoring system itself</p>
+<h2>Metric Design Best Practices</h2>
+<h3>Naming Conventions</h3>
+<h4>Meaningful Names</h4>
+<div class="codehilite"><pre><span></span><code><span class="gh">#</span> Good
+msisdn_stock_available
+http_requests_duration_seconds
+database_connections_active <span class="gh">#</span> Bad
+stock
+requests
+connections
+</code></pre></div> <h4>Unit Specification</h4>
+<div class="codehilite"><pre><span></span><code><span class="gh">#</span> Time-based metrics
+response_time_seconds
+process_uptime_seconds <span class="gh">#</span> Count-based metrics
+items_processed_total
+errors_count <span class="gh">#</span> Gauge metrics
+memory_usage_bytes
+cpu_utilization_percent
+</code></pre></div> <h3>Label Strategy</h3>
+<h4>Consistent Labeling</h4>
+<div class="codehilite"><pre><span></span><code><span class="n">msisdn_stock_available</span><span class="p">{</span>
+<span class="w"> </span><span class="n">job</span><span class="o">=</span><span class="s">&quot;msisdn_stock_monitor&quot;</span><span class="p">,</span>
+<span class="w"> </span><span class="n">instance</span><span class="o">=</span><span class="s">&quot;wireless_fulfillment_scripts&quot;</span><span class="p">,</span>
+<span class="w"> </span><span class="n">environment</span><span class="o">=</span><span class="s">&quot;production&quot;</span><span class="p">,</span>
+<span class="w"> </span><span class="n">region</span><span class="o">=</span><span class="s">&quot;us-east-1&quot;</span>
+<span class="p">}</span>
+</code></pre></div> <h4>Label Cardinality Management</h4>
+<div class="codehilite"><pre><span></span><code><span class="c1"># Good - Low cardinality</span>
+<span class="nv">labels</span><span class="o">=</span><span class="s2">&quot;job=\&quot;</span><span class="nv">$JOB_NAME</span><span class="s2">\&quot;,instance=\&quot;</span><span class="nv">$INSTANCE_NAME</span><span class="s2">\&quot;,environment=\&quot;</span><span class="nv">$ENV</span><span class="s2">\&quot;&quot;</span> <span class="c1"># Bad - High cardinality (avoid user_id, session_id, etc.)</span>
+<span class="nv">labels</span><span class="o">=</span><span class="s2">&quot;job=\&quot;</span><span class="nv">$JOB_NAME</span><span class="s2">\&quot;,user_id=\&quot;</span><span class="nv">$USER_ID</span><span class="s2">\&quot;,session=\&quot;</span><span class="nv">$SESSION</span><span class="s2">\&quot;&quot;</span>
+</code></pre></div> <p>High cardinality labels can overwhelm Prometheus and should be avoided.</p>
+<h2>Production Integration Patterns</h2>
+<h3>Environment-Specific Configuration</h3>
+<div class="codehilite"><pre><span></span><code><span class="c1"># Environment-based Pushgateway selection</span>
+<span class="k">case</span><span class="w"> </span><span class="s2">&quot;</span><span class="nv">$ENVIRONMENT</span><span class="s2">&quot;</span><span class="w"> </span><span class="k">in</span>
+<span class="w"> </span><span class="s2">&quot;production&quot;</span><span class="o">)</span>
+<span class="w"> </span><span class="nv">PUSHGATEWAY_URL</span><span class="o">=</span><span class="s2">&quot;https://pushgateway.prod.company.com:9091&quot;</span>
+<span class="w"> </span><span class="p">;;</span>
+<span class="w"> </span><span class="s2">&quot;staging&quot;</span><span class="o">)</span>
+<span class="w"> </span><span class="nv">PUSHGATEWAY_URL</span><span class="o">=</span><span class="s2">&quot;https://pushgateway.staging.company.com:9091&quot;</span>
+<span class="w"> </span><span class="p">;;</span>
+<span class="w"> </span><span class="s2">&quot;development&quot;</span><span class="o">)</span>
+<span class="w"> </span><span class="nv">PUSHGATEWAY_URL</span><span class="o">=</span><span class="s2">&quot;https://pushgateway.dev.company.com:9091&quot;</span>
+<span class="w"> </span><span class="p">;;</span>
+<span class="k">esac</span>
+</code></pre></div> <h3>Authentication and Security</h3>
+<h4>API Token Authentication</h4>
+<div class="codehilite"><pre><span></span><code>curl<span class="w"> </span>-X<span class="w"> </span>POST<span class="w"> </span><span class="se">\</span>
+<span class="w"> </span>-H<span class="w"> </span><span class="s2">&quot;Content-Type: text/plain&quot;</span><span class="w"> </span><span class="se">\</span>
+<span class="w"> </span>-H<span class="w"> </span><span class="s2">&quot;Authorization: Bearer &lt;REDACTED&gt;</span>
+<span class="s2"> --data-binary &quot;</span><span class="nv">$METRIC_DATA</span><span class="s2">&quot; \</span>
+<span class="s2"> &quot;</span><span class="nv">$PUSHGATEWAY_URL</span>/metrics/job/<span class="nv">$JOB_NAME</span><span class="s2">&quot;</span>
+</code></pre></div> <h4>TLS Configuration</h4>
+<div class="codehilite"><pre><span></span><code>curl<span class="w"> </span>-X<span class="w"> </span>POST<span class="w"> </span><span class="se">\</span>
+<span class="w"> </span>--cacert<span class="w"> </span>/path/to/ca-bundle.crt<span class="w"> </span><span class="se">\</span>
+<span class="w"> </span>--cert<span class="w"> </span>/path/to/client.crt<span class="w"> </span><span class="se">\</span>
+<span class="w"> </span>--key<span class="w"> </span>/path/to/client.key<span class="w"> </span><span class="se">\</span>
+<span class="w"> </span>-H<span class="w"> </span><span class="s2">&quot;Content-Type: text/plain&quot;</span><span class="w"> </span><span class="se">\</span>
+<span class="w"> </span>--data-binary<span class="w"> </span><span class="s2">&quot;</span><span class="nv">$METRIC_DATA</span><span class="s2">&quot;</span><span class="w"> </span><span class="se">\</span>
+<span class="w"> </span><span class="s2">&quot;</span><span class="nv">$PUSHGATEWAY_URL</span><span class="s2">/metrics/job/</span><span class="nv">$JOB_NAME</span><span class="s2">&quot;</span>
+</code></pre></div> <h3>Metric Lifecycle Management</h3>
+<h4>Metric Cleanup</h4>
+<div class="codehilite"><pre><span></span><code><span class="c1"># Delete metrics for completed job</span>
+curl<span class="w"> </span>-X<span class="w"> </span>DELETE<span class="w"> </span><span class="se">\</span>
+<span class="w"> </span><span class="s2">&quot;</span><span class="nv">$PUSHGATEWAY_URL</span><span class="s2">/metrics/job/</span><span class="nv">$JOB_NAME</span><span class="s2">/instance/</span><span class="nv">$INSTANCE_NAME</span><span class="s2">&quot;</span>
+</code></pre></div> <h4>Metric Grouping</h4>
+<div class="codehilite"><pre><span></span><code><span class="c1"># Group related metrics by instance</span>
+curl<span class="w"> </span>-X<span class="w"> </span>POST<span class="w"> </span><span class="se">\</span>
+<span class="w"> </span>-H<span class="w"> </span><span class="s2">&quot;Content-Type: text/plain&quot;</span><span class="w"> </span><span class="se">\</span>
+<span class="w"> </span>--data-binary<span class="w"> </span><span class="s2">&quot;</span><span class="nv">$METRIC_DATA</span><span class="s2">&quot;</span><span class="w"> </span><span class="se">\</span>
+<span class="w"> </span><span class="s2">&quot;</span><span class="nv">$PUSHGATEWAY_URL</span><span class="s2">/metrics/job/</span><span class="nv">$JOB_NAME</span><span class="s2">/instance/</span><span class="nv">$INSTANCE_NAME</span><span class="s2">&quot;</span>
+</code></pre></div> <h2>Advanced Monitoring Patterns</h2>
+<h3>Composite Metrics</h3>
+<div class="codehilite"><pre><span></span><code><span class="c1"># Calculate and push derived metrics</span>
+<span class="nv">SUCCESS_RATE</span><span class="o">=</span><span class="k">$(</span><span class="nb">echo</span><span class="w"> </span><span class="s2">&quot;scale=2; </span><span class="nv">$SUCCESSFUL_OPERATIONS</span><span class="s2"> * 100 / </span><span class="nv">$TOTAL_OPERATIONS</span><span class="s2">&quot;</span><span class="w"> </span><span class="p">|</span><span class="w"> </span>bc<span class="k">)</span> <span class="nv">METRIC_DATA</span><span class="o">=</span><span class="s2">&quot;</span>
+<span class="s2">job_success_rate{job=\&quot;</span><span class="nv">$JOB_NAME</span><span class="s2">\&quot;} </span><span class="nv">$SUCCESS_RATE</span>
+<span class="s2">job_operations_successful{job=\&quot;</span><span class="nv">$JOB_NAME</span><span class="s2">\&quot;} </span><span class="nv">$SUCCESSFUL_OPERATIONS</span><span class="s2"> </span>
+<span class="s2">job_operations_total{job=\&quot;</span><span class="nv">$JOB_NAME</span><span class="s2">\&quot;} </span><span class="nv">$TOTAL_OPERATIONS</span>
+<span class="s2">job_duration_seconds{job=\&quot;</span><span class="nv">$JOB_NAME</span><span class="s2">\&quot;} </span><span class="nv">$JOB_DURATION</span>
+<span class="s2">&quot;</span>
+</code></pre></div> <h3>Histogram Metrics for Batch Jobs</h3>
+<div class="codehilite"><pre><span></span><code><span class="c1"># Custom histogram implementation for batch processing</span>
+<span class="nb">declare</span><span class="w"> </span>-A<span class="w"> </span>histogram_buckets
+histogram_buckets<span class="o">[</span><span class="s2">&quot;le_1&quot;</span><span class="o">]=</span><span class="m">0</span>
+histogram_buckets<span class="o">[</span><span class="s2">&quot;le_5&quot;</span><span class="o">]=</span><span class="m">0</span>
+histogram_buckets<span class="o">[</span><span class="s2">&quot;le_10&quot;</span><span class="o">]=</span><span class="m">0</span>
+histogram_buckets<span class="o">[</span><span class="s2">&quot;le_inf&quot;</span><span class="o">]=</span><span class="m">0</span> <span class="c1"># Process items and populate buckets</span>
+<span class="k">for</span><span class="w"> </span>duration<span class="w"> </span><span class="k">in</span><span class="w"> </span><span class="nv">$processing_times</span><span class="p">;</span><span class="w"> </span><span class="k">do</span>
+<span class="w"> </span><span class="k">if</span><span class="w"> </span><span class="o">[</span><span class="w"> </span><span class="s2">&quot;</span><span class="nv">$duration</span><span class="s2">&quot;</span><span class="w"> </span>-le<span class="w"> </span><span class="m">1</span><span class="w"> </span><span class="o">]</span><span class="p">;</span><span class="w"> </span><span class="k">then</span>
+<span class="w"> </span><span class="o">((</span>histogram_buckets<span class="o">[</span><span class="s2">&quot;le_1&quot;</span><span class="o">]</span>++<span class="o">))</span>
+<span class="w"> </span><span class="k">elif</span><span class="w"> </span><span class="o">[</span><span class="w"> </span><span class="s2">&quot;</span><span class="nv">$duration</span><span class="s2">&quot;</span><span class="w"> </span>-le<span class="w"> </span><span class="m">5</span><span class="w"> </span><span class="o">]</span><span class="p">;</span><span class="w"> </span><span class="k">then</span>
+<span class="w"> </span><span class="o">((</span>histogram_buckets<span class="o">[</span><span class="s2">&quot;le_5&quot;</span><span class="o">]</span>++<span class="o">))</span>
+<span class="w"> </span><span class="k">elif</span><span class="w"> </span><span class="o">[</span><span class="w"> </span><span class="s2">&quot;</span><span class="nv">$duration</span><span class="s2">&quot;</span><span class="w"> </span>-le<span class="w"> </span><span class="m">10</span><span class="w"> </span><span class="o">]</span><span class="p">;</span><span class="w"> </span><span class="k">then</span>
+<span class="w"> </span><span class="o">((</span>histogram_buckets<span class="o">[</span><span class="s2">&quot;le_10&quot;</span><span class="o">]</span>++<span class="o">))</span>
+<span class="w"> </span><span class="k">fi</span>
+<span class="w"> </span><span class="o">((</span>histogram_buckets<span class="o">[</span><span class="s2">&quot;le_inf&quot;</span><span class="o">]</span>++<span class="o">))</span>
+<span class="k">done</span> <span class="c1"># Push histogram data</span>
+<span class="nv">HISTOGRAM_DATA</span><span class="o">=</span><span class="s2">&quot;</span>
+<span class="s2">processing_duration_seconds_bucket{le=\&quot;1\&quot;} </span><span class="si">${</span><span class="nv">histogram_buckets</span><span class="p">[</span><span class="s2">&quot;le_1&quot;</span><span class="p">]</span><span class="si">}</span>
+<span class="s2">processing_duration_seconds_bucket{le=\&quot;5\&quot;} </span><span class="si">${</span><span class="nv">histogram_buckets</span><span class="p">[</span><span class="s2">&quot;le_5&quot;</span><span class="p">]</span><span class="si">}</span>
+<span class="s2">processing_duration_seconds_bucket{le=\&quot;10\&quot;} </span><span class="si">${</span><span class="nv">histogram_buckets</span><span class="p">[</span><span class="s2">&quot;le_10&quot;</span><span class="p">]</span><span class="si">}</span>
+<span class="s2">processing_duration_seconds_bucket{le=\&quot;+Inf\&quot;} </span><span class="si">${</span><span class="nv">histogram_buckets</span><span class="p">[</span><span class="s2">&quot;le_inf&quot;</span><span class="p">]</span><span class="si">}</span>
+<span class="s2">processing_duration_seconds_count </span><span class="si">${</span><span class="nv">histogram_buckets</span><span class="p">[</span><span class="s2">&quot;le_inf&quot;</span><span class="p">]</span><span class="si">}</span>
+<span class="s2">processing_duration_seconds_sum </span><span class="nv">$total_processing_time</span>
+<span class="s2">&quot;</span>
+</code></pre></div> <h2>Operational Excellence</h2>
+<h3>Health Check Integration</h3>
+<div class="codehilite"><pre><span></span><code><span class="c1"># Include health check metrics</span>
+<span class="nv">HEALTH_STATUS</span><span class="o">=</span><span class="m">1</span><span class="w"> </span><span class="c1"># 1 for healthy, 0 for unhealthy</span> <span class="k">if</span><span class="w"> </span>!<span class="w"> </span>check_dependency_health<span class="p">;</span><span class="w"> </span><span class="k">then</span>
+<span class="w"> </span><span class="nv">HEALTH_STATUS</span><span class="o">=</span><span class="m">0</span>
+<span class="k">fi</span> <span class="nv">METRIC_DATA</span><span class="o">=</span><span class="s2">&quot;</span><span class="nv">$METRIC_DATA</span>
+<span class="s2">job_health_status{job=\&quot;</span><span class="nv">$JOB_NAME</span><span class="s2">\&quot;} </span><span class="nv">$HEALTH_STATUS</span>
+<span class="s2">&quot;</span>
+</code></pre></div> <h3>Performance Monitoring</h3>
+<div class="codehilite"><pre><span></span><code><span class="c1"># Track job performance metrics</span>
+<span class="nv">START_TIME</span><span class="o">=</span><span class="k">$(</span>date<span class="w"> </span>+%s<span class="k">)</span> <span class="c1"># ... job execution ...</span> <span class="nv">END_TIME</span><span class="o">=</span><span class="k">$(</span>date<span class="w"> </span>+%s<span class="k">)</span>
+<span class="nv">DURATION</span><span class="o">=</span><span class="k">$((</span><span class="nv">END_TIME</span><span class="w"> </span><span class="o">-</span><span class="w"> </span><span class="nv">START_TIME</span><span class="k">))</span> <span class="nv">METRIC_DATA</span><span class="o">=</span><span class="s2">&quot;</span><span class="nv">$METRIC_DATA</span>
+<span class="s2">job_execution_duration_seconds{job=\&quot;</span><span class="nv">$JOB_NAME</span><span class="s2">\&quot;} </span><span class="nv">$DURATION</span>
+<span class="s2">job_last_execution_timestamp{job=\&quot;</span><span class="nv">$JOB_NAME</span><span class="s2">\&quot;} </span><span class="nv">$END_TIME</span>
+<span class="s2">&quot;</span>
+</code></pre></div> <h3>Resource Usage Tracking</h3>
+<div class="codehilite"><pre><span></span><code><span class="c1"># Memory and CPU usage tracking</span>
+<span class="nv">MEMORY_USAGE</span><span class="o">=</span><span class="k">$(</span>ps<span class="w"> </span>-o<span class="w"> </span>pid,vsz,rss<span class="w"> </span>-p<span class="w"> </span><span class="nv">$$</span><span class="w"> </span><span class="p">|</span><span class="w"> </span>tail<span class="w"> </span>-1<span class="w"> </span><span class="p">|</span><span class="w"> </span>awk<span class="w"> </span><span class="s1">&#39;{print $3}&#39;</span><span class="k">)</span>
+<span class="nv">CPU_USAGE</span><span class="o">=</span><span class="k">$(</span>ps<span class="w"> </span>-o<span class="w"> </span>pid,pcpu<span class="w"> </span>-p<span class="w"> </span><span class="nv">$$</span><span class="w"> </span><span class="p">|</span><span class="w"> </span>tail<span class="w"> </span>-1<span class="w"> </span><span class="p">|</span><span class="w"> </span>awk<span class="w"> </span><span class="s1">&#39;{print $2}&#39;</span><span class="k">)</span> <span class="nv">METRIC_DATA</span><span class="o">=</span><span class="s2">&quot;</span><span class="nv">$METRIC_DATA</span>
+<span class="s2">job_memory_usage_kb{job=\&quot;</span><span class="nv">$JOB_NAME</span><span class="s2">\&quot;} </span><span class="nv">$MEMORY_USAGE</span>
+<span class="s2">job_cpu_usage_percent{job=\&quot;</span><span class="nv">$JOB_NAME</span><span class="s2">\&quot;} </span><span class="nv">$CPU_USAGE</span>
+<span class="s2">&quot;</span>
+</code></pre></div> <h2>Alerting Integration</h2>
+<h3>Threshold-Based Alerts</h3>
+<div class="codehilite"><pre><span></span><code><span class="c1"># Prometheus alerting rule</span>
+<span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">alert</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">MSISDNStockLow</span>
+<span class="w"> </span><span class="nt">expr</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">msisdn_stock_available &lt; 1000</span>
+<span class="w"> </span><span class="nt">for</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">5m</span>
+<span class="w"> </span><span class="nt">labels</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">severity</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">warning</span>
+<span class="w"> </span><span class="nt">service</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">msisdn_management</span>
+<span class="w"> </span><span class="nt">annotations</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">summary</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;MSISDN</span><span class="nv"> </span><span class="s">stock</span><span class="nv"> </span><span class="s">is</span><span class="nv"> </span><span class="s">running</span><span class="nv"> </span><span class="s">low&quot;</span>
+<span class="w"> </span><span class="nt">description</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;Available</span><span class="nv"> </span><span class="s">MSISDN</span><span class="nv"> </span><span class="s">count</span><span class="nv"> </span><span class="s">is</span><span class="nv"> </span><span class="s">{{</span><span class="nv"> </span><span class="s">$value</span><span class="nv"> </span><span class="s">}},</span><span class="nv"> </span><span class="s">below</span><span class="nv"> </span><span class="s">threshold</span><span class="nv"> </span><span class="s">of</span><span class="nv"> </span><span class="s">1000&quot;</span>
+</code></pre></div> <h3>Job Failure Detection</h3>
+<div class="codehilite"><pre><span></span><code><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">alert</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">BatchJobFailed</span>
+<span class="w"> </span><span class="nt">expr</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">time() - job_last_execution_timestamp &gt; 86400</span>
+<span class="w"> </span><span class="nt">for</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">10m</span>
+<span class="w"> </span><span class="nt">labels</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">severity</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">critical</span>
+<span class="w"> </span><span class="nt">service</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">batch_processing</span>
+<span class="w"> </span><span class="nt">annotations</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">summary</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;Batch</span><span class="nv"> </span><span class="s">job</span><span class="nv"> </span><span class="s">has</span><span class="nv"> </span><span class="s">not</span><span class="nv"> </span><span class="s">run</span><span class="nv"> </span><span class="s">successfully</span><span class="nv"> </span><span class="s">in</span><span class="nv"> </span><span class="s">24</span><span class="nv"> </span><span class="s">hours&quot;</span>
+<span class="w"> </span><span class="nt">description</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;Job</span><span class="nv"> </span><span class="s">{{</span><span class="nv"> </span><span class="s">$labels.job</span><span class="nv"> </span><span class="s">}}</span><span class="nv"> </span><span class="s">last</span><span class="nv"> </span><span class="s">successful</span><span class="nv"> </span><span class="s">execution</span><span class="nv"> </span><span class="s">was</span><span class="nv"> </span><span class="s">{{</span><span class="nv"> </span><span class="s">$value</span><span class="nv"> </span><span class="s">}}</span><span class="nv"> </span><span class="s">seconds</span><span class="nv"> </span><span class="s">ago&quot;</span>
+</code></pre></div> <h2>Grafana Dashboard Integration</h2>
+<h3>Dashboard Design Patterns</h3>
+<h4>Time-series Visualization</h4>
+<div class="codehilite"><pre><span></span><code><span class="o">#</span><span class="w"> </span><span class="n">PromQL</span><span class="w"> </span><span class="k">for</span><span class="w"> </span><span class="n">stock</span><span class="w"> </span><span class="n">levels</span><span class="w"> </span><span class="n">over</span><span class="w"> </span><span class="k">time</span>
+<span class="n">msisdn_stock_available</span><span class="err">{</span><span class="n">job</span><span class="o">=</span><span class="ss">&quot;msisdn_stock_monitor&quot;</span><span class="err">}</span>
+</code></pre></div> <h4>Success Rate Calculation</h4>
+<div class="codehilite"><pre><span></span><code><span class="o">#</span><span class="w"> </span><span class="n">Calculate</span><span class="w"> </span><span class="n">success</span><span class="w"> </span><span class="n">rate</span>
+<span class="n">rate</span><span class="p">(</span><span class="n">job_operations_successful</span><span class="p">[</span><span class="mi">5</span><span class="n">m</span><span class="p">])</span><span class="w"> </span><span class="o">/</span><span class="w"> </span><span class="n">rate</span><span class="p">(</span><span class="n">job_operations_total</span><span class="p">[</span><span class="mi">5</span><span class="n">m</span><span class="p">])</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="mi">100</span>
+</code></pre></div> <h4>Performance Trends</h4>
+<div class="codehilite"><pre><span></span><code><span class="o">#</span><span class="w"> </span><span class="n">Average</span><span class="w"> </span><span class="n">job</span><span class="w"> </span><span class="n">duration</span><span class="w"> </span><span class="n">over</span><span class="w"> </span><span class="k">time</span>
+<span class="n">avg_over_time</span><span class="p">(</span><span class="n">job_execution_duration_seconds</span><span class="p">[</span><span class="mi">1</span><span class="n">h</span><span class="p">])</span>
+</code></pre></div> <h3>Multi-dimensional Analysis</h3>
+<div class="codehilite"><pre><span></span><code><span class="o">#</span><span class="w"> </span><span class="n">Stock</span><span class="w"> </span><span class="n">levels</span><span class="w"> </span><span class="k">by</span><span class="w"> </span><span class="n">region</span>
+<span class="k">sum</span><span class="w"> </span><span class="k">by</span><span class="w"> </span><span class="p">(</span><span class="n">region</span><span class="p">)</span><span class="w"> </span><span class="p">(</span><span class="n">msisdn_stock_available</span><span class="p">)</span> <span class="o">#</span><span class="w"> </span><span class="n">Success</span><span class="w"> </span><span class="n">rates</span><span class="w"> </span><span class="k">by</span><span class="w"> </span><span class="n">environment</span>
+<span class="k">avg</span><span class="w"> </span><span class="k">by</span><span class="w"> </span><span class="p">(</span><span class="n">environment</span><span class="p">)</span><span class="w"> </span><span class="p">(</span><span class="n">job_success_rate</span><span class="p">)</span>
+</code></pre></div> <h2>Troubleshooting Common Issues</h2>
+<h3>Metric Retention</h3>
+<h4>Pushgateway Cleanup</h4>
+<div class="codehilite"><pre><span></span><code><span class="c1"># Regular cleanup of stale metrics</span>
+curl<span class="w"> </span>-X<span class="w"> </span>DELETE<span class="w"> </span><span class="s2">&quot;</span><span class="nv">$PUSHGATEWAY_URL</span><span class="s2">/metrics/job/</span><span class="nv">$OLD_JOB_NAME</span><span class="s2">&quot;</span>
+</code></pre></div> <h4>Prometheus Configuration</h4>
+<div class="codehilite"><pre><span></span><code><span class="c1"># prometheus.yml</span>
+<span class="nt">global</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">scrape_interval</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">15s</span>
+<span class="w"> </span><span class="nt">evaluation_interval</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">15s</span> <span class="nt">scrape_configs</span><span class="p">:</span>
+<span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">job_name</span><span class="p">:</span><span class="w"> </span><span class="s">&#39;pushgateway&#39;</span>
+<span class="w"> </span><span class="nt">static_configs</span><span class="p">:</span>
+<span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">targets</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="s">&#39;pushgateway:9091&#39;</span><span class="p p-Indicator">]</span>
+<span class="w"> </span><span class="nt">scrape_interval</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">5s</span>
+<span class="w"> </span><span class="nt">metrics_path</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">/metrics</span>
+</code></pre></div> <h3>Network and Connectivity Issues</h3>
+<h4>Retry Logic</h4>
+<div class="codehilite"><pre><span></span><code><span class="nv">retry_count</span><span class="o">=</span><span class="m">0</span>
+<span class="nv">max_retries</span><span class="o">=</span><span class="m">3</span> <span class="k">while</span><span class="w"> </span><span class="o">[</span><span class="w"> </span><span class="nv">$retry_count</span><span class="w"> </span>-lt<span class="w"> </span><span class="nv">$max_retries</span><span class="w"> </span><span class="o">]</span><span class="p">;</span><span class="w"> </span><span class="k">do</span>
+<span class="w"> </span><span class="k">if</span><span class="w"> </span>curl<span class="w"> </span>-X<span class="w"> </span>POST<span class="w"> </span><span class="s2">&quot;</span><span class="nv">$PUSHGATEWAY_URL</span><span class="s2">/metrics/job/</span><span class="nv">$JOB_NAME</span><span class="s2">&quot;</span><span class="w"> </span><span class="se">\</span>
+<span class="w"> </span>-H<span class="w"> </span><span class="s2">&quot;Content-Type: text/plain&quot;</span><span class="w"> </span><span class="se">\</span>
+<span class="w"> </span>--data-binary<span class="w"> </span><span class="s2">&quot;</span><span class="nv">$METRIC_DATA</span><span class="s2">&quot;</span><span class="p">;</span><span class="w"> </span><span class="k">then</span>
+<span class="w"> </span><span class="k">break</span>
+<span class="w"> </span><span class="k">fi</span> <span class="w"> </span><span class="o">((</span>retry_count++<span class="o">))</span>
+<span class="w"> </span>sleep<span class="w"> </span><span class="k">$((</span><span class="nv">retry_count</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="m">2</span><span class="k">))</span><span class="w"> </span><span class="c1"># Exponential backoff</span>
+<span class="k">done</span>
+</code></pre></div> <h4>Connection Validation</h4>
+<div class="codehilite"><pre><span></span><code><span class="c1"># Validate connectivity before pushing metrics</span>
+<span class="k">if</span><span class="w"> </span>!<span class="w"> </span>curl<span class="w"> </span>-s<span class="w"> </span>--head<span class="w"> </span><span class="s2">&quot;</span><span class="nv">$PUSHGATEWAY_URL</span><span class="s2">&quot;</span><span class="w"> </span>&gt;<span class="w"> </span>/dev/null<span class="p">;</span><span class="w"> </span><span class="k">then</span>
+<span class="w"> </span><span class="nb">echo</span><span class="w"> </span><span class="s2">&quot;Cannot connect to Pushgateway at </span><span class="nv">$PUSHGATEWAY_URL</span><span class="s2">&quot;</span>
+<span class="w"> </span><span class="nb">exit</span><span class="w"> </span><span class="m">1</span>
+<span class="k">fi</span>
+</code></pre></div> <h2>Performance Optimization</h2>
+<h3>Batch Processing</h3>
+<div class="codehilite"><pre><span></span><code><span class="c1"># Batch multiple metrics in single request</span>
+<span class="nv">METRIC_BATCH</span><span class="o">=</span><span class="s2">&quot;&quot;</span>
+<span class="k">for</span><span class="w"> </span>metric<span class="w"> </span><span class="k">in</span><span class="w"> </span><span class="s2">&quot;</span><span class="si">${</span><span class="nv">metrics</span><span class="p">[@]</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">;</span><span class="w"> </span><span class="k">do</span>
+<span class="w"> </span><span class="nv">METRIC_BATCH</span><span class="o">=</span><span class="s2">&quot;</span><span class="nv">$METRIC_BATCH$metric</span><span class="s2">&quot;</span><span class="s1">$&#39;\n&#39;</span>
+<span class="k">done</span> curl<span class="w"> </span>-X<span class="w"> </span>POST<span class="w"> </span><span class="se">\</span>
+<span class="w"> </span>-H<span class="w"> </span><span class="s2">&quot;Content-Type: text/plain&quot;</span><span class="w"> </span><span class="se">\</span>
+<span class="w"> </span>--data-binary<span class="w"> </span><span class="s2">&quot;</span><span class="nv">$METRIC_BATCH</span><span class="s2">&quot;</span><span class="w"> </span><span class="se">\</span>
+<span class="w"> </span><span class="s2">&quot;</span><span class="nv">$PUSHGATEWAY_URL</span><span class="s2">/metrics/job/</span><span class="nv">$JOB_NAME</span><span class="s2">&quot;</span>
+</code></pre></div> <h3>Compression</h3>
+<div class="codehilite"><pre><span></span><code><span class="c1"># Use gzip compression for large metric payloads</span>
+curl<span class="w"> </span>-X<span class="w"> </span>POST<span class="w"> </span><span class="se">\</span>
+<span class="w"> </span>-H<span class="w"> </span><span class="s2">&quot;Content-Type: text/plain&quot;</span><span class="w"> </span><span class="se">\</span>
+<span class="w"> </span>-H<span class="w"> </span><span class="s2">&quot;Content-Encoding: gzip&quot;</span><span class="w"> </span><span class="se">\</span>
+<span class="w"> </span>--data-binary<span class="w"> </span>@&lt;<span class="o">(</span><span class="nb">echo</span><span class="w"> </span><span class="s2">&quot;</span><span class="nv">$METRIC_DATA</span><span class="s2">&quot;</span><span class="w"> </span><span class="p">|</span><span class="w"> </span>gzip<span class="o">)</span><span class="w"> </span><span class="se">\</span>
+<span class="w"> </span><span class="s2">&quot;</span><span class="nv">$PUSHGATEWAY_URL</span><span class="s2">/metrics/job/</span><span class="nv">$JOB_NAME</span><span class="s2">&quot;</span>
+</code></pre></div> <h2>Conclusion</h2>
+<p>Effective Prometheus integration requires understanding both the technical implementation details and the operational patterns that ensure reliable monitoring. The Pushgateway pattern enables monitoring of batch jobs and scheduled workflows while maintaining the benefits of Prometheus's powerful querying and alerting capabilities.</p>
+<p>Key success factors include:</p>
+<ol>
+<li><strong>Proper Metric Design</strong>: Meaningful names, consistent labels, and appropriate metric types</li>
+<li><strong>Robust Integration</strong>: Error handling, retry logic, and health checking</li>
+<li><strong>Security Implementation</strong>: Authentication, encryption, and access controls</li>
+<li><strong>Operational Excellence</strong>: Cleanup procedures, performance optimization, and troubleshooting</li>
+</ol>
+<p>By following these patterns and practices, organizations can build reliable, scalable monitoring systems that provide deep visibility into batch job performance and infrastructure health.</p>
+<h2>Technical Summary</h2>
+<ul>
+<li><strong>Pushgateway Integration</strong>: Proper use of push patterns for batch job monitoring</li>
+<li><strong>Metric Design</strong>: Best practices for naming, labeling, and structuring metrics</li>
+<li><strong>Error Handling</strong>: Robust error detection and retry mechanisms</li>
+<li><strong>Security</strong>: Authentication, TLS, and access control implementation</li>
+<li><strong>Performance</strong>: Optimization techniques for large-scale deployments</li>
+<li><strong>Operations</strong>: Monitoring, alerting, and troubleshooting strategies</li>
+</ul></div> <footer><ul class="stats"><li><a href="../index.html">Back to posts</a></li></ul></footer> </article> </div> <section id="sidebar"> <section> <div class="mini-posts"> <header><h3>Recent</h3></header> <ul>
+<li><a href="../posts/project--infrastructure-automation-blog.html">Building Production-Scale Telecommunications Infrastructure: A Deep Dive into EPC Automation</a> <span class=\"published\">Infra</span></li>
+<li><a href="../posts/project--network-visualization-blog.html">Visualizing Complex Network Topologies: From Chaos to Clarity</a> <span class=\"published\">Infra</span></li>
+<li><a href="../posts/project--cicd-automation-blog.html">Automating Critical Infrastructure Monitoring with GitHub Actions: A Telecommunications Case Study</a> <span class=\"published\">DevOps</span></li>
+<li><a href="../posts/project--telecommunications-infrastructure-blog.html">Building Robust Telecommunications Infrastructure: A Deep Dive into MSISDN Management and SIM Provisioning</a> <span class=\"published\">Infra</span></li>
+<li><a href="../posts/project-new--devops-automation-blog.html">DevOps Automation in Telecommunications: Building Resilient Monitoring Workflows with GitHub Actions</a> <span class=\"published\">DevOps</span></li> </ul> </div> </section> <section> <header><h3>About</h3></header> <p>Notes on telecom, infra, and automation.</p> </section> </section> <section id="footer"><p class="copyright">&copy; 2025</p></section> </div> <script src="../assets/js/jquery.min.js"></script> <script src="../assets/js/browser.min.js"></script> <script src="../assets/js/breakpoints.min.js"></script> <script src="../assets/js/util.js"></script> <script src="../assets/js/main.js"></script> </body>
+</html>

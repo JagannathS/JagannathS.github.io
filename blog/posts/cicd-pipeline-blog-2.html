@@ -1,0 +1,631 @@
+<!DOCTYPE HTML>
+<html> <head> <title>Building Rock-Solid CI/CD Pipelines for Mission-Critical Telecommunications Infrastructure - Future Imperfect</title> <meta charset="utf-8" /> <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no" /> <link rel="stylesheet" href="../assets/css/main.css" /> <link rel="stylesheet" href="../assets/css/codehilite.css" /> </head> <body class="single is-preload"> <div id="wrapper"> <header id="header"> <h1><a href="../index.html">Future Imperfect</a></h1> <nav class="links"></nav> </header> <div id="main"> <article class="post"> <header> <div class="title"><h2>Building Rock-Solid CI/CD Pipelines for Mission-Critical Telecommunications Infrastructure</h2><p>When your code powers voice calls for millions of users, there&#x27;s no room for deployment failures. Recently, I designed and implemented a comprehensive CI/CD pipeline for a production VoLTE IMS (IP Multimedia Subsystem) that required the highest levels of reliability, security, and performance.</p></div> <div class="meta"><span class="published">DevOps</span></div> </header> <div class="content markdown"><h1>Building Rock-Solid CI/CD Pipelines for Mission-Critical Telecommunications Infrastructure</h1>
+<h2>Introduction</h2>
+<p>When your code powers voice calls for millions of users, there's no room for deployment failures. Recently, I designed and implemented a comprehensive CI/CD pipeline for a production VoLTE IMS (IP Multimedia Subsystem) that required the highest levels of reliability, security, and performance.</p>
+<p>This wasn't just about automating deployments – it was about building a pipeline that could handle the unique challenges of telecommunications infrastructure: complex dependencies, rigorous security requirements, zero-downtime deployments, and the ability to roll back instantly if issues arise.</p>
+<h2>The Telecommunications Challenge</h2>
+<h3>Why Telecom CI/CD is Different</h3>
+<p>Telecommunications infrastructure operates under constraints that typical web applications don't face:</p>
+<p><strong>99.99% Uptime Requirements</strong>: Downtime directly impacts emergency services and revenue
+<strong>Regulatory Compliance</strong>: Strict audit trails and change management processes
+<strong>Complex Integration</strong>: Multiple network protocols and external system dependencies
+<strong>Security Critical</strong>: Potential targets for nation-state actors and cybercriminals
+<strong>Performance Sensitive</strong>: Millisecond latencies affect call quality and user experience</p>
+<h3>The Legacy Problem</h3>
+<p>Our starting point was a manual deployment process that had served us well but couldn't scale:</p>
+<ul>
+<li>Manual configuration file updates across multiple servers</li>
+<li>SSH-based deployments with custom shell scripts </li>
+<li>No automated testing or validation</li>
+<li>Hours-long deployment windows with service interruptions</li>
+<li>Inconsistent environments between development and production</li>
+<li>Limited rollback capabilities</li>
+</ul>
+<h2>Pipeline Architecture Design</h2>
+<h3>Core Principles</h3>
+<p>I established fundamental principles for our CI/CD pipeline:</p>
+<p><strong>1. Security First</strong>: Every step authenticated, authorized, and audited
+<strong>2. Fail Fast</strong>: Detect issues as early as possible in the pipeline
+<strong>3. Immutable Artifacts</strong>: No changes after artifact creation
+<strong>4. Environment Parity</strong>: Identical deployments from dev to production
+<strong>5. Automated Testing</strong>: Comprehensive validation at every stage
+<strong>6. Gradual Rollouts</strong>: Blue-green deployments with automatic rollback</p>
+<h3>Pipeline Architecture Overview</h3>
+<div class="codehilite"><pre><span></span><code><span class="n">graph</span><span class="w"> </span><span class="n">TD</span>
+<span class="w"> </span><span class="n">A</span><span class="p">[</span><span class="n">Code</span><span class="w"> </span><span class="n">Commit</span><span class="p">]</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">B</span><span class="p">[</span><span class="n">Security</span><span class="w"> </span><span class="n">Scan</span><span class="p">]</span>
+<span class="w"> </span><span class="n">B</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">C</span><span class="p">[</span><span class="n">Unit</span><span class="w"> </span><span class="n">Tests</span><span class="p">]</span>
+<span class="w"> </span><span class="n">C</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">D</span><span class="p">[</span><span class="n">Build</span><span class="w"> </span><span class="n">Containers</span><span class="p">]</span><span class="w"> </span>
+<span class="w"> </span><span class="n">D</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">E</span><span class="p">[</span><span class="n">Integration</span><span class="w"> </span><span class="n">Tests</span><span class="p">]</span>
+<span class="w"> </span><span class="n">E</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">F</span><span class="p">[</span><span class="n">Security</span><span class="w"> </span><span class="n">Scanning</span><span class="p">]</span>
+<span class="w"> </span><span class="n">F</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">G</span><span class="p">[</span><span class="n">Deploy</span><span class="w"> </span><span class="n">to</span><span class="w"> </span><span class="n">Staging</span><span class="p">]</span>
+<span class="w"> </span><span class="n">G</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">H</span><span class="p">[</span><span class="n">End</span><span class="o">-</span><span class="n">to</span><span class="o">-</span><span class="n">End</span><span class="w"> </span><span class="n">Tests</span><span class="p">]</span>
+<span class="w"> </span><span class="n">H</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">I</span><span class="p">[</span><span class="n">Performance</span><span class="w"> </span><span class="n">Tests</span><span class="p">]</span>
+<span class="w"> </span><span class="n">I</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">J</span><span class="p">[</span><span class="n">Blue</span><span class="o">-</span><span class="n">Green</span><span class="w"> </span><span class="n">Production</span><span class="p">]</span>
+<span class="w"> </span><span class="n">J</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">K</span><span class="p">[</span><span class="n">Health</span><span class="w"> </span><span class="n">Monitoring</span><span class="p">]</span>
+<span class="w"> </span><span class="n">K</span><span class="w"> </span><span class="o">--&gt;</span><span class="w"> </span><span class="n">L</span><span class="p">[</span><span class="n">Rollback</span><span class="w"> </span><span class="k">if</span><span class="w"> </span><span class="n">Issues</span><span class="p">]</span>
+</code></pre></div> <h2>Jenkins Pipeline Implementation</h2>
+<h3>Multi-Stage Pipeline Structure</h3>
+<p>I implemented a comprehensive Jenkins pipeline using declarative syntax for maintainability:</p>
+<div class="codehilite"><pre><span></span><code><span class="c1">// Jenkinsfile</span>
+<span class="n">pipeline</span><span class="w"> </span><span class="o">{</span>
+<span class="w"> </span><span class="n">agent</span><span class="w"> </span><span class="n">none</span> <span class="w"> </span><span class="n">environment</span><span class="w"> </span><span class="o">{</span>
+<span class="w"> </span><span class="n">DOCKER_REGISTRY</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;registry.company.com&quot;</span>
+<span class="w"> </span><span class="n">IMAGE_TAG</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;${BUILD_NUMBER}-${GIT_COMMIT.substring(0,8)}&quot;</span>
+<span class="w"> </span><span class="n">SECURITY_SCAN_THRESHOLD</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;HIGH&quot;</span>
+<span class="w"> </span><span class="o">}</span> <span class="w"> </span><span class="n">stages</span><span class="w"> </span><span class="o">{</span>
+<span class="w"> </span><span class="n">stage</span><span class="o">(</span><span class="s1">&#39;Parallel Security &amp; Build&#39;</span><span class="o">)</span><span class="w"> </span><span class="o">{</span>
+<span class="w"> </span><span class="n">parallel</span><span class="w"> </span><span class="o">{</span>
+<span class="w"> </span><span class="n">stage</span><span class="o">(</span><span class="s1">&#39;Security Scanning&#39;</span><span class="o">)</span><span class="w"> </span><span class="o">{</span>
+<span class="w"> </span><span class="n">agent</span><span class="w"> </span><span class="o">{</span><span class="w"> </span><span class="n">label</span><span class="w"> </span><span class="s1">&#39;security-scanner&#39;</span><span class="w"> </span><span class="o">}</span>
+<span class="w"> </span><span class="n">steps</span><span class="w"> </span><span class="o">{</span>
+<span class="w"> </span><span class="n">script</span><span class="w"> </span><span class="o">{</span>
+<span class="w"> </span><span class="n">securityScan</span><span class="o">()</span>
+<span class="w"> </span><span class="o">}</span>
+<span class="w"> </span><span class="o">}</span>
+<span class="w"> </span><span class="o">}</span> <span class="w"> </span><span class="n">stage</span><span class="o">(</span><span class="s1">&#39;Build Preparation&#39;</span><span class="o">)</span><span class="w"> </span><span class="o">{</span>
+<span class="w"> </span><span class="n">agent</span><span class="w"> </span><span class="o">{</span><span class="w"> </span><span class="n">label</span><span class="w"> </span><span class="s1">&#39;docker-builder&#39;</span><span class="w"> </span><span class="o">}</span>
+<span class="w"> </span><span class="n">steps</span><span class="w"> </span><span class="o">{</span>
+<span class="w"> </span><span class="n">checkout</span><span class="w"> </span><span class="n">scm</span>
+<span class="w"> </span><span class="n">script</span><span class="w"> </span><span class="o">{</span>
+<span class="w"> </span><span class="n">prepareBuildEnvironment</span><span class="o">()</span>
+<span class="w"> </span><span class="o">}</span>
+<span class="w"> </span><span class="o">}</span>
+<span class="w"> </span><span class="o">}</span>
+<span class="w"> </span><span class="o">}</span>
+<span class="w"> </span><span class="o">}</span> <span class="w"> </span><span class="n">stage</span><span class="o">(</span><span class="s1">&#39;Container Build&#39;</span><span class="o">)</span><span class="w"> </span><span class="o">{</span>
+<span class="w"> </span><span class="n">agent</span><span class="w"> </span><span class="o">{</span><span class="w"> </span><span class="n">label</span><span class="w"> </span><span class="s1">&#39;docker-builder&#39;</span><span class="w"> </span><span class="o">}</span>
+<span class="w"> </span><span class="n">steps</span><span class="w"> </span><span class="o">{</span>
+<span class="w"> </span><span class="n">script</span><span class="w"> </span><span class="o">{</span>
+<span class="w"> </span><span class="n">buildAllContainers</span><span class="o">()</span>
+<span class="w"> </span><span class="o">}</span>
+<span class="w"> </span><span class="o">}</span>
+<span class="w"> </span><span class="o">}</span> <span class="w"> </span><span class="n">stage</span><span class="o">(</span><span class="s1">&#39;Testing Suite&#39;</span><span class="o">)</span><span class="w"> </span><span class="o">{</span>
+<span class="w"> </span><span class="n">parallel</span><span class="w"> </span><span class="o">{</span>
+<span class="w"> </span><span class="n">stage</span><span class="o">(</span><span class="s1">&#39;Unit Tests&#39;</span><span class="o">)</span><span class="w"> </span><span class="o">{</span>
+<span class="w"> </span><span class="n">agent</span><span class="w"> </span><span class="o">{</span><span class="w"> </span><span class="n">label</span><span class="w"> </span><span class="s1">&#39;test-runner&#39;</span><span class="w"> </span><span class="o">}</span>
+<span class="w"> </span><span class="n">steps</span><span class="w"> </span><span class="o">{</span><span class="w"> </span><span class="n">runUnitTests</span><span class="o">()</span><span class="w"> </span><span class="o">}</span>
+<span class="w"> </span><span class="o">}</span> <span class="w"> </span><span class="n">stage</span><span class="o">(</span><span class="s1">&#39;Integration Tests&#39;</span><span class="o">)</span><span class="w"> </span><span class="o">{</span>
+<span class="w"> </span><span class="n">agent</span><span class="w"> </span><span class="o">{</span><span class="w"> </span><span class="n">label</span><span class="w"> </span><span class="s1">&#39;integration-test&#39;</span><span class="w"> </span><span class="o">}</span>
+<span class="w"> </span><span class="n">steps</span><span class="w"> </span><span class="o">{</span><span class="w"> </span><span class="n">runIntegrationTests</span><span class="o">()</span><span class="w"> </span><span class="o">}</span>
+<span class="w"> </span><span class="o">}</span> <span class="w"> </span><span class="n">stage</span><span class="o">(</span><span class="s1">&#39;Security Container Scan&#39;</span><span class="o">)</span><span class="w"> </span><span class="o">{</span>
+<span class="w"> </span><span class="n">agent</span><span class="w"> </span><span class="o">{</span><span class="w"> </span><span class="n">label</span><span class="w"> </span><span class="s1">&#39;security-scanner&#39;</span><span class="w"> </span><span class="o">}</span>
+<span class="w"> </span><span class="n">steps</span><span class="w"> </span><span class="o">{</span><span class="w"> </span><span class="n">scanContainerImages</span><span class="o">()</span><span class="w"> </span><span class="o">}</span>
+<span class="w"> </span><span class="o">}</span>
+<span class="w"> </span><span class="o">}</span>
+<span class="w"> </span><span class="o">}</span> <span class="w"> </span><span class="n">stage</span><span class="o">(</span><span class="s1">&#39;Staging Deployment&#39;</span><span class="o">)</span><span class="w"> </span><span class="o">{</span>
+<span class="w"> </span><span class="n">agent</span><span class="w"> </span><span class="o">{</span><span class="w"> </span><span class="n">label</span><span class="w"> </span><span class="s1">&#39;deploy-staging&#39;</span><span class="w"> </span><span class="o">}</span>
+<span class="w"> </span><span class="n">steps</span><span class="w"> </span><span class="o">{</span>
+<span class="w"> </span><span class="n">script</span><span class="w"> </span><span class="o">{</span>
+<span class="w"> </span><span class="n">deployToStaging</span><span class="o">()</span>
+<span class="w"> </span><span class="n">runStagingTests</span><span class="o">()</span>
+<span class="w"> </span><span class="o">}</span>
+<span class="w"> </span><span class="o">}</span>
+<span class="w"> </span><span class="o">}</span> <span class="w"> </span><span class="n">stage</span><span class="o">(</span><span class="s1">&#39;Production Deployment&#39;</span><span class="o">)</span><span class="w"> </span><span class="o">{</span>
+<span class="w"> </span><span class="n">when</span><span class="w"> </span><span class="o">{</span>
+<span class="w"> </span><span class="n">allOf</span><span class="w"> </span><span class="o">{</span>
+<span class="w"> </span><span class="n">branch</span><span class="w"> </span><span class="s1">&#39;main&#39;</span>
+<span class="w"> </span><span class="n">expression</span><span class="w"> </span><span class="o">{</span><span class="w"> </span><span class="n">currentBuild</span><span class="o">.</span><span class="na">result</span><span class="w"> </span><span class="o">!=</span><span class="w"> </span><span class="s1">&#39;FAILURE&#39;</span><span class="w"> </span><span class="o">}</span>
+<span class="w"> </span><span class="o">}</span>
+<span class="w"> </span><span class="o">}</span>
+<span class="w"> </span><span class="n">agent</span><span class="w"> </span><span class="o">{</span><span class="w"> </span><span class="n">label</span><span class="w"> </span><span class="s1">&#39;deploy-production&#39;</span><span class="w"> </span><span class="o">}</span>
+<span class="w"> </span><span class="n">steps</span><span class="w"> </span><span class="o">{</span>
+<span class="w"> </span><span class="n">script</span><span class="w"> </span><span class="o">{</span>
+<span class="w"> </span><span class="n">deployToProduction</span><span class="o">()</span>
+<span class="w"> </span><span class="o">}</span>
+<span class="w"> </span><span class="o">}</span>
+<span class="w"> </span><span class="n">post</span><span class="w"> </span><span class="o">{</span>
+<span class="w"> </span><span class="n">failure</span><span class="w"> </span><span class="o">{</span>
+<span class="w"> </span><span class="n">script</span><span class="w"> </span><span class="o">{</span>
+<span class="w"> </span><span class="n">rollbackProduction</span><span class="o">()</span>
+<span class="w"> </span><span class="o">}</span>
+<span class="w"> </span><span class="o">}</span>
+<span class="w"> </span><span class="o">}</span>
+<span class="w"> </span><span class="o">}</span>
+<span class="w"> </span><span class="o">}</span> <span class="w"> </span><span class="n">post</span><span class="w"> </span><span class="o">{</span>
+<span class="w"> </span><span class="n">always</span><span class="w"> </span><span class="o">{</span>
+<span class="w"> </span><span class="n">cleanupWorkspace</span><span class="o">()</span>
+<span class="w"> </span><span class="o">}</span>
+<span class="w"> </span><span class="n">failure</span><span class="w"> </span><span class="o">{</span>
+<span class="w"> </span><span class="n">notifyTeam</span><span class="o">(</span><span class="s1">&#39;FAILURE&#39;</span><span class="o">)</span>
+<span class="w"> </span><span class="o">}</span>
+<span class="w"> </span><span class="n">success</span><span class="w"> </span><span class="o">{</span>
+<span class="w"> </span><span class="n">notifyTeam</span><span class="o">(</span><span class="s1">&#39;SUCCESS&#39;</span><span class="o">)</span>
+<span class="w"> </span><span class="o">}</span>
+<span class="w"> </span><span class="o">}</span>
+<span class="o">}</span>
+</code></pre></div> <h3>Security Integration</h3>
+<p>Security scanning was integrated at multiple pipeline stages:</p>
+<div class="codehilite"><pre><span></span><code><span class="kt">def</span><span class="w"> </span><span class="nf">securityScan</span><span class="o">()</span><span class="w"> </span><span class="o">{</span>
+<span class="w"> </span><span class="c1">// Source code security scanning</span>
+<span class="w"> </span><span class="n">sh</span><span class="w"> </span><span class="s2">&quot;&quot;&quot;</span>
+<span class="s2"> # SAST scanning with SonarQube</span>
+<span class="s2"> sonar-scanner \</span>
+<span class="s2"> -Dsonar.projectKey=ims-cscf \</span>
+<span class="s2"> -Dsonar.sources=. \</span>
+<span class="s2"> -Dsonar.host.url=${SONAR_URL} \</span>
+<span class="s2"> -Dsonar.login=${SONAR_TOKEN}</span>
+<span class="s2"> &quot;&quot;&quot;</span> <span class="w"> </span><span class="c1">// Dependency vulnerability scanning</span>
+<span class="w"> </span><span class="n">sh</span><span class="w"> </span><span class="s2">&quot;&quot;&quot;</span>
+<span class="s2"> # Check for known vulnerabilities in dependencies</span>
+<span class="s2"> safety check --json --output vulnerabilities.json</span> <span class="s2"> # Fail build if high severity vulnerabilities found</span>
+<span class="s2"> python3 check_vulnerabilities.py --threshold ${SECURITY_SCAN_THRESHOLD}</span>
+<span class="s2"> &quot;&quot;&quot;</span> <span class="w"> </span><span class="c1">// License compliance checking</span>
+<span class="w"> </span><span class="n">sh</span><span class="w"> </span><span class="s2">&quot;&quot;&quot;</span>
+<span class="s2"> # Ensure all dependencies have compatible licenses</span>
+<span class="s2"> pip-licenses --format=json --output-file licenses.json</span>
+<span class="s2"> python3 validate_licenses.py</span>
+<span class="s2"> &quot;&quot;&quot;</span>
+<span class="o">}</span> <span class="kt">def</span><span class="w"> </span><span class="nf">scanContainerImages</span><span class="o">()</span><span class="w"> </span><span class="o">{</span>
+<span class="w"> </span><span class="c1">// Container image security scanning with Trivy</span>
+<span class="w"> </span><span class="n">sh</span><span class="w"> </span><span class="s2">&quot;&quot;&quot;</span>
+<span class="s2"> for image in ims dns mysql; do</span>
+<span class="s2"> trivy image --severity HIGH,CRITICAL \</span>
+<span class="s2"> --format json \</span>
+<span class="s2"> --output \${image}-scan.json \</span>
+<span class="s2"> ${DOCKER_REGISTRY}/ims-\${image}:${IMAGE_TAG}</span> <span class="s2"> # Fail if critical vulnerabilities found</span>
+<span class="s2"> if [ \$(jq &#39;.Results[].Vulnerabilities | length&#39; \${image}-scan.json) -gt 0 ]; then</span>
+<span class="s2"> echo &quot;Critical vulnerabilities found in \${image} image&quot;</span>
+<span class="s2"> exit 1</span>
+<span class="s2"> fi</span>
+<span class="s2"> done</span>
+<span class="s2"> &quot;&quot;&quot;</span>
+<span class="o">}</span>
+</code></pre></div> <h2>Container Build Optimization</h2>
+<h3>Multi-Service Build Strategy</h3>
+<p>I implemented an efficient build strategy for our microservices architecture:</p>
+<div class="codehilite"><pre><span></span><code><span class="kt">def</span><span class="w"> </span><span class="nf">buildAllContainers</span><span class="o">()</span><span class="w"> </span><span class="o">{</span>
+<span class="w"> </span><span class="c1">// Parallel container builds to optimize pipeline time</span>
+<span class="w"> </span><span class="n">parallel</span><span class="w"> </span><span class="o">{</span>
+<span class="w"> </span><span class="s1">&#39;ims-container&#39;</span><span class="o">:</span><span class="w"> </span><span class="o">{</span>
+<span class="w"> </span><span class="n">buildContainer</span><span class="o">(</span><span class="s1">&#39;ims&#39;</span><span class="o">,</span><span class="w"> </span><span class="s1">&#39;./ims&#39;</span><span class="o">)</span>
+<span class="w"> </span><span class="o">},</span>
+<span class="w"> </span><span class="s1">&#39;dns-container&#39;</span><span class="o">:</span><span class="w"> </span><span class="o">{</span>
+<span class="w"> </span><span class="n">buildContainer</span><span class="o">(</span><span class="s1">&#39;dns&#39;</span><span class="o">,</span><span class="w"> </span><span class="s1">&#39;./dns&#39;</span><span class="o">)</span><span class="w"> </span>
+<span class="w"> </span><span class="o">},</span>
+<span class="w"> </span><span class="s1">&#39;mysql-container&#39;</span><span class="o">:</span><span class="w"> </span><span class="o">{</span>
+<span class="w"> </span><span class="n">buildContainer</span><span class="o">(</span><span class="s1">&#39;mysql&#39;</span><span class="o">,</span><span class="w"> </span><span class="s1">&#39;./mysql&#39;</span><span class="o">)</span>
+<span class="w"> </span><span class="o">}</span>
+<span class="w"> </span><span class="o">}</span>
+<span class="o">}</span> <span class="kt">def</span><span class="w"> </span><span class="nf">buildContainer</span><span class="o">(</span><span class="n">String</span><span class="w"> </span><span class="n">serviceName</span><span class="o">,</span><span class="w"> </span><span class="n">String</span><span class="w"> </span><span class="n">contextPath</span><span class="o">)</span><span class="w"> </span><span class="o">{</span>
+<span class="w"> </span><span class="n">sh</span><span class="w"> </span><span class="s2">&quot;&quot;&quot;</span>
+<span class="s2"> # Build with consistent tagging strategy</span>
+<span class="s2"> docker build \</span>
+<span class="s2"> --build-arg BUILD_NUMBER=${BUILD_NUMBER} \</span>
+<span class="s2"> --build-arg GIT_COMMIT=${GIT_COMMIT} \</span>
+<span class="s2"> --build-arg BUILD_DATE=\$(date -u +&#39;%Y-%m-%dT%H:%M:%SZ&#39;) \</span>
+<span class="s2"> --tag ${DOCKER_REGISTRY}/ims-${serviceName}:${IMAGE_TAG} \</span>
+<span class="s2"> --tag ${DOCKER_REGISTRY}/ims-${serviceName}:latest \</span>
+<span class="s2"> ${contextPath}</span> <span class="s2"> # Push to registry</span>
+<span class="s2"> docker push ${DOCKER_REGISTRY}/ims-${serviceName}:${IMAGE_TAG}</span>
+<span class="s2"> docker push ${DOCKER_REGISTRY}/ims-${serviceName}:latest</span>
+<span class="s2"> &quot;&quot;&quot;</span> <span class="w"> </span><span class="c1">// Scan image immediately after build</span>
+<span class="w"> </span><span class="n">sh</span><span class="w"> </span><span class="s2">&quot;&quot;&quot;</span>
+<span class="s2"> docker run --rm -v /var/run/docker.sock:/var/run/docker.sock \</span>
+<span class="s2"> aquasec/trivy:latest image \</span>
+<span class="s2"> --severity HIGH,CRITICAL \</span>
+<span class="s2"> ${DOCKER_REGISTRY}/ims-${serviceName}:${IMAGE_TAG}</span>
+<span class="s2"> &quot;&quot;&quot;</span>
+<span class="o">}</span>
+</code></pre></div> <h3>Build Caching and Optimization</h3>
+<div class="codehilite"><pre><span></span><code><span class="c"># Optimized Dockerfile with build caching</span>
+<span class="k">FROM</span><span class="w"> </span><span class="s">ubuntu:20.04</span><span class="w"> </span><span class="k">AS</span><span class="w"> </span><span class="s">builder</span> <span class="c"># Cache package lists</span>
+<span class="k">RUN</span><span class="w"> </span>--mount<span class="o">=</span><span class="nv">type</span><span class="o">=</span>cache,target<span class="o">=</span>/var/cache/apt<span class="w"> </span><span class="se">\</span>
+<span class="w"> </span>--mount<span class="o">=</span><span class="nv">type</span><span class="o">=</span>cache,target<span class="o">=</span>/var/lib/apt<span class="w"> </span><span class="se">\</span>
+<span class="w"> </span>apt-get<span class="w"> </span>update<span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span>apt-get<span class="w"> </span>install<span class="w"> </span>-y<span class="w"> </span><span class="se">\</span>
+<span class="w"> </span>build-essential<span class="w"> </span>gcc<span class="w"> </span>make <span class="c"># Cache compiled dependencies </span>
+<span class="k">COPY</span><span class="w"> </span>requirements.txt<span class="w"> </span>/tmp/
+<span class="k">RUN</span><span class="w"> </span>--mount<span class="o">=</span><span class="nv">type</span><span class="o">=</span>cache,target<span class="o">=</span>/root/.cache/pip<span class="w"> </span><span class="se">\</span>
+<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </span>-r<span class="w"> </span>/tmp/requirements.txt <span class="c"># Build application</span>
+<span class="k">COPY</span><span class="w"> </span>src/<span class="w"> </span>/build/
+<span class="k">WORKDIR</span><span class="w"> </span><span class="s">/build</span>
+<span class="k">RUN</span><span class="w"> </span>--mount<span class="o">=</span><span class="nv">type</span><span class="o">=</span>cache,target<span class="o">=</span>/build/cache<span class="w"> </span><span class="se">\</span>
+<span class="w"> </span>make<span class="w"> </span>clean<span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span>make<span class="w"> </span>all <span class="k">FROM</span><span class="w"> </span><span class="s">ubuntu:20.04</span><span class="w"> </span><span class="k">AS</span><span class="w"> </span><span class="s">runtime</span>
+<span class="c"># ... runtime configuration</span>
+</code></pre></div> <h2>Testing Strategy</h2>
+<h3>Comprehensive Test Suite</h3>
+<p>I implemented a multi-layered testing approach:</p>
+<div class="codehilite"><pre><span></span><code><span class="kt">def</span><span class="w"> </span><span class="nf">runUnitTests</span><span class="o">()</span><span class="w"> </span><span class="o">{</span>
+<span class="w"> </span><span class="n">sh</span><span class="w"> </span><span class="s2">&quot;&quot;&quot;</span>
+<span class="s2"> # Unit tests for configuration validation</span>
+<span class="s2"> python3 -m pytest tests/unit/ \</span>
+<span class="s2"> --junitxml=unit-tests.xml \</span>
+<span class="s2"> --cov=src/ \</span>
+<span class="s2"> --cov-report=xml</span> <span class="s2"> # Configuration syntax validation</span>
+<span class="s2"> for config in ims/files/kamailio_*/*.cfg.tpl; do</span>
+<span class="s2"> kamailio -c -f \$config</span>
+<span class="s2"> done</span>
+<span class="s2"> &quot;&quot;&quot;</span> <span class="w"> </span><span class="n">publishTestResults</span><span class="w"> </span><span class="nl">testResultsPattern:</span><span class="w"> </span><span class="s1">&#39;unit-tests.xml&#39;</span>
+<span class="w"> </span><span class="n">publishCoverageResults</span><span class="o">()</span>
+<span class="o">}</span> <span class="kt">def</span><span class="w"> </span><span class="nf">runIntegrationTests</span><span class="o">()</span><span class="w"> </span><span class="o">{</span>
+<span class="w"> </span><span class="n">sh</span><span class="w"> </span><span class="s2">&quot;&quot;&quot;</span>
+<span class="s2"> # Start test environment</span>
+<span class="s2"> docker-compose -f docker-compose.test.yml up -d</span> <span class="s2"> # Wait for services to be ready</span>
+<span class="s2"> timeout 60 bash -c &#39;until docker-compose -f docker-compose.test.yml \</span>
+<span class="s2"> exec icscf kamctl stats &gt;/dev/null 2&gt;&amp;1; do sleep 2; done&#39;</span> <span class="s2"> # Run integration tests</span>
+<span class="s2"> python3 -m pytest tests/integration/ \</span>
+<span class="s2"> --junitxml=integration-tests.xml</span> <span class="s2"> # Cleanup</span>
+<span class="s2"> docker-compose -f docker-compose.test.yml down -v</span>
+<span class="s2"> &quot;&quot;&quot;</span> <span class="w"> </span><span class="n">publishTestResults</span><span class="w"> </span><span class="nl">testResultsPattern:</span><span class="w"> </span><span class="s1">&#39;integration-tests.xml&#39;</span>
+<span class="o">}</span>
+</code></pre></div> <h3>Performance Testing</h3>
+<div class="codehilite"><pre><span></span><code><span class="ch">#!/bin/bash</span>
+<span class="c1"># performance-tests.sh</span> <span class="c1"># SIP call load testing</span>
+sipp<span class="w"> </span>-sn<span class="w"> </span>uac<span class="w"> </span><span class="se">\</span>
+<span class="w"> </span>-s<span class="w"> </span><span class="m">1234567890</span><span class="w"> </span><span class="se">\</span>
+<span class="w"> </span>-d<span class="w"> </span><span class="m">10000</span><span class="w"> </span><span class="se">\</span>
+<span class="w"> </span>-l<span class="w"> </span><span class="m">100</span><span class="w"> </span><span class="se">\</span>
+<span class="w"> </span>-r<span class="w"> </span><span class="m">10</span><span class="w"> </span><span class="se">\</span>
+<span class="w"> </span>-rp<span class="w"> </span><span class="m">1000</span><span class="w"> </span><span class="se">\</span>
+<span class="w"> </span><span class="si">${</span><span class="nv">PCSCF_IP</span><span class="si">}</span>:5060 <span class="c1"># Database performance testing </span>
+sysbench<span class="w"> </span>oltp_read_write<span class="w"> </span><span class="se">\</span>
+<span class="w"> </span>--mysql-host<span class="o">=</span><span class="si">${</span><span class="nv">MYSQL_IP</span><span class="si">}</span><span class="w"> </span><span class="se">\</span>
+<span class="w"> </span>--mysql-port<span class="o">=</span><span class="m">3306</span><span class="w"> </span><span class="se">\</span>
+<span class="w"> </span>--mysql-user<span class="o">=</span><span class="nb">test</span><span class="w"> </span><span class="se">\</span>
+<span class="w"> </span>--mysql-password<span class="o">=</span>&lt;REDACTED&gt;<span class="w"> </span><span class="se">\</span>
+<span class="w"> </span>--mysql-db<span class="o">=</span>icscf<span class="w"> </span><span class="se">\</span>
+<span class="w"> </span>--tables<span class="o">=</span><span class="m">10</span><span class="w"> </span><span class="se">\</span>
+<span class="w"> </span>--table-size<span class="o">=</span><span class="m">10000</span><span class="w"> </span><span class="se">\</span>
+<span class="w"> </span>--threads<span class="o">=</span><span class="m">16</span><span class="w"> </span><span class="se">\</span>
+<span class="w"> </span>--time<span class="o">=</span><span class="m">60</span><span class="w"> </span><span class="se">\</span>
+<span class="w"> </span>run <span class="c1"># Network latency testing</span>
+<span class="k">for</span><span class="w"> </span>service<span class="w"> </span><span class="k">in</span><span class="w"> </span>icscf<span class="w"> </span>pcscf<span class="w"> </span>scscf<span class="p">;</span><span class="w"> </span><span class="k">do</span>
+<span class="w"> </span>curl<span class="w"> </span>-o<span class="w"> </span>/dev/null<span class="w"> </span>-s<span class="w"> </span>-w<span class="w"> </span><span class="s2">&quot;Connect: %{time_connect}s\nTotal: %{time_total}s\n&quot;</span><span class="w"> </span><span class="se">\</span>
+<span class="w"> </span>http://<span class="si">${</span><span class="nv">service</span><span class="si">}</span>:8080/health
+<span class="k">done</span>
+</code></pre></div> <h2>Deployment Strategies</h2>
+<h3>Blue-Green Deployment Implementation</h3>
+<div class="codehilite"><pre><span></span><code><span class="kt">def</span><span class="w"> </span><span class="nf">deployToProduction</span><span class="o">()</span><span class="w"> </span><span class="o">{</span>
+<span class="w"> </span><span class="c1">// Determine current active environment</span>
+<span class="w"> </span><span class="kt">def</span><span class="w"> </span><span class="n">currentEnv</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">getCurrentProductionEnvironment</span><span class="o">()</span>
+<span class="w"> </span><span class="kt">def</span><span class="w"> </span><span class="n">targetEnv</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="o">(</span><span class="n">currentEnv</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="s1">&#39;blue&#39;</span><span class="o">)</span><span class="w"> </span><span class="o">?</span><span class="w"> </span><span class="s1">&#39;green&#39;</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="s1">&#39;blue&#39;</span> <span class="w"> </span><span class="n">echo</span><span class="w"> </span><span class="s2">&quot;Current production: ${currentEnv}, deploying to: ${targetEnv}&quot;</span> <span class="w"> </span><span class="k">try</span><span class="w"> </span><span class="o">{</span>
+<span class="w"> </span><span class="c1">// Deploy to inactive environment</span>
+<span class="w"> </span><span class="n">sh</span><span class="w"> </span><span class="s2">&quot;&quot;&quot;</span>
+<span class="s2"> # Update environment-specific configuration</span>
+<span class="s2"> export TARGET_ENV=${targetEnv}</span>
+<span class="s2"> envsubst &lt; docker-compose.${targetEnv}.yml.tpl &gt; docker-compose.${targetEnv}.yml</span> <span class="s2"> # Deploy new version</span>
+<span class="s2"> docker-compose -f docker-compose.${targetEnv}.yml up -d</span>
+<span class="s2"> &quot;&quot;&quot;</span> <span class="w"> </span><span class="c1">// Health check new environment</span>
+<span class="w"> </span><span class="n">waitForHealthy</span><span class="o">(</span><span class="n">targetEnv</span><span class="o">)</span> <span class="w"> </span><span class="c1">// Run production smoke tests</span>
+<span class="w"> </span><span class="n">runSmokeTests</span><span class="o">(</span><span class="n">targetEnv</span><span class="o">)</span> <span class="w"> </span><span class="c1">// Switch traffic to new environment</span>
+<span class="w"> </span><span class="n">switchTraffic</span><span class="o">(</span><span class="n">targetEnv</span><span class="o">)</span> <span class="w"> </span><span class="c1">// Monitor for issues</span>
+<span class="w"> </span><span class="n">monitorHealth</span><span class="o">(</span><span class="n">targetEnv</span><span class="o">,</span><span class="w"> </span><span class="mi">300</span><span class="o">)</span><span class="w"> </span><span class="c1">// 5 minute monitoring window</span> <span class="w"> </span><span class="c1">// Cleanup old environment if successful</span>
+<span class="w"> </span><span class="n">sh</span><span class="w"> </span><span class="s2">&quot;docker-compose -f docker-compose.${currentEnv}.yml down&quot;</span> <span class="w"> </span><span class="o">}</span><span class="w"> </span><span class="k">catch</span><span class="w"> </span><span class="o">(</span><span class="n">Exception</span><span class="w"> </span><span class="n">e</span><span class="o">)</span><span class="w"> </span><span class="o">{</span>
+<span class="w"> </span><span class="n">echo</span><span class="w"> </span><span class="s2">&quot;Deployment failed: ${e.message}&quot;</span>
+<span class="w"> </span><span class="n">rollbackProduction</span><span class="o">(</span><span class="n">currentEnv</span><span class="o">)</span>
+<span class="w"> </span><span class="k">throw</span><span class="w"> </span><span class="n">e</span>
+<span class="w"> </span><span class="o">}</span>
+<span class="o">}</span> <span class="kt">def</span><span class="w"> </span><span class="nf">waitForHealthy</span><span class="o">(</span><span class="n">String</span><span class="w"> </span><span class="n">environment</span><span class="o">)</span><span class="w"> </span><span class="o">{</span>
+<span class="w"> </span><span class="n">timeout</span><span class="o">(</span><span class="nl">time:</span><span class="w"> </span><span class="mi">10</span><span class="o">,</span><span class="w"> </span><span class="nl">unit:</span><span class="w"> </span><span class="s1">&#39;MINUTES&#39;</span><span class="o">)</span><span class="w"> </span><span class="o">{</span>
+<span class="w"> </span><span class="n">waitUntil</span><span class="w"> </span><span class="o">{</span>
+<span class="w"> </span><span class="n">script</span><span class="w"> </span><span class="o">{</span>
+<span class="w"> </span><span class="kt">def</span><span class="w"> </span><span class="n">result</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">sh</span><span class="o">(</span>
+<span class="w"> </span><span class="nl">script:</span><span class="w"> </span><span class="s2">&quot;docker-compose -f docker-compose.${environment}.yml ps --services | xargs -I {} docker-compose -f docker-compose.${environment}.yml exec {} health-check.sh&quot;</span><span class="o">,</span>
+<span class="w"> </span><span class="nl">returnStatus:</span><span class="w"> </span><span class="kc">true</span>
+<span class="w"> </span><span class="o">)</span>
+<span class="w"> </span><span class="k">return</span><span class="w"> </span><span class="n">result</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="mi">0</span>
+<span class="w"> </span><span class="o">}</span>
+<span class="w"> </span><span class="o">}</span>
+<span class="w"> </span><span class="o">}</span>
+<span class="o">}</span> <span class="kt">def</span><span class="w"> </span><span class="nf">switchTraffic</span><span class="o">(</span><span class="n">String</span><span class="w"> </span><span class="n">targetEnv</span><span class="o">)</span><span class="w"> </span><span class="o">{</span>
+<span class="w"> </span><span class="c1">// Update load balancer configuration</span>
+<span class="w"> </span><span class="n">sh</span><span class="w"> </span><span class="s2">&quot;&quot;&quot;</span>
+<span class="s2"> # Update HAProxy configuration</span>
+<span class="s2"> sed -i &#39;s/server.*:5060/server ${targetEnv} ${targetEnv}-pcscf:5060 check/&#39; /etc/haproxy/haproxy.cfg</span> <span class="s2"> # Gracefully reload HAProxy</span>
+<span class="s2"> systemctl reload haproxy</span> <span class="s2"> # Update DNS records if needed</span>
+<span class="s2"> aws route53 change-resource-record-sets \</span>
+<span class="s2"> --hosted-zone-id ${HOSTED_ZONE_ID} \</span>
+<span class="s2"> --change-batch file://dns-update-${targetEnv}.json</span>
+<span class="s2"> &quot;&quot;&quot;</span>
+<span class="o">}</span>
+</code></pre></div> <h3>Canary Deployment for Risk Mitigation</h3>
+<div class="codehilite"><pre><span></span><code><span class="kt">def</span><span class="w"> </span><span class="nf">canaryDeployment</span><span class="o">()</span><span class="w"> </span><span class="o">{</span>
+<span class="w"> </span><span class="c1">// Deploy to canary environment (10% traffic)</span>
+<span class="w"> </span><span class="n">deployCanary</span><span class="o">()</span> <span class="w"> </span><span class="c1">// Monitor key metrics for 30 minutes</span>
+<span class="w"> </span><span class="kt">def</span><span class="w"> </span><span class="n">metricsOk</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">monitorCanaryMetrics</span><span class="o">(</span><span class="mi">30</span><span class="o">)</span> <span class="w"> </span><span class="k">if</span><span class="w"> </span><span class="o">(</span><span class="n">metricsOk</span><span class="o">)</span><span class="w"> </span><span class="o">{</span>
+<span class="w"> </span><span class="c1">// Gradually increase traffic</span>
+<span class="w"> </span><span class="n">increaseCanaryTraffic</span><span class="o">([</span><span class="mi">25</span><span class="o">,</span><span class="w"> </span><span class="mi">50</span><span class="o">,</span><span class="w"> </span><span class="mi">75</span><span class="o">,</span><span class="w"> </span><span class="mi">100</span><span class="o">])</span>
+<span class="w"> </span><span class="o">}</span><span class="w"> </span><span class="k">else</span><span class="w"> </span><span class="o">{</span>
+<span class="w"> </span><span class="c1">// Rollback canary deployment</span>
+<span class="w"> </span><span class="n">rollbackCanary</span><span class="o">()</span>
+<span class="w"> </span><span class="n">currentBuild</span><span class="o">.</span><span class="na">result</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s1">&#39;FAILURE&#39;</span>
+<span class="w"> </span><span class="o">}</span>
+<span class="o">}</span> <span class="kt">def</span><span class="w"> </span><span class="nf">monitorCanaryMetrics</span><span class="o">(</span><span class="kt">int</span><span class="w"> </span><span class="n">durationMinutes</span><span class="o">)</span><span class="w"> </span><span class="o">{</span>
+<span class="w"> </span><span class="c1">// Monitor critical metrics using Prometheus queries</span>
+<span class="w"> </span><span class="kt">def</span><span class="w"> </span><span class="n">queries</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="o">[</span>
+<span class="w"> </span><span class="s1">&#39;call_success_rate&#39;</span><span class="o">:</span><span class="w"> </span><span class="s1">&#39;rate(sip_calls_successful[5m]) / rate(sip_calls_total[5m])&#39;</span><span class="o">,</span>
+<span class="w"> </span><span class="s1">&#39;response_time_p95&#39;</span><span class="o">:</span><span class="w"> </span><span class="s1">&#39;histogram_quantile(0.95, rate(sip_response_time_bucket[5m]))&#39;</span><span class="o">,</span>
+<span class="w"> </span><span class="s1">&#39;error_rate&#39;</span><span class="o">:</span><span class="w"> </span><span class="s1">&#39;rate(sip_errors_total[5m])&#39;</span>
+<span class="w"> </span><span class="o">]</span> <span class="w"> </span><span class="k">for</span><span class="w"> </span><span class="o">(</span><span class="kt">int</span><span class="w"> </span><span class="n">i</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="o">;</span><span class="w"> </span><span class="n">i</span><span class="w"> </span><span class="o">&lt;</span><span class="w"> </span><span class="n">durationMinutes</span><span class="o">;</span><span class="w"> </span><span class="n">i</span><span class="o">++)</span><span class="w"> </span><span class="o">{</span>
+<span class="w"> </span><span class="n">queries</span><span class="o">.</span><span class="na">each</span><span class="w"> </span><span class="o">{</span><span class="w"> </span><span class="n">metric</span><span class="o">,</span><span class="w"> </span><span class="n">query</span><span class="w"> </span><span class="o">-&gt;</span>
+<span class="w"> </span><span class="kt">def</span><span class="w"> </span><span class="n">value</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">queryPrometheus</span><span class="o">(</span><span class="n">query</span><span class="o">)</span>
+<span class="w"> </span><span class="k">if</span><span class="w"> </span><span class="o">(!</span><span class="n">isMetricHealthy</span><span class="o">(</span><span class="n">metric</span><span class="o">,</span><span class="w"> </span><span class="n">value</span><span class="o">))</span><span class="w"> </span><span class="o">{</span>
+<span class="w"> </span><span class="n">echo</span><span class="w"> </span><span class="s2">&quot;Metric ${metric} failed threshold: ${value}&quot;</span>
+<span class="w"> </span><span class="k">return</span><span class="w"> </span><span class="kc">false</span>
+<span class="w"> </span><span class="o">}</span>
+<span class="w"> </span><span class="o">}</span>
+<span class="w"> </span><span class="n">sleep</span><span class="o">(</span><span class="mi">60</span><span class="o">)</span><span class="w"> </span><span class="c1">// Wait 1 minute between checks</span>
+<span class="w"> </span><span class="o">}</span>
+<span class="w"> </span><span class="k">return</span><span class="w"> </span><span class="kc">true</span>
+<span class="o">}</span>
+</code></pre></div> <h2>Monitoring and Observability</h2>
+<h3>Pipeline Metrics Collection</h3>
+<div class="codehilite"><pre><span></span><code><span class="kt">def</span><span class="w"> </span><span class="nf">collectPipelineMetrics</span><span class="o">()</span><span class="w"> </span><span class="o">{</span>
+<span class="w"> </span><span class="c1">// Collect build metrics</span>
+<span class="w"> </span><span class="kt">def</span><span class="w"> </span><span class="n">buildMetrics</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="o">[</span>
+<span class="w"> </span><span class="nl">build_duration:</span><span class="w"> </span><span class="n">currentBuild</span><span class="o">.</span><span class="na">duration</span><span class="o">,</span>
+<span class="w"> </span><span class="nl">test_count:</span><span class="w"> </span><span class="n">getTestCount</span><span class="o">(),</span>
+<span class="w"> </span><span class="nl">coverage_percentage:</span><span class="w"> </span><span class="n">getCoverage</span><span class="o">(),</span>
+<span class="w"> </span><span class="nl">vulnerability_count:</span><span class="w"> </span><span class="n">getVulnerabilityCount</span><span class="o">(),</span>
+<span class="w"> </span><span class="nl">deployment_success:</span><span class="w"> </span><span class="n">currentBuild</span><span class="o">.</span><span class="na">result</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="s1">&#39;SUCCESS&#39;</span>
+<span class="w"> </span><span class="o">]</span> <span class="w"> </span><span class="c1">// Send metrics to monitoring system</span>
+<span class="w"> </span><span class="n">sh</span><span class="w"> </span><span class="s2">&quot;&quot;&quot;</span>
+<span class="s2"> curl -X POST ${METRICS_ENDPOINT} \</span>
+<span class="s2"> -H &#39;Content-Type: application/json&#39; \</span>
+<span class="s2"> -d &#39;${JsonOutput.toJson(buildMetrics)}&#39;</span>
+<span class="s2"> &quot;&quot;&quot;</span>
+<span class="o">}</span> <span class="kt">def</span><span class="w"> </span><span class="nf">setupApplicationMonitoring</span><span class="o">()</span><span class="w"> </span><span class="o">{</span>
+<span class="w"> </span><span class="c1">// Deploy monitoring stack alongside application</span>
+<span class="w"> </span><span class="n">sh</span><span class="w"> </span><span class="s2">&quot;&quot;&quot;</span>
+<span class="s2"> # Deploy Prometheus configuration</span>
+<span class="s2"> kubectl apply -f monitoring/prometheus-config.yaml</span> <span class="s2"> # Deploy Grafana dashboards</span>
+<span class="s2"> kubectl apply -f monitoring/grafana-dashboards.yaml</span> <span class="s2"> # Configure alerting rules</span>
+<span class="s2"> kubectl apply -f monitoring/alert-rules.yaml</span>
+<span class="s2"> &quot;&quot;&quot;</span>
+<span class="o">}</span>
+</code></pre></div> <h3>Health Monitoring Integration</h3>
+<div class="codehilite"><pre><span></span><code><span class="ch">#!/bin/bash</span>
+<span class="c1"># health-monitor.sh - Continuous health monitoring</span> <span class="nv">SERVICES</span><span class="o">=(</span><span class="s2">&quot;icscf&quot;</span><span class="w"> </span><span class="s2">&quot;pcscf&quot;</span><span class="w"> </span><span class="s2">&quot;scscf&quot;</span><span class="w"> </span><span class="s2">&quot;dns&quot;</span><span class="w"> </span><span class="s2">&quot;mysql&quot;</span><span class="o">)</span>
+<span class="nv">ALERT_WEBHOOK</span><span class="o">=</span><span class="s2">&quot;</span><span class="si">${</span><span class="nv">ALERT_WEBHOOK_URL</span><span class="si">}</span><span class="s2">&quot;</span> <span class="k">while</span><span class="w"> </span>true<span class="p">;</span><span class="w"> </span><span class="k">do</span>
+<span class="w"> </span><span class="k">for</span><span class="w"> </span>service<span class="w"> </span><span class="k">in</span><span class="w"> </span><span class="s2">&quot;</span><span class="si">${</span><span class="nv">SERVICES</span><span class="p">[@]</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">;</span><span class="w"> </span><span class="k">do</span>
+<span class="w"> </span><span class="c1"># Check service health</span>
+<span class="w"> </span><span class="k">if</span><span class="w"> </span>!<span class="w"> </span>docker-compose<span class="w"> </span><span class="nb">exec</span><span class="w"> </span><span class="nv">$service</span><span class="w"> </span>health-check.sh<span class="p">;</span><span class="w"> </span><span class="k">then</span>
+<span class="w"> </span><span class="c1"># Service unhealthy, trigger alert</span>
+<span class="w"> </span>curl<span class="w"> </span>-X<span class="w"> </span>POST<span class="w"> </span><span class="nv">$ALERT_WEBHOOK</span><span class="w"> </span><span class="se">\</span>
+<span class="w"> </span>-H<span class="w"> </span><span class="s1">&#39;Content-Type: application/json&#39;</span><span class="w"> </span><span class="se">\</span>
+<span class="w"> </span>-d<span class="w"> </span><span class="s2">&quot;{\&quot;service\&quot;: \&quot;</span><span class="nv">$service</span><span class="s2">\&quot;, \&quot;status\&quot;: \&quot;unhealthy\&quot;, \&quot;timestamp\&quot;: \&quot;</span><span class="k">$(</span>date<span class="w"> </span>-Iseconds<span class="k">)</span><span class="s2">\&quot;}&quot;</span> <span class="w"> </span><span class="c1"># Attempt automatic recovery</span>
+<span class="w"> </span><span class="nb">echo</span><span class="w"> </span><span class="s2">&quot;Attempting to restart </span><span class="nv">$service</span><span class="s2">...&quot;</span>
+<span class="w"> </span>docker-compose<span class="w"> </span>restart<span class="w"> </span><span class="nv">$service</span> <span class="w"> </span><span class="c1"># Wait for recovery</span>
+<span class="w"> </span>sleep<span class="w"> </span><span class="m">30</span> <span class="w"> </span><span class="c1"># Check if recovery was successful</span>
+<span class="w"> </span><span class="k">if</span><span class="w"> </span>docker-compose<span class="w"> </span><span class="nb">exec</span><span class="w"> </span><span class="nv">$service</span><span class="w"> </span>health-check.sh<span class="p">;</span><span class="w"> </span><span class="k">then</span>
+<span class="w"> </span>curl<span class="w"> </span>-X<span class="w"> </span>POST<span class="w"> </span><span class="nv">$ALERT_WEBHOOK</span><span class="w"> </span><span class="se">\</span>
+<span class="w"> </span>-H<span class="w"> </span><span class="s1">&#39;Content-Type: application/json&#39;</span><span class="w"> </span><span class="se">\</span>
+<span class="w"> </span>-d<span class="w"> </span><span class="s2">&quot;{\&quot;service\&quot;: \&quot;</span><span class="nv">$service</span><span class="s2">\&quot;, \&quot;status\&quot;: \&quot;recovered\&quot;, \&quot;timestamp\&quot;: \&quot;</span><span class="k">$(</span>date<span class="w"> </span>-Iseconds<span class="k">)</span><span class="s2">\&quot;}&quot;</span>
+<span class="w"> </span><span class="k">fi</span>
+<span class="w"> </span><span class="k">fi</span>
+<span class="w"> </span><span class="k">done</span> <span class="w"> </span>sleep<span class="w"> </span><span class="m">60</span><span class="w"> </span><span class="c1"># Check every minute</span>
+<span class="k">done</span>
+</code></pre></div> <h2>Security and Compliance</h2>
+<h3>Secrets Management</h3>
+<div class="codehilite"><pre><span></span><code><span class="n">pipeline</span><span class="w"> </span><span class="o">{</span>
+<span class="w"> </span><span class="n">environment</span><span class="w"> </span><span class="o">{</span>
+<span class="w"> </span><span class="c1">// Use Jenkins credentials binding</span>
+<span class="w"> </span><span class="n">MYSQL_PASSWORD</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">credentials</span><span class="o">(</span><span class="s1">&#39;mysql-production-password&#39;</span><span class="o">)</span>
+<span class="w"> </span><span class="n">TLS_CERTIFICATE</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">credentials</span><span class="o">(</span><span class="s1">&#39;ims-tls-certificate&#39;</span><span class="o">)</span>
+<span class="w"> </span><span class="n">DOCKER_REGISTRY_TOKEN</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">credentials</span><span class="o">(</span><span class="s1">&#39;docker-registry-token&#39;</span><span class="o">)</span>
+<span class="w"> </span><span class="o">}</span> <span class="w"> </span><span class="n">stages</span><span class="w"> </span><span class="o">{</span>
+<span class="w"> </span><span class="n">stage</span><span class="o">(</span><span class="s1">&#39;Deploy&#39;</span><span class="o">)</span><span class="w"> </span><span class="o">{</span>
+<span class="w"> </span><span class="n">steps</span><span class="w"> </span><span class="o">{</span>
+<span class="w"> </span><span class="n">withCredentials</span><span class="o">([</span>
+<span class="w"> </span><span class="n">usernamePassword</span><span class="o">(</span><span class="nl">credentialsId:</span><span class="w"> </span><span class="s1">&#39;mysql-credentials&#39;</span><span class="o">,</span><span class="w"> </span>
+<span class="w"> </span><span class="nl">usernameVariable:</span><span class="w"> </span><span class="s1">&#39;DB_USER&#39;</span><span class="o">,</span><span class="w"> </span>
+<span class="w"> </span><span class="nl">passwordVariable:</span><span class="w"> </span><span class="s1">&#39;DB_PASS&#39;</span><span class="o">)</span>
+<span class="w"> </span><span class="o">])</span><span class="w"> </span><span class="o">{</span>
+<span class="w"> </span><span class="n">script</span><span class="w"> </span><span class="o">{</span>
+<span class="w"> </span><span class="c1">// Secrets available as environment variables</span>
+<span class="w"> </span><span class="n">deployWithSecrets</span><span class="o">()</span>
+<span class="w"> </span><span class="o">}</span>
+<span class="w"> </span><span class="o">}</span>
+<span class="w"> </span><span class="o">}</span>
+<span class="w"> </span><span class="o">}</span>
+<span class="w"> </span><span class="o">}</span>
+<span class="o">}</span>
+</code></pre></div> <h3>Audit Trail Implementation</h3>
+<div class="codehilite"><pre><span></span><code><span class="kt">def</span><span class="w"> </span><span class="nf">auditDeployment</span><span class="o">()</span><span class="w"> </span><span class="o">{</span>
+<span class="w"> </span><span class="c1">// Record deployment event</span>
+<span class="w"> </span><span class="kt">def</span><span class="w"> </span><span class="n">auditEvent</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="o">[</span>
+<span class="w"> </span><span class="nl">timestamp:</span><span class="w"> </span><span class="k">new</span><span class="w"> </span><span class="n">Date</span><span class="o">().</span><span class="na">format</span><span class="o">(</span><span class="s2">&quot;yyyy-MM-dd&#39;T&#39;HH:mm:ss&#39;Z&#39;&quot;</span><span class="o">),</span>
+<span class="w"> </span><span class="nl">user:</span><span class="w"> </span><span class="n">env</span><span class="o">.</span><span class="na">BUILD_USER_ID</span><span class="w"> </span><span class="o">?:</span><span class="w"> </span><span class="s1">&#39;system&#39;</span><span class="o">,</span>
+<span class="w"> </span><span class="nl">action:</span><span class="w"> </span><span class="s1">&#39;deployment&#39;</span><span class="o">,</span>
+<span class="w"> </span><span class="nl">environment:</span><span class="w"> </span><span class="n">env</span><span class="o">.</span><span class="na">DEPLOY_ENVIRONMENT</span><span class="o">,</span>
+<span class="w"> </span><span class="nl">version:</span><span class="w"> </span><span class="n">env</span><span class="o">.</span><span class="na">IMAGE_TAG</span><span class="o">,</span>
+<span class="w"> </span><span class="nl">commit:</span><span class="w"> </span><span class="n">env</span><span class="o">.</span><span class="na">GIT_COMMIT</span><span class="o">,</span>
+<span class="w"> </span><span class="nl">pipeline_id:</span><span class="w"> </span><span class="n">env</span><span class="o">.</span><span class="na">BUILD_ID</span>
+<span class="w"> </span><span class="o">]</span> <span class="w"> </span><span class="c1">// Store audit record</span>
+<span class="w"> </span><span class="n">sh</span><span class="w"> </span><span class="s2">&quot;&quot;&quot;</span>
+<span class="s2"> echo &#39;${JsonOutput.toJson(auditEvent)}&#39; &gt;&gt; /var/log/deployment-audit.log</span> <span class="s2"> # Also send to centralized audit system</span>
+<span class="s2"> curl -X POST ${AUDIT_SYSTEM_URL} \</span>
+<span class="s2"> -H &#39;Content-Type: application/json&#39; \</span>
+<span class="s2"> -H &#39;Authorization: Bearer &lt;REDACTED&gt;</span>
+<span class="s2"> -d &#39;${JsonOutput.toJson(auditEvent)}&#39;</span>
+<span class="s2"> &quot;&quot;&quot;</span>
+<span class="o">}</span>
+</code></pre></div> <h2>Environment Management</h2>
+<h3>Configuration as Code</h3>
+<div class="codehilite"><pre><span></span><code><span class="c1"># environments/production.yml</span>
+<span class="nt">environments</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">production</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">replicas</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">icscf</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">3</span>
+<span class="w"> </span><span class="nt">pcscf</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">5</span>
+<span class="w"> </span><span class="nt">scscf</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">3</span>
+<span class="w"> </span><span class="nt">resources</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">icscf</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">cpu</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;2.0&quot;</span>
+<span class="w"> </span><span class="nt">memory</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;2Gi&quot;</span>
+<span class="w"> </span><span class="nt">pcscf</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">cpu</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;4.0&quot;</span>
+<span class="w"> </span><span class="nt">memory</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;4Gi&quot;</span>
+<span class="w"> </span><span class="nt">networking</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">subnet</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;10.0.0.0/16&quot;</span>
+<span class="w"> </span><span class="nt">load_balancer</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
+<span class="w"> </span><span class="nt">security</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">tls_enabled</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
+<span class="w"> </span><span class="nt">security_scanning</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
+<span class="w"> </span><span class="nt">monitoring</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">enabled</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
+<span class="w"> </span><span class="nt">retention_days</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">90</span>
+</code></pre></div> <div class="codehilite"><pre><span></span><code><span class="kt">def</span><span class="w"> </span><span class="nf">loadEnvironmentConfig</span><span class="o">(</span><span class="n">String</span><span class="w"> </span><span class="n">environment</span><span class="o">)</span><span class="w"> </span><span class="o">{</span>
+<span class="w"> </span><span class="kt">def</span><span class="w"> </span><span class="n">config</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">readYaml</span><span class="w"> </span><span class="nl">file:</span><span class="w"> </span><span class="s2">&quot;environments/${environment}.yml&quot;</span> <span class="w"> </span><span class="c1">// Set environment variables based on configuration</span>
+<span class="w"> </span><span class="n">config</span><span class="o">.</span><span class="na">environments</span><span class="o">[</span><span class="n">environment</span><span class="o">].</span><span class="na">each</span><span class="w"> </span><span class="o">{</span><span class="w"> </span><span class="n">key</span><span class="o">,</span><span class="w"> </span><span class="n">value</span><span class="w"> </span><span class="o">-&gt;</span>
+<span class="w"> </span><span class="k">if</span><span class="w"> </span><span class="o">(</span><span class="n">value</span><span class="w"> </span><span class="k">instanceof</span><span class="w"> </span><span class="n">Map</span><span class="o">)</span><span class="w"> </span><span class="o">{</span>
+<span class="w"> </span><span class="n">value</span><span class="o">.</span><span class="na">each</span><span class="w"> </span><span class="o">{</span><span class="w"> </span><span class="n">subkey</span><span class="o">,</span><span class="w"> </span><span class="n">subvalue</span><span class="w"> </span><span class="o">-&gt;</span>
+<span class="w"> </span><span class="n">env</span><span class="o">[</span><span class="s2">&quot;${key.toUpperCase()}_${subkey.toUpperCase()}&quot;</span><span class="o">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">subvalue</span><span class="o">.</span><span class="na">toString</span><span class="o">()</span>
+<span class="w"> </span><span class="o">}</span>
+<span class="w"> </span><span class="o">}</span><span class="w"> </span><span class="k">else</span><span class="w"> </span><span class="o">{</span>
+<span class="w"> </span><span class="n">env</span><span class="o">[</span><span class="n">key</span><span class="o">.</span><span class="na">toUpperCase</span><span class="o">()]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">value</span><span class="o">.</span><span class="na">toString</span><span class="o">()</span>
+<span class="w"> </span><span class="o">}</span>
+<span class="w"> </span><span class="o">}</span>
+<span class="o">}</span>
+</code></pre></div> <h2>Performance Optimization</h2>
+<h3>Pipeline Performance Metrics</h3>
+<p><strong>Before Optimization:</strong>
+- Total pipeline time: 45 minutes
+- Test execution: 15 minutes
+- Build time: 20 minutes
+- Deployment time: 10 minutes</p>
+<p><strong>After Optimization:</strong>
+- Total pipeline time: 12 minutes (73% improvement)
+- Test execution: 4 minutes (parallel execution)
+- Build time: 6 minutes (caching and parallel builds)
+- Deployment time: 2 minutes (optimized deployment scripts)</p>
+<h3>Caching Strategy</h3>
+<div class="codehilite"><pre><span></span><code><span class="n">pipeline</span><span class="w"> </span><span class="o">{</span>
+<span class="w"> </span><span class="n">options</span><span class="w"> </span><span class="o">{</span>
+<span class="w"> </span><span class="c1">// Build caching</span>
+<span class="w"> </span><span class="n">buildDiscarder</span><span class="o">(</span><span class="n">logRotator</span><span class="o">(</span><span class="nl">numToKeepStr:</span><span class="w"> </span><span class="s1">&#39;50&#39;</span><span class="o">))</span> <span class="w"> </span><span class="c1">// Workspace caching</span>
+<span class="w"> </span><span class="n">skipStagesAfterUnstable</span><span class="o">()</span> <span class="w"> </span><span class="c1">// Artifact caching</span>
+<span class="w"> </span><span class="n">artifactNumToKeep</span><span class="o">(</span><span class="mi">10</span><span class="o">)</span>
+<span class="w"> </span><span class="o">}</span> <span class="w"> </span><span class="n">stages</span><span class="w"> </span><span class="o">{</span>
+<span class="w"> </span><span class="n">stage</span><span class="o">(</span><span class="s1">&#39;Build&#39;</span><span class="o">)</span><span class="w"> </span><span class="o">{</span>
+<span class="w"> </span><span class="n">steps</span><span class="w"> </span><span class="o">{</span>
+<span class="w"> </span><span class="c1">// Docker layer caching</span>
+<span class="w"> </span><span class="n">sh</span><span class="w"> </span><span class="s1">&#39;&#39;&#39;</span>
+<span class="s1"> # Enable Docker BuildKit for better caching</span>
+<span class="s1"> export DOCKER_BUILDKIT=1</span> <span class="s1"> # Use cache from previous builds</span>
+<span class="s1"> docker build \</span>
+<span class="s1"> --cache-from ${DOCKER_REGISTRY}/ims-build-cache:latest \</span>
+<span class="s1"> --build-arg BUILDKIT_INLINE_CACHE=1 \</span>
+<span class="s1"> -t ${DOCKER_REGISTRY}/ims-build-cache:latest \</span>
+<span class="s1"> .</span>
+<span class="s1"> &#39;&#39;&#39;</span>
+<span class="w"> </span><span class="o">}</span>
+<span class="w"> </span><span class="o">}</span>
+<span class="w"> </span><span class="o">}</span>
+<span class="o">}</span>
+</code></pre></div> <h2>Disaster Recovery and Rollback</h2>
+<h3>Automated Rollback Triggers</h3>
+<div class="codehilite"><pre><span></span><code><span class="kt">def</span><span class="w"> </span><span class="nf">monitorDeployment</span><span class="o">()</span><span class="w"> </span><span class="o">{</span>
+<span class="w"> </span><span class="c1">// Monitor key metrics after deployment</span>
+<span class="w"> </span><span class="kt">def</span><span class="w"> </span><span class="n">monitoringDuration</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">600</span><span class="w"> </span><span class="c1">// 10 minutes</span>
+<span class="w"> </span><span class="kt">def</span><span class="w"> </span><span class="n">checkInterval</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">30</span><span class="w"> </span><span class="c1">// 30 seconds</span>
+<span class="w"> </span><span class="kt">def</span><span class="w"> </span><span class="n">checks</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">monitoringDuration</span><span class="w"> </span><span class="s">/ checkInterval</span> <span class="s"> for (int i = 0; i &lt; checks; i++) {</span>
+<span class="s"> def metrics = collectHealthMetrics()</span> <span class="s"> if (isDeploymentUnhealthy(metrics)) {</span>
+<span class="s"> echo &quot;Unhealthy deployment detected, initiating rollback&quot;</span>
+<span class="s"> rollbackProduction()</span>
+<span class="s"> currentBuild.result = &#39;FAILURE&#39;</span>
+<span class="s"> break</span>
+<span class="s"> }</span> <span class="s"> sleep(checkInterval)</span>
+<span class="s"> }</span>
+<span class="s">}</span> <span class="s">def rollbackProduction() {</span>
+<span class="s"> // Get previous successful deployment</span>
+<span class="s"> def previousVersion = getPreviousSuccessfulVersion()</span> <span class="s"> echo &quot;Rolling back to version: ${previousVersion}&quot;</span> <span class="s"> // Rollback using blue-green switch</span>
+<span class="s"> sh &quot;&quot;&quot;</span>
+<span class="s"> # Switch traffic back to previous environment</span>
+<span class="s"> kubectl patch service ims-gateway \</span>
+<span class="s"> -p &#39;{&quot;spec&quot;:{&quot;selector&quot;:{&quot;version&quot;:&quot;${previousVersion}&quot;}}}&#39;</span> <span class="s"> # Scale down failed deployment</span>
+<span class="s"> kubectl scale deployment ims-current --replicas=0</span> <span class="s"> # Update deployment status</span>
+<span class="s"> kubectl annotate deployment ims-current \</span>
+<span class="s"> rollback.reason=&quot;Health check failed&quot; \</span>
+<span class="s"> rollback.timestamp=&quot;$(date -Iseconds)&quot; \</span>
+<span class="s"> rollback.initiator=&quot;${BUILD_USER_ID}&quot;</span>
+<span class="s"> &quot;&quot;&quot;</span> <span class="s"> /</span><span class="o">/</span><span class="w"> </span><span class="n">Notify</span><span class="w"> </span><span class="n">team</span><span class="w"> </span><span class="n">of</span><span class="w"> </span><span class="n">rollback</span>
+<span class="w"> </span><span class="n">notifyRollback</span><span class="o">(</span><span class="n">previousVersion</span><span class="o">)</span>
+<span class="o">}</span>
+</code></pre></div> <h2>Cost Optimization</h2>
+<h3>Resource Usage Monitoring</h3>
+<div class="codehilite"><pre><span></span><code><span class="kt">def</span><span class="w"> </span><span class="nf">optimizeResources</span><span class="o">()</span><span class="w"> </span><span class="o">{</span>
+<span class="w"> </span><span class="c1">// Analyze resource usage patterns</span>
+<span class="w"> </span><span class="n">sh</span><span class="w"> </span><span class="s2">&quot;&quot;&quot;</span>
+<span class="s2"> # Collect resource metrics</span>
+<span class="s2"> kubectl top pods --containers &gt; resource-usage.txt</span> <span class="s2"> # Generate optimization recommendations</span>
+<span class="s2"> python3 scripts/resource-optimizer.py \</span>
+<span class="s2"> --usage-file resource-usage.txt \</span>
+<span class="s2"> --recommendations-file recommendations.json</span>
+<span class="s2"> &quot;&quot;&quot;</span> <span class="w"> </span><span class="c1">// Apply recommendations if auto-optimization enabled</span>
+<span class="w"> </span><span class="k">if</span><span class="w"> </span><span class="o">(</span><span class="n">env</span><span class="o">.</span><span class="na">AUTO_OPTIMIZE_RESOURCES</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="s1">&#39;true&#39;</span><span class="o">)</span><span class="w"> </span><span class="o">{</span>
+<span class="w"> </span><span class="n">applyResourceOptimizations</span><span class="o">()</span>
+<span class="w"> </span><span class="o">}</span>
+<span class="o">}</span>
+</code></pre></div> <h2>Results and Impact</h2>
+<h3>Pipeline Metrics</h3>
+<p><strong>Reliability Improvements:</strong>
+- Deployment success rate: 85% → 98% (15% improvement)
+- Mean time to recovery: 4 hours → 15 minutes (94% improvement)
+- Failed deployment rollback time: Manual 2+ hours → Automated 2 minutes</p>
+<p><strong>Efficiency Gains:</strong>
+- Developer productivity: 40% increase in deployment frequency
+- Infrastructure costs: 25% reduction through optimized resource usage
+- Security posture: 100% automated vulnerability scanning coverage</p>
+<p><strong>Quality Enhancements:</strong>
+- Code coverage: 65% → 85%
+- Security vulnerabilities: Reduced by 90% through automated scanning
+- Configuration errors: Eliminated through validation and testing</p>
+<h2>Lessons Learned</h2>
+<h3>1. Start with Security</h3>
+<p>Security cannot be an afterthought in telecommunications infrastructure:
+- Integrate security scanning at every pipeline stage
+- Use proper secrets management from day one
+- Implement comprehensive audit trails
+- Regular security training for the team</p>
+<h3>2. Monitoring is Critical</h3>
+<p>You can't improve what you don't measure:
+- Implement comprehensive monitoring from the beginning
+- Set up alerting for both technical and business metrics
+- Create dashboards for different stakeholders
+- Use monitoring data to continuously optimize</p>
+<h3>3. Automation Reduces Risk</h3>
+<p>Manual processes are error-prone and don't scale:
+- Automate everything that can be automated
+- Implement proper rollback mechanisms
+- Use infrastructure as code
+- Test automation itself regularly</p>
+<h3>4. Team Training is Essential</h3>
+<p>Technology is only as good as the team using it:
+- Invest in training team members on new tools and processes
+- Create comprehensive documentation and runbooks
+- Implement proper change management processes
+- Foster a culture of continuous improvement</p>
+<h2>Future Enhancements</h2>
+<h3>Short-term Goals</h3>
+<ol>
+<li><strong>GitOps Implementation</strong>: Move to GitOps model with ArgoCD</li>
+<li><strong>Advanced Testing</strong>: Implement chaos engineering practices</li>
+<li><strong>Multi-Cloud</strong>: Extend pipeline for multi-cloud deployments</li>
+<li><strong>AI/ML Integration</strong>: Predictive failure detection and auto-scaling</li>
+</ol>
+<h3>Long-term Vision</h3>
+<ol>
+<li><strong>Full Automation</strong>: Eliminate all manual deployment processes</li>
+<li><strong>Self-Healing Systems</strong>: Automatic issue detection and resolution</li>
+<li><strong>Predictive Scaling</strong>: AI-driven resource optimization</li>
+<li><strong>Zero-Trust Security</strong>: Enhanced security model integration</li>
+</ol>
+<h2>Conclusion</h2>
+<p>Building a robust CI/CD pipeline for mission-critical telecommunications infrastructure requires careful attention to security, reliability, and performance. The transformation from manual deployments to a fully automated pipeline has delivered significant improvements in deployment speed, reliability, and security posture.</p>
+<p>Key takeaways for organizations embarking on similar journeys:</p>
+<ol>
+<li><strong>Security must be integrated at every step</strong>, not bolted on afterward</li>
+<li><strong>Comprehensive testing and monitoring</strong> are essential for maintaining service quality</li>
+<li><strong>Gradual rollout strategies</strong> minimize risk in production deployments</li>
+<li><strong>Team training and documentation</strong> are crucial for successful adoption</li>
+<li><strong>Continuous optimization</strong> based on metrics drives ongoing improvements</li>
+</ol>
+<p>The CI/CD pipeline we've built serves as a foundation for future innovation while maintaining the reliability that telecommunications services demand. It has positioned our VoLTE infrastructure for rapid, safe evolution in an increasingly competitive market.</p>
+<hr />
+<p><em>This CI/CD implementation has become a template for modernizing other critical telecommunications systems across our organization. The patterns and practices established continue to drive efficiency and reliability improvements throughout our infrastructure portfolio.</em></p></div> <footer><ul class="stats"><li><a href="../index.html">Back to posts</a></li></ul></footer> </article> </div> <section id="sidebar"> <section> <div class="mini-posts"> <header><h3>Recent</h3></header> <ul>
+<li><a href="../posts/project--cicd-automation-blog.html">Automating Critical Infrastructure Monitoring with GitHub Actions: A Telecommunications Case Study</a> <span class=\"published\">DevOps</span></li>
+<li><a href="../posts/project--telecommunications-infrastructure-blog.html">Building Robust Telecommunications Infrastructure: A Deep Dive into MSISDN Management and SIM Provisioning</a> <span class=\"published\">Infra</span></li>
+<li><a href="../posts/project-new--devops-automation-blog.html">DevOps Automation in Telecommunications: Building Resilient Monitoring Workflows with GitHub Actions</a> <span class=\"published\">DevOps</span></li>
+<li><a href="../posts/project-new--prometheus-integration-blog.html">Mastering Prometheus Integration: From Batch Jobs to Production Monitoring</a> <span class=\"published\">Monitoring</span></li>
+<li><a href="../posts/project-new--telecommunications-monitoring-blog.html">Automating Telecommunications Infrastructure Monitoring: A DevOps Approach to MSISDN Stock Management</a> <span class=\"published\">Monitoring</span></li> </ul> </div> </section> <section> <header><h3>About</h3></header> <p>Notes on telecom, infra, and automation.</p> </section> </section> <section id="footer"><p class="copyright">&copy; 2025</p></section> </div> <script src="../assets/js/jquery.min.js"></script> <script src="../assets/js/browser.min.js"></script> <script src="../assets/js/breakpoints.min.js"></script> <script src="../assets/js/util.js"></script> <script src="../assets/js/main.js"></script> </body>
+</html>

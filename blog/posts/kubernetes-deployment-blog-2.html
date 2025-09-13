@@ -1,0 +1,177 @@
+<!DOCTYPE HTML>
+<html> <head> <title>From Kubernetes to CI Pipeline: A Strategic Infrastructure Migration - Future Imperfect</title> <meta charset="utf-8" /> <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no" /> <link rel="stylesheet" href="../assets/css/main.css" /> <link rel="stylesheet" href="../assets/css/codehilite.css" /> </head> <body class="single is-preload"> <div id="wrapper"> <header id="header"> <h1><a href="../index.html">Future Imperfect</a></h1> <nav class="links"></nav> </header> <div id="main"> <article class="post"> <header> <div class="title"><h2>From Kubernetes to CI Pipeline: A Strategic Infrastructure Migration</h2><p>Sometimes the most important architectural decisions are the ones that go against conventional wisdom. This post chronicles a strategic decision to migrate from Kubernetes deployment to CI pipeline-based deployment, the reasoning behind it, and the lessons learned.</p></div> <div class="meta"><span class="published">Containers</span></div> </header> <div class="content markdown"><h1>From Kubernetes to CI Pipeline: A Strategic Infrastructure Migration</h1>
+<h2>Introduction</h2>
+<p>Sometimes the most important architectural decisions are the ones that go against conventional wisdom. This post chronicles a strategic decision to migrate from Kubernetes deployment to CI pipeline-based deployment, the reasoning behind it, and the lessons learned.</p>
+<h2>The Original Setup</h2>
+<p>Our wireless monitoring service initially followed standard microservice deployment patterns:</p>
+<ul>
+<li>Kubernetes pods across multiple datacenters (CH1, DC2)</li>
+<li>Traditional service mesh architecture</li>
+<li>Complex networking and service discovery</li>
+<li>Multi-replica deployments for high availability</li>
+</ul>
+<h2>The Inflection Point</h2>
+<p>During development, several factors made us reconsider our deployment strategy:</p>
+<h3>1. Service Classification Analysis</h3>
+<p>The wireless query exporter was classified as a <strong>non-critical service</strong>:
+- No direct customer impact if temporarily unavailable
+- Monitoring data, not core business logic
+- Recovery time measured in minutes, not seconds</p>
+<h3>2. Operational Complexity</h3>
+<p>Kubernetes deployment introduced unnecessary complexity:
+- Multiple datacenter coordination
+- Network policy management<br />
+- Service mesh overhead
+- Resource allocation across clusters</p>
+<h3>3. Resource Efficiency</h3>
+<p>Multi-replica deployment was overkill:
+- Single replica could handle the workload efficiently
+- Database queries were the bottleneck, not application processing
+- Minimal memory and CPU requirements</p>
+<h2>The Migration Strategy</h2>
+<h3>Phase 1: Infrastructure Assessment</h3>
+<div class="codehilite"><pre><span></span><code><span class="c1"># Before: Multi-cluster deployment</span>
+meta-prod.yml:
+<span class="w"> </span>replicas:<span class="w"> </span><span class="m">2</span>
+<span class="w"> </span>clusters:<span class="w"> </span><span class="o">[</span>ch1,<span class="w"> </span>dc2<span class="o">]</span> <span class="c1"># After: Single datacenter optimization </span>
+meta-prod.yml:
+<span class="w"> </span>replicas:<span class="w"> </span><span class="m">1</span>
+<span class="w"> </span>clusters:<span class="w"> </span><span class="o">[</span>ch1<span class="o">]</span>
+</code></pre></div> <h3>Phase 2: Deployment Pipeline Transition</h3>
+<p>The key commit that changed everything:</p>
+<div class="codehilite"><pre><span></span><code><span class="c1"># Jenkinsfile modification</span>
+<span class="l l-Scalar l-Scalar-Plain">pipeline {</span>
+<span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">agent any</span>
+<span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">stages {</span>
+<span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">stage(&#39;Deploy&#39;) {</span>
+<span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">steps {</span>
+<span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">// Switched from kubectl to CI pipeline deployment</span>
+<span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">sh &#39;deploy-via-pipeline.sh&#39;</span>
+<span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">}</span>
+<span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">}</span>
+<span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">}</span>
+<span class="l l-Scalar l-Scalar-Plain">}</span>
+</code></pre></div> <h3>Phase 3: Secret Management Optimization</h3>
+<p>During migration, we also improved secret management:</p>
+<div class="codehilite"><pre><span></span><code><span class="c1"># Before: Manual secret definitions</span>
+<span class="nt">spec</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">containers</span><span class="p">:</span>
+<span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">app</span>
+<span class="w"> </span><span class="nt">env</span><span class="p">:</span>
+<span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">DB_PASSWORD</span>
+<span class="w"> </span><span class="nt">value</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;hardcoded-value&quot;</span><span class="w"> </span><span class="c1"># Bad practice</span> <span class="c1"># After: Vault integration</span>
+<span class="nt">spec</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">containers</span><span class="p">:</span>
+<span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">app</span>
+<span class="w"> </span><span class="nt">envFrom</span><span class="p">:</span>
+<span class="w"> </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">secretRef</span><span class="p">:</span>
+<span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">wireless-secrets</span><span class="w"> </span><span class="c1"># Vault-managed</span>
+</code></pre></div> <h2>Technical Implementation Details</h2>
+<h3>CI Pipeline Deployment</h3>
+<p>The new deployment strategy uses:
+- <strong>Jenkins pipeline</strong> for orchestration
+- <strong>Docker containers</strong> for consistency
+- <strong>Environment-specific configurations</strong> for flexibility
+- <strong>Health check integration</strong> for reliability</p>
+<h3>Configuration Management</h3>
+<p>Streamlined configuration management:</p>
+<div class="codehilite"><pre><span></span><code><span class="c1"># main.py - Simplified health monitoring</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">HealthQueryExporterScript</span><span class="p">(</span><span class="n">QueryExporterScript</span><span class="p">):</span> <span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">on_application_startup</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">application</span><span class="p">:</span> <span class="n">Application</span><span class="p">):</span> <span class="n">application</span><span class="o">.</span><span class="n">router</span><span class="o">.</span><span class="n">add_get</span><span class="p">(</span><span class="s2">&quot;/health&quot;</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_handle_health</span><span class="p">)</span> <span class="k">await</span> <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="n">on_application_startup</span><span class="p">(</span><span class="n">application</span><span class="p">)</span>
+</code></pre></div> <h3>Monitoring Integration</h3>
+<p>Maintained monitoring capabilities:
+- Prometheus metrics endpoint
+- Health check endpoint
+- Integration with existing alerting systems</p>
+<h2>Results &amp; Impact</h2>
+<h3>1. <strong>Reduced Complexity</strong></h3>
+<ul>
+<li>50% reduction in deployment configuration</li>
+<li>Simplified troubleshooting and debugging</li>
+<li>Faster deployment cycles</li>
+</ul>
+<h3>2. <strong>Improved Reliability</strong></h3>
+<ul>
+<li>Single point of failure, but faster recovery</li>
+<li>Simplified rollback procedures</li>
+<li>Clearer error diagnosis</li>
+</ul>
+<h3>3. <strong>Resource Efficiency</strong></h3>
+<ul>
+<li>50% reduction in resource allocation</li>
+<li>Lower operational overhead</li>
+<li>Simplified capacity planning</li>
+</ul>
+<h3>4. <strong>Operational Benefits</strong></h3>
+<ul>
+<li>Faster deployments (minutes vs. hours)</li>
+<li>Simpler monitoring and alerting</li>
+<li>Reduced team cognitive load</li>
+</ul>
+<h2>When This Strategy Makes Sense</h2>
+<p>This migration strategy works well for:</p>
+<h3>✅ <strong>Good Candidates</strong></h3>
+<ul>
+<li>Non-critical services</li>
+<li>Low-traffic applications</li>
+<li>Monitoring and logging services</li>
+<li>Development and staging environments</li>
+<li>Services with simple scaling requirements</li>
+</ul>
+<h3>❌ <strong>Not Recommended For</strong></h3>
+<ul>
+<li>Customer-facing APIs</li>
+<li>High-availability requirements</li>
+<li>Services requiring auto-scaling</li>
+<li>Complex networking requirements</li>
+<li>Stateful applications requiring coordination</li>
+</ul>
+<h2>Lessons Learned</h2>
+<h3>1. <strong>Right-Size Your Architecture</strong></h3>
+<p>Not every service needs the full complexity of microservice architecture. Match your deployment strategy to your service requirements.</p>
+<h3>2. <strong>Consider Operational Overhead</strong></h3>
+<p>Kubernetes is powerful but comes with operational complexity. For some services, simpler deployment strategies provide better ROI.</p>
+<h3>3. <strong>Security Doesn't Have to Suffer</strong></h3>
+<p>We maintained security best practices (Vault integration, secret management) while simplifying deployment.</p>
+<h3>4. <strong>Monitoring Remains Critical</strong></h3>
+<p>Regardless of deployment strategy, proper monitoring and health checks are essential.</p>
+<h2>Migration Checklist</h2>
+<p>If you're considering a similar migration:</p>
+<ul>
+<li>[ ] <strong>Assess service criticality</strong> - Is high availability required?</li>
+<li>[ ] <strong>Evaluate traffic patterns</strong> - Can a single instance handle the load?</li>
+<li>[ ] <strong>Review dependencies</strong> - Are there complex networking requirements?</li>
+<li>[ ] <strong>Consider team expertise</strong> - What's the operational complexity preference?</li>
+<li>[ ] <strong>Plan rollback strategy</strong> - How quickly can you revert if needed?</li>
+<li>[ ] <strong>Update monitoring</strong> - Ensure observability during transition</li>
+<li>[ ] <strong>Test thoroughly</strong> - Validate behavior in staging first</li>
+</ul>
+<h2>Alternative Approaches</h2>
+<p>Other options we considered:</p>
+<ol>
+<li><strong>Kubernetes with minimal resources</strong> - Stay in K8s but reduce replicas</li>
+<li><strong>Serverless deployment</strong> - Functions for periodic metric collection</li>
+<li><strong>Bare metal deployment</strong> - Direct server deployment</li>
+<li><strong>Hybrid approach</strong> - K8s for prod, CI pipeline for dev/staging</li>
+</ol>
+<h2>Future Considerations</h2>
+<p>This decision isn't permanent. We'll reassess if:
+- Service becomes business-critical
+- Traffic patterns change significantly
+- Team operational preferences evolve
+- Technology landscape shifts</p>
+<h2>Conclusion</h2>
+<p>The migration from Kubernetes to CI pipeline deployment demonstrates that <strong>the best architecture is the one that matches your actual requirements</strong>, not necessarily the most sophisticated one.</p>
+<p>Key takeaways:
+- <strong>Match complexity to requirements</strong> - Don't over-engineer
+- <strong>Consider operational overhead</strong> - Simple can be better
+- <strong>Maintain observability</strong> - Monitoring remains crucial regardless of deployment strategy
+- <strong>Stay flexible</strong> - Architectural decisions can evolve</p>
+<p>Sometimes stepping back from cutting-edge solutions leads to more maintainable, efficient systems. The goal isn't to use the newest technology—it's to solve business problems effectively.</p>
+<hr />
+<p><em>This migration reduced deployment complexity by 50% while maintaining service reliability and improving team velocity. Sometimes the best path forward is intentionally simple.</em></p></div> <footer><ul class="stats"><li><a href="../index.html">Back to posts</a></li></ul></footer> </article> </div> <section id="sidebar"> <section> <div class="mini-posts"> <header><h3>Recent</h3></header> <ul>
+<li><a href="../posts/project--coredns-custom-implementation-blog.html">Building Custom CoreDNS Solutions for Enterprise Infrastructure</a> <span class=\"published\">Infra</span></li>
+<li><a href="../posts/project--docker-infrastructure-blog.html">Containerizing DNS Services: Docker Infrastructure for Enterprise Networks</a> <span class=\"published\">Containers</span></li>
+<li><a href="../posts/project--prometheus-metrics-blog.html">Implementing Prometheus Metrics for DNS Services: A Complete Observability Strategy</a> <span class=\"published\">Monitoring</span></li>
+<li><a href="../posts/project--wireless-infrastructure-blog.html">DNS Infrastructure for Wireless Networks: Building Reliable Services for Private PGW Environments</a> <span class=\"published\">Infra</span></li>
+<li><a href="../posts/project--devops-secrets-management-blog.html">DevOps Security: From Hardcoded Secrets to Vault Integration</a> <span class=\"published\">DevOps</span></li> </ul> </div> </section> <section> <header><h3>About</h3></header> <p>Notes on telecom, infra, and automation.</p> </section> </section> <section id="footer"><p class="copyright">&copy; 2025</p></section> </div> <script src="../assets/js/jquery.min.js"></script> <script src="../assets/js/browser.min.js"></script> <script src="../assets/js/breakpoints.min.js"></script> <script src="../assets/js/util.js"></script> <script src="../assets/js/main.js"></script> </body>
+</html>
